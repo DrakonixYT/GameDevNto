@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.IO;
 using HangarGame.Core;
 using HangarGame.CameraControl;
 using HangarGame.Interaction;
@@ -15,38 +16,73 @@ using HangarGame.Prototype;
 
 namespace HangarGame.EditorTools
 {
+    [InitializeOnLoad]
     public static class HangarSceneGenerator
     {
-        [MenuItem("Pacific Rim / 🚀 1. Сгенерировать сцену 'HangarMainScene'")]
-        public static void GenerateScene()
+        static HangarSceneGenerator()
         {
-            // 1. Создаем новую чистую сцену
-            Scene newScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            // Автоматически запускается при загрузке или компиляции редактора Unity
+            EditorApplication.delayCall += AutoCheckAndBuild;
+        }
 
-            // 2. Создаем PrototypeSceneBuilder и запускаем сборку
+        private static void AutoCheckAndBuild()
+        {
+            string targetPath = "Assets/Scenes/HangarMainScene.unity";
+            if (!File.Exists(targetPath))
+            {
+                Debug.Log("<color=cyan>[HangarSceneGenerator] Первичная авто-генерация сцены 'HangarMainScene.unity'...</color>");
+                GenerateSceneInternal();
+            }
+        }
+
+        [MenuItem("Pacific Rim / 🚀 1. Сгенерировать сцену прямо сюда (Bake)")]
+        public static void BakeIntoCurrentScene()
+        {
+            // Строит прямо в текущей открытой сцене
+            GameObject existingRoot = GameObject.Find("Hangar_Room");
+            if (existingRoot != null)
+            {
+                Object.DestroyImmediate(existingRoot);
+            }
+
             GameObject builderObj = new GameObject("--- SCENE GENERATOR ---");
             PrototypeSceneBuilder builder = builderObj.AddComponent<PrototypeSceneBuilder>();
             builder.BuildCompleteHangarPrototype();
-
-            // Удаляем временный билдер, так как объекты уже созданы в сцене
             Object.DestroyImmediate(builderObj);
 
-            // 3. Создаем папку для сцен если ее нет
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+            Debug.Log("<color=green><b>[Pacific Rim]</b> Все объекты (ангар, робот, верстак, пульт, UI) успешно добавлены в текущую сцену!</color>");
+        }
+
+        [MenuItem("Pacific Rim / 💾 2. Пересоздать файл сцены 'HangarMainScene'")]
+        public static void GenerateSceneMenu()
+        {
+            GenerateSceneInternal();
+        }
+
+        public static void GenerateSceneInternal()
+        {
+            Scene newScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            GameObject builderObj = new GameObject("--- SCENE GENERATOR ---");
+            PrototypeSceneBuilder builder = builderObj.AddComponent<PrototypeSceneBuilder>();
+            builder.BuildCompleteHangarPrototype();
+            Object.DestroyImmediate(builderObj);
+
             if (!AssetDatabase.IsValidFolder("Assets/Scenes"))
             {
                 AssetDatabase.CreateFolder("Assets", "Scenes");
             }
 
-            // 4. Сохраняем сцену
             string scenePath = "Assets/Scenes/HangarMainScene.unity";
             EditorSceneManager.SaveScene(newScene, scenePath);
+            AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log($"<color=green><b>[HangarSceneGenerator] УСПЕХ!</b> Сцена сохранена в {scenePath}. Теперь просто нажми Play!</color>");
-            EditorUtility.DisplayDialog("Генератор сцены", "Сцена HangarMainScene успешно создана и сохранена в Assets/Scenes/!\n\nМожешь сразу нажимать кнопку Play и тестировать!", "Погнали!");
+            Debug.Log($"<color=green><b>[HangarSceneGenerator] УСПЕХ!</b> Сцена сохранена в {scenePath}.</color>");
         }
 
-        [MenuItem("Pacific Rim / 📦 2. Создать тестовые ScriptableObjects")]
+        [MenuItem("Pacific Rim / 📦 3. Создать тестовые ScriptableObjects")]
         public static void CreateDefaultDataAssets()
         {
             if (!AssetDatabase.IsValidFolder("Assets/DataAssets"))
@@ -54,12 +90,10 @@ namespace HangarGame.EditorTools
                 AssetDatabase.CreateFolder("Assets", "DataAssets");
             }
 
-            // 1. Оружие и модули
             CreatePartAsset("Assets/DataAssets/Part_Shield_Bastion.asset", "Тяжелый щит 'Бастион'", PartSlot.LeftArm, DamageType.Physical, DamageType.Physical, 10f, 90f);
             CreatePartAsset("Assets/DataAssets/Part_Plasma_Cannon.asset", "Плазменная пушка 'Сверхновая'", PartSlot.RightArm, DamageType.Plasma, DamageType.Thermal, 70f, 15f);
             CreatePartAsset("Assets/DataAssets/Part_Heavy_Torso.asset", "Бронекорпус МК-IV", PartSlot.Torso, DamageType.Physical, DamageType.Physical, 20f, 100f);
 
-            // 2. Угрозы
             CreateThreatAsset("Assets/DataAssets/Threat_AssaultDrones.asset", "Штурмовые дроны", DamageType.Physical, DamageType.Plasma, 45f, 200, 80);
             CreateThreatAsset("Assets/DataAssets/Threat_FireBeast.asset", "Огненный монстр 'Инферно'", DamageType.Thermal, DamageType.Plasma, 60f, 300, 120);
             CreateThreatAsset("Assets/DataAssets/Threat_GoliathMech.asset", "Вражеский Титан 'Голиаф'", DamageType.Physical, DamageType.Thermal, 80f, 450, 200);
@@ -68,7 +102,6 @@ namespace HangarGame.EditorTools
             AssetDatabase.Refresh();
 
             Debug.Log("<color=cyan>[HangarSceneGenerator] Тестовые ассеты данных созданы в папке Assets/DataAssets/!</color>");
-            EditorUtility.DisplayDialog("Генератор данных", "ScriptableObjects деталей и угроз созданы в папке Assets/DataAssets/!\n\nЭто выполняет критерий 'Высший уровень' (100 баллов) НТО!", "Отлично");
         }
 
         private static void CreatePartAsset(string path, string name, PartSlot slot, DamageType def, DamageType atk, float atkPow, float defPow)
