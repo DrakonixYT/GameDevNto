@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using HangarGame.Interaction;
+using HangarGame.Core;
 
 namespace HangarGame.Repair
 {
@@ -11,7 +12,7 @@ namespace HangarGame.Repair
 
         [Header("Welding Seam")]
         [SerializeField] private int seamPointsCount = 5;
-        [SerializeField] private float seamLength = 0.6f;
+        [SerializeField] private float seamLength = 0.7f;
 
         private List<GameObject> seamNodes = new List<GameObject>();
         private int nodesWelded = 0;
@@ -20,24 +21,31 @@ namespace HangarGame.Repair
 
         public void StartMiniGame(Transform workbenchTable)
         {
+            Vector3 center = workbenchTable != null ? workbenchTable.position + Vector3.up * 0.35f : new Vector3(0f, 1.15f, 2.2f);
+            StartMiniGameAt(center);
+        }
+
+        public void StartMiniGameAt(Vector3 center)
+        {
             Cleanup();
 
             nodesWelded = 0;
-            Vector3 startPos = workbenchTable.position + new Vector3(-seamLength * 0.5f, 0.05f, 0f);
+            Vector3 startPos = center + new Vector3(-seamLength * 0.5f, 0.05f, 0f);
 
             for (int i = 0; i < seamPointsCount; i++)
             {
                 float t = i / (float)(seamPointsCount - 1);
-                Vector3 nodePos = startPos + new Vector3(t * seamLength, 0f, Mathf.Sin(t * Mathf.PI) * 0.08f);
+                Vector3 nodePos = startPos + new Vector3(t * seamLength, 0f, Mathf.Sin(t * Mathf.PI) * 0.1f);
 
                 GameObject nodeObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 nodeObj.name = $"WeldNode_{i + 1}";
                 nodeObj.transform.position = nodePos;
-                nodeObj.transform.localScale = new Vector3(0.06f, 0.03f, 0.06f);
+                // Крупные заметные раскаленные сферы
+                nodeObj.transform.localScale = new Vector3(0.14f, 0.1f, 0.14f);
                 nodeObj.transform.SetParent(transform);
 
                 Renderer rend = nodeObj.GetComponent<Renderer>();
-                rend.material.color = new Color(1f, 0.4f, 0f); // Раскаленный оранжевый шов
+                rend.material.color = new Color(1f, 0.35f, 0f); // Раскаленный оранжевый
 
                 Clickable3DObject clickable = nodeObj.AddComponent<Clickable3DObject>();
                 clickable.onInteract.AddListener(() => OnNodeWelded(nodeObj));
@@ -45,7 +53,7 @@ namespace HangarGame.Repair
                 seamNodes.Add(nodeObj);
             }
 
-            Debug.Log($"[WeldingMiniGame] Заварите трещину брони, пройдясь горелкой по {seamPointsCount} точкам!");
+            Debug.Log($"<color=orange>[WeldingMiniGame]</color> Кликните по {seamPointsCount} раскаленным точкам шва для сварки!");
         }
 
         private void OnNodeWelded(GameObject nodeObj)
@@ -55,12 +63,11 @@ namespace HangarGame.Repair
             Renderer rend = nodeObj.GetComponent<Renderer>();
             if (rend != null)
             {
-                rend.material.color = new Color(0.2f, 0.8f, 1f); // Остывший заваренный металл
+                rend.material.color = new Color(0.2f, 0.85f, 1f); // Заваренный холодный металл
             }
 
-            HangarGame.Core.HangarAudio.Instance?.PlayWeld();
+            HangarAudio.Instance?.PlayWeld();
 
-            // Убираем кликабельность заваренной точки
             Destroy(nodeObj.GetComponent<Clickable3DObject>());
 
             nodesWelded++;
@@ -68,7 +75,7 @@ namespace HangarGame.Repair
 
             if (nodesWelded >= seamPointsCount)
             {
-                Debug.Log("<color=green>[WeldingMiniGame] Сварочный шов герметичен! Прочность восстановлена!</color>");
+                Debug.Log("<color=green>[WeldingMiniGame] Шов заварен!</color>");
                 OnWeldingCompleted?.Invoke();
             }
         }

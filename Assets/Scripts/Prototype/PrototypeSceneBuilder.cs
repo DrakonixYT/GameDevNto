@@ -81,8 +81,8 @@ namespace HangarGame.Prototype
                 GameObject dirLightObj = new GameObject("Directional Light");
                 Light dirLight = dirLightObj.AddComponent<Light>();
                 dirLight.type = LightType.Directional;
-                dirLight.intensity = 1.0f;
-                dirLight.color = new Color(0.9f, 0.95f, 1f);
+                dirLight.intensity = 1.2f;
+                dirLight.color = new Color(0.95f, 0.98f, 1f);
                 dirLightObj.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
             }
         }
@@ -175,13 +175,18 @@ namespace HangarGame.Prototype
             wbObj.transform.position = new Vector3(0f, 0f, 2.2f);
             wbObj.transform.SetParent(parent);
 
-            // Стол
+            // Столешница (верх на Y = 0.8)
             GameObject table = GameObject.CreatePrimitive(PrimitiveType.Cube);
             table.name = "Workbench_Table";
             table.transform.position = new Vector3(0f, 0.7f, 2.2f);
             table.transform.localScale = new Vector3(2.4f, 0.2f, 1.2f);
             table.transform.SetParent(wbObj.transform);
             SetColor(table, new Color(0.25f, 0.27f, 0.3f));
+
+            // Точка крепления детали ровно на поверхности стола
+            GameObject mountObj = new GameObject("Part_Mount_Point");
+            mountObj.transform.position = new Vector3(0f, 0.82f, 2.2f);
+            mountObj.transform.SetParent(wbObj.transform);
 
             // Ножки стола
             for (int x = -1; x <= 1; x += 2)
@@ -197,6 +202,8 @@ namespace HangarGame.Prototype
             }
 
             RepairWorkbench workbench = wbObj.AddComponent<RepairWorkbench>();
+            SetField(typeof(RepairWorkbench), workbench, "partMountPoint", mountObj.transform);
+
             wbObj.AddComponent<BoltMiniGame>();
             wbObj.AddComponent<WeldingMiniGame>();
 
@@ -248,7 +255,7 @@ namespace HangarGame.Prototype
             SetColor(rightArm, new Color(0.85f, 0.2f, 0.2f));
             SetupMechPart(rightArm, "Плазменная Пушка 'Сверхновая'", PartSlot.RightArm, DamageType.Plasma, DamageType.Thermal, 60f, 20f);
 
-            // 5. Ноги
+            // 5. Ноги (аккуратно стоят на полу Y = 0)
             GameObject legLeft = GameObject.CreatePrimitive(PrimitiveType.Cube);
             legLeft.name = "Leg_Left";
             legLeft.transform.position = new Vector3(-0.55f, 1.0f, 5.5f);
@@ -347,67 +354,197 @@ namespace HangarGame.Prototype
             GameObject canvasObj = new GameObject("HUD_Canvas");
             Canvas canvas = canvasObj.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvasObj.AddComponent<CanvasScaler>();
+
+            CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+
             canvasObj.AddComponent<GraphicRaycaster>();
 
-            Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            Font defaultFont = Font.CreateDynamicFontFromOSFont("Arial", 16);
             if (defaultFont == null)
             {
-                defaultFont = Font.CreateDynamicFontFromOSFont("Arial", 16);
+                defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             }
 
-            // HUDManager
+            // HUDManager & DispatchUI
             HUDManager hud = canvasObj.AddComponent<HUDManager>();
             DispatchUI dispatchUI = canvasObj.AddComponent<DispatchUI>();
 
-            // 1. Кнопка "⬅ Диспетчерская (180°)"
-            GameObject btnLeftObj = CreateSimpleButton(canvasObj.transform, "Btn_TurnLeft", "⬅ Диспетчерская (180°)", new Vector2(-Screen.width * 0.38f, -Screen.height * 0.38f), new Vector2(230f, 60f), defaultFont);
-            // 2. Кнопка "➡ Ангар (180°)"
-            GameObject btnRightObj = CreateSimpleButton(canvasObj.transform, "Btn_TurnRight", "➡ Ангар (180°)", new Vector2(Screen.width * 0.38f, -Screen.height * 0.38f), new Vector2(230f, 60f), defaultFont);
+            // 1. Кнопка "◀ 180° [A / Q]" (Прижата к левому краю экрана)
+            GameObject btnLeftObj = CreateAnchoredButton(
+                canvasObj.transform, 
+                "Btn_TurnLeft", 
+                "◀ Диспетчерская\n(180° / A / Q)", 
+                new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), 
+                new Vector2(20f, 0f), new Vector2(180f, 110f), 
+                defaultFont, new Color(0.15f, 0.35f, 0.6f, 0.95f)
+            );
 
-            // 3. Кнопка возврата с верстака
-            GameObject btnExitWb = CreateSimpleButton(canvasObj.transform, "Btn_ExitWorkbench", "❌ Вернуть деталь в Ангар", new Vector2(0f, -Screen.height * 0.38f), new Vector2(260f, 55f), defaultFont);
-            btnExitWb.SetActive(false);
+            // 2. Кнопка "180° ▶ [D / E]" (Прижата к правому краю экрана)
+            GameObject btnRightObj = CreateAnchoredButton(
+                canvasObj.transform, 
+                "Btn_TurnRight", 
+                "Диспетчерская ▶\n(180° / D / E)", 
+                new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), 
+                new Vector2(-20f, 0f), new Vector2(180f, 110f), 
+                defaultFont, new Color(0.15f, 0.35f, 0.6f, 0.95f)
+            );
 
-            // 4. Текст ресурсов
-            GameObject txtResObj = CreateSimpleText(canvasObj.transform, "Txt_Resources", "КРЕДИТЫ: 500 ¢  |  СПЛАВ: 200 т.", new Vector2(0f, Screen.height * 0.42f), new Vector2(500f, 40f), 20, defaultFont, Color.yellow);
+            // 3. Панель Верстака (появляется только в режиме верстака)
+            GameObject wbPanel = new GameObject("Workbench_Panel");
+            wbPanel.transform.SetParent(canvasObj.transform, false);
+            RectTransform wbRect = wbPanel.AddComponent<RectTransform>();
+            wbRect.anchorMin = new Vector2(0.5f, 0f);
+            wbRect.anchorMax = new Vector2(0.5f, 0f);
+            wbRect.pivot = new Vector2(0.5f, 0f);
+            wbRect.anchoredPosition = new Vector2(0f, 25f);
+            wbRect.sizeDelta = new Vector2(650f, 140f);
+
+            Image wbBg = wbPanel.AddComponent<Image>();
+            wbBg.color = new Color(0.1f, 0.12f, 0.16f, 0.92f);
+
+            GameObject txtWbTitle = CreateAnchoredText(
+                wbPanel.transform, "Txt_WbTitle", 
+                "🔧 РЕЖИМ ВЕРСТАКА: Кликайте по болтам/сварке", 
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 
+                new Vector2(0f, -25f), new Vector2(600f, 35f), 
+                18, defaultFont, Color.yellow
+            );
+
+            GameObject btnExitWb = CreateAnchoredButton(
+                wbPanel.transform, "Btn_ExitWorkbench", 
+                "❌ ВЫЙТИ В АНГАР (ESC)", 
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), 
+                new Vector2(-150f, 40f), new Vector2(260f, 60f), 
+                defaultFont, new Color(0.85f, 0.2f, 0.2f, 0.95f)
+            );
+
+            GameObject btnInstant = CreateAnchoredButton(
+                wbPanel.transform, "Btn_InstantRepair", 
+                "⚡ БЫСТРЫЙ РЕМОНТ (ПРОБЕЛ)", 
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), 
+                new Vector2(150f, 40f), new Vector2(260f, 60f), 
+                defaultFont, new Color(0.15f, 0.7f, 0.3f, 0.95f)
+            );
+            wbPanel.SetActive(false);
+
+            // 4. Текст ресурсов (Верхний центр)
+            GameObject txtResObj = CreateAnchoredText(
+                canvasObj.transform, "Txt_Resources", 
+                "КРЕДИТЫ: 500 ¢  |  СПЛАВ: 200 т.", 
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 
+                new Vector2(0f, -30f), new Vector2(600f, 45f), 
+                22, defaultFont, Color.yellow
+            );
 
             // 5. Прогресс сборки Егеря
-            GameObject txtJaegerObj = CreateSimpleText(canvasObj.transform, "Txt_Jaeger", "ПРОЕКТ 'ЕГЕРЬ': 0% (Собрать 100% для победы)", new Vector2(0f, Screen.height * 0.36f), new Vector2(650f, 30f), 16, defaultFont, Color.cyan);
-            GameObject btnJaeger = CreateSimpleButton(canvasObj.transform, "Btn_BuildJaeger", "🔨 Собрать модуль Егеря (+25%) [300¢, 150т]", new Vector2(0f, Screen.height * 0.30f), new Vector2(380f, 45f), defaultFont);
+            GameObject txtJaegerObj = CreateAnchoredText(
+                canvasObj.transform, "Txt_Jaeger", 
+                "ПРОЕКТ 'ЕГЕРЬ': 0% (Собрать 100% для победы)", 
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 
+                new Vector2(0f, -75f), new Vector2(600f, 35f), 
+                16, defaultFont, Color.cyan
+            );
 
-            // 6. Подсказка ховера
-            GameObject txtPromptObj = CreateSimpleText(canvasObj.transform, "Txt_HoverPrompt", "", new Vector2(0f, -Screen.height * 0.28f), new Vector2(700f, 50f), 18, defaultFont, Color.white);
+            GameObject btnJaeger = CreateAnchoredButton(
+                canvasObj.transform, "Btn_BuildJaeger", 
+                "🔨 Собрать модуль Егеря (+25%) [300¢, 150т]", 
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 
+                new Vector2(0f, -125f), new Vector2(400f, 45f), 
+                defaultFont, new Color(0.2f, 0.5f, 0.7f, 0.9f)
+            );
+
+            // 6. Подсказка ховера (Нижний центр)
+            GameObject promptBgObj = new GameObject("Prompt_Box");
+            promptBgObj.transform.SetParent(canvasObj.transform, false);
+            RectTransform pRect = promptBgObj.AddComponent<RectTransform>();
+            pRect.anchorMin = new Vector2(0.5f, 0f);
+            pRect.anchorMax = new Vector2(0.5f, 0f);
+            pRect.pivot = new Vector2(0.5f, 0f);
+            pRect.anchoredPosition = new Vector2(0f, 160f);
+            pRect.sizeDelta = new Vector2(750f, 50f);
+            Image pImg = promptBgObj.AddComponent<Image>();
+            pImg.color = new Color(0f, 0f, 0f, 0.6f);
+
+            GameObject txtPromptObj = CreateAnchoredText(
+                promptBgObj.transform, "Txt_HoverPrompt", 
+                "", 
+                new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0.5f, 0.5f), 
+                Vector2.zero, Vector2.zero, 
+                18, defaultFont, Color.white
+            );
 
             // 7. Карточка активной угрозы (Dispatch)
             GameObject threatCard = new GameObject("ThreatCard");
             threatCard.transform.SetParent(canvasObj.transform, false);
             RectTransform tcRect = threatCard.AddComponent<RectTransform>();
-            tcRect.anchoredPosition = new Vector2(0f, 50f);
-            tcRect.sizeDelta = new Vector2(500f, 180f);
+            tcRect.anchorMin = new Vector2(0.5f, 0.5f);
+            tcRect.anchorMax = new Vector2(0.5f, 0.5f);
+            tcRect.pivot = new Vector2(0.5f, 0.5f);
+            tcRect.anchoredPosition = new Vector2(0f, 40f);
+            tcRect.sizeDelta = new Vector2(550f, 210f);
 
             Image cardBg = threatCard.AddComponent<Image>();
-            cardBg.color = new Color(0.1f, 0.1f, 0.15f, 0.9f);
+            cardBg.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
 
-            GameObject txtThreatName = CreateSimpleText(threatCard.transform, "Txt_ThreatName", "СКАНИРОВАНИЕ СЕКТОРА...", new Vector2(0f, 55f), new Vector2(460f, 35f), 18, defaultFont, Color.red);
-            GameObject txtThreatInfo = CreateSimpleText(threatCard.transform, "Txt_ThreatDetails", "Ожидание сигнатуры врага...", new Vector2(0f, 5f), new Vector2(460f, 60f), 14, defaultFont, Color.white);
-            GameObject btnDeploy = CreateSimpleButton(threatCard.transform, "Btn_Deploy", "⚔ ОТПРАВИТЬ ЕГЕРЯ В БОЙ", new Vector2(0f, -55f), new Vector2(300f, 45f), defaultFont);
+            GameObject txtThreatName = CreateAnchoredText(
+                threatCard.transform, "Txt_ThreatName", 
+                "СКАНИРОВАНИЕ СЕКТОРА...", 
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 
+                new Vector2(0f, -30f), new Vector2(500f, 40f), 
+                20, defaultFont, Color.red
+            );
+
+            GameObject txtThreatInfo = CreateAnchoredText(
+                threatCard.transform, "Txt_ThreatDetails", 
+                "Ожидание сигнатуры врага...", 
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), 
+                new Vector2(0f, 5f), new Vector2(500f, 70f), 
+                16, defaultFont, Color.white
+            );
+
+            GameObject btnDeploy = CreateAnchoredButton(
+                threatCard.transform, "Btn_Deploy", 
+                "⚔ ОТПРАВИТЬ ЕГЕРЯ В БОЙ", 
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), 
+                new Vector2(0f, 35f), new Vector2(340f, 50f), 
+                defaultFont, new Color(0.85f, 0.2f, 0.2f, 0.95f)
+            );
 
             // 8. Лог миссий и тревога адаптации
-            GameObject txtLog = CreateSimpleText(canvasObj.transform, "Txt_MissionLog", "Добро пожаловать на базу, Командир! Чините роботов и сдерживайте атаки.", new Vector2(0f, -Screen.height * 0.20f), new Vector2(800f, 60f), 15, defaultFont, new Color(0.8f, 0.8f, 0.8f));
-            GameObject txtAdapt = CreateSimpleText(canvasObj.transform, "Txt_AdaptationAlert", "", new Vector2(0f, Screen.height * 0.24f), new Vector2(750f, 40f), 16, defaultFont, new Color(1f, 0.5f, 0.2f));
+            GameObject txtLog = CreateAnchoredText(
+                canvasObj.transform, "Txt_MissionLog", 
+                "Добро пожаловать на базу, Командир! Отправляйте роботов в бой и чините повреждения на верстаке.", 
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), 
+                new Vector2(0f, 110f), new Vector2(850f, 50f), 
+                16, defaultFont, new Color(0.85f, 0.85f, 0.85f)
+            );
 
-            // Связываем ссылки в HUDManager и DispatchUI через рефлексию / сериализацию
-            LinkHudFields(hud, btnLeftObj, btnRightObj, btnExitWb, txtResObj, txtJaegerObj, btnJaeger, txtPromptObj);
+            GameObject txtAdapt = CreateAnchoredText(
+                canvasObj.transform, "Txt_AdaptationAlert", 
+                "", 
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 
+                new Vector2(0f, -170f), new Vector2(800f, 40f), 
+                17, defaultFont, new Color(1f, 0.55f, 0.1f)
+            );
+
+            // Связываем ссылки
+            LinkHudFields(hud, btnLeftObj, btnRightObj, wbPanel, btnExitWb, btnInstant, txtResObj, txtJaegerObj, btnJaeger, txtPromptObj);
             LinkDispatchFields(dispatchUI, threatCard, txtThreatName, txtThreatInfo, btnDeploy, txtLog, txtAdapt);
         }
 
-        private void LinkHudFields(HUDManager hud, GameObject bL, GameObject bR, GameObject bExit, GameObject tRes, GameObject tJaeger, GameObject bJaeger, GameObject tPrompt)
+        private void LinkHudFields(HUDManager hud, GameObject bL, GameObject bR, GameObject wbPanel, GameObject bExit, GameObject bInstant, GameObject tRes, GameObject tJaeger, GameObject bJaeger, GameObject tPrompt)
         {
             var t = typeof(HUDManager);
             SetField(t, hud, "btnLookLeft", bL.GetComponent<Button>());
             SetField(t, hud, "btnLookRight", bR.GetComponent<Button>());
+            SetField(t, hud, "txtLookLeft", bL.GetComponentInChildren<Text>());
+            SetField(t, hud, "txtLookRight", bR.GetComponentInChildren<Text>());
+            SetField(t, hud, "workbenchPanel", wbPanel);
             SetField(t, hud, "btnExitWorkbench", bExit.GetComponent<Button>());
+            SetField(t, hud, "btnInstantRepair", bInstant.GetComponent<Button>());
             SetField(t, hud, "txtResources", tRes.GetComponent<Text>());
             SetField(t, hud, "txtJaegerProgress", tJaeger.GetComponent<Text>());
             SetField(t, hud, "btnBuildJaeger", bJaeger.GetComponent<Button>());
@@ -431,25 +568,30 @@ namespace HangarGame.Prototype
             if (field != null) field.SetValue(instance, value);
         }
 
-        private GameObject CreateSimpleButton(Transform parent, string name, string label, Vector2 pos, Vector2 size, Font font)
+        private GameObject CreateAnchoredButton(Transform parent, string name, string label, Vector2 aMin, Vector2 aMax, Vector2 pivot, Vector2 pos, Vector2 size, Font font, Color bgColor)
         {
             GameObject btnObj = new GameObject(name);
             btnObj.transform.SetParent(parent, false);
+
             RectTransform rect = btnObj.AddComponent<RectTransform>();
+            rect.anchorMin = aMin;
+            rect.anchorMax = aMax;
+            rect.pivot = pivot;
             rect.anchoredPosition = pos;
             rect.sizeDelta = size;
 
             Image img = btnObj.AddComponent<Image>();
-            img.color = new Color(0.2f, 0.45f, 0.65f, 0.9f);
+            img.color = bgColor;
 
             Button btn = btnObj.AddComponent<Button>();
             ColorBlock cb = btn.colors;
-            cb.highlightedColor = new Color(0.3f, 0.6f, 0.85f);
-            cb.pressedColor = new Color(0.1f, 0.3f, 0.5f);
+            cb.highlightedColor = bgColor * 1.3f;
+            cb.pressedColor = bgColor * 0.7f;
             btn.colors = cb;
 
             GameObject textObj = new GameObject("Text");
             textObj.transform.SetParent(btnObj.transform, false);
+
             RectTransform tRect = textObj.AddComponent<RectTransform>();
             tRect.anchorMin = Vector2.zero;
             tRect.anchorMax = Vector2.one;
@@ -465,11 +607,15 @@ namespace HangarGame.Prototype
             return btnObj;
         }
 
-        private GameObject CreateSimpleText(Transform parent, string name, string text, Vector2 pos, Vector2 size, int fontSize, Font font, Color color)
+        private GameObject CreateAnchoredText(Transform parent, string name, string text, Vector2 aMin, Vector2 aMax, Vector2 pivot, Vector2 pos, Vector2 size, int fontSize, Font font, Color color)
         {
             GameObject txtObj = new GameObject(name);
             txtObj.transform.SetParent(parent, false);
+
             RectTransform rect = txtObj.AddComponent<RectTransform>();
+            rect.anchorMin = aMin;
+            rect.anchorMax = aMax;
+            rect.pivot = pivot;
             rect.anchoredPosition = pos;
             rect.sizeDelta = size;
 

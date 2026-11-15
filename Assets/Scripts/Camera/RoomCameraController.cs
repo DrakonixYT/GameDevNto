@@ -1,5 +1,6 @@
 using UnityEngine;
 using HangarGame.Core;
+using HangarGame.Repair;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -12,9 +13,9 @@ namespace HangarGame.CameraControl
         [Tooltip("Базовая позиция игрока в комнате (по центру)")]
         [SerializeField] private Vector3 roomPosition = new Vector3(0f, 1.6f, 0f);
         [Tooltip("Позиция камеры в режиме верстака")]
-        [SerializeField] private Vector3 workbenchPosition = new Vector3(0f, 1.2f, 1.5f);
+        [SerializeField] private Vector3 workbenchPosition = new Vector3(0f, 1.4f, 1.3f);
         [Tooltip("Угол взгляда на верстаке")]
-        [SerializeField] private Vector3 workbenchEulerAngles = new Vector3(35f, 0f, 0f);
+        [SerializeField] private Vector3 workbenchEulerAngles = new Vector3(30f, 0f, 0f);
 
         [Header("Room Angles (180 deg FNAF-style rotation)")]
         [Tooltip("0 градусов — вид на ангар с мехами")]
@@ -31,12 +32,13 @@ namespace HangarGame.CameraControl
         [SerializeField] private float leanSmoothSpeed = 6f;
 
         [Header("Transition Smoothing")]
-        [SerializeField] private float moveSmoothSpeed = 5f;
-        [SerializeField] private float rotationSmoothSpeed = 6f;
+        [SerializeField] private float moveSmoothSpeed = 6f;
+        [SerializeField] private float rotationSmoothSpeed = 7f;
 
         private RoomView currentView = RoomView.Hangar;
         private Vector2 currentLean;
-        private Vector2 leanVelocity;
+
+        public RoomView CurrentView => currentView;
 
         private void OnEnable()
         {
@@ -56,8 +58,47 @@ namespace HangarGame.CameraControl
 
         private void Update()
         {
+            HandleKeyboardNavigation();
             UpdateCursorLean();
             UpdateCameraTransform();
+        }
+
+        private void HandleKeyboardNavigation()
+        {
+            // Поддержка клавиатуры (A, D, Q, E, стрелки, Esc, Space)
+            bool turnLeft = false;
+            bool turnRight = false;
+            bool escape = false;
+
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null)
+            {
+                turnLeft = Keyboard.current.aKey.wasPressedThisFrame || 
+                           Keyboard.current.qKey.wasPressedThisFrame || 
+                           Keyboard.current.leftArrowKey.wasPressedThisFrame;
+
+                turnRight = Keyboard.current.dKey.wasPressedThisFrame || 
+                            Keyboard.current.eKey.wasPressedThisFrame || 
+                            Keyboard.current.rightArrowKey.wasPressedThisFrame;
+
+                escape = Keyboard.current.escapeKey.wasPressedThisFrame || 
+                         Keyboard.current.backspaceKey.wasPressedThisFrame;
+            }
+#else
+            turnLeft = Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.Q) || Input.GetKeyDown(KeyCode.LeftArrow);
+            turnRight = Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.RightArrow);
+            escape = Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Backspace);
+#endif
+
+            if (turnLeft || turnRight)
+            {
+                Toggle180View();
+            }
+
+            if (escape && currentView == RoomView.WorkbenchFocus)
+            {
+                RepairWorkbench.Instance?.ReturnPartToMech();
+            }
         }
 
         private void HandleRoomViewChanged(RoomView view)
@@ -72,16 +113,16 @@ namespace HangarGame.CameraControl
         {
             if (currentView == RoomView.Hangar)
             {
-                GameManager.Instance.SwitchRoomView(RoomView.DispatchConsole);
+                GameManager.Instance?.SwitchRoomView(RoomView.DispatchConsole);
             }
             else if (currentView == RoomView.DispatchConsole)
             {
-                GameManager.Instance.SwitchRoomView(RoomView.Hangar);
+                GameManager.Instance?.SwitchRoomView(RoomView.Hangar);
             }
             else if (currentView == RoomView.WorkbenchFocus)
             {
                 // Возврат из верстака обратно в ангар
-                GameManager.Instance.SwitchRoomView(RoomView.Hangar);
+                RepairWorkbench.Instance?.ReturnPartToMech();
             }
         }
 
@@ -109,7 +150,6 @@ namespace HangarGame.CameraControl
             float screenW = Mathf.Max(1, Screen.width);
             float screenH = Mathf.Max(1, Screen.height);
 
-            // Преобразуем экранные координаты в диапазон от -1 (лево/низ) до +1 (право/верх)
             float normX = (mousePos.x / screenW - 0.5f) * 2f;
             float normY = (mousePos.y / screenH - 0.5f) * 2f;
 
@@ -131,7 +171,7 @@ namespace HangarGame.CameraControl
             Vector2 normMouse = GetNormalizedMousePosition();
             Vector2 targetLean = new Vector2(
                 normMouse.x * maxLeanYaw,
-                -normMouse.y * maxLeanPitch // Инвертируем Y для наклона взгляда вверх/вниз
+                -normMouse.y * maxLeanPitch
             );
 
             currentLean = Vector2.Lerp(currentLean, targetLean, Time.deltaTime * leanSmoothSpeed);
@@ -151,7 +191,6 @@ namespace HangarGame.CameraControl
 
                 case RoomView.DispatchConsole:
                     targetPosition = roomPosition;
-                    // В диспетчерской (180°) смещение мыши инвертирует горизонталь относительно мира
                     targetRotation = Quaternion.Euler(currentLean.y, dispatchYaw - currentLean.x, 0f);
                     break;
 

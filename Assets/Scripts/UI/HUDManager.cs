@@ -14,7 +14,14 @@ namespace HangarGame.UI
         [Header("Room Navigation Buttons (FNAF-style 180 deg)")]
         [SerializeField] private Button btnLookLeft;
         [SerializeField] private Button btnLookRight;
+        [SerializeField] private Text txtLookLeft;
+        [SerializeField] private Text txtLookRight;
+
+        [Header("Workbench Overlay UI")]
+        [SerializeField] private GameObject workbenchPanel;
         [SerializeField] private Button btnExitWorkbench;
+        [SerializeField] private Button btnInstantRepair;
+        [SerializeField] private Text txtWorkbenchTitle;
 
         [Header("Status & Resources UI")]
         [SerializeField] private Text txtResources;
@@ -84,6 +91,14 @@ namespace HangarGame.UI
                 });
             }
 
+            if (btnInstantRepair != null)
+            {
+                btnInstantRepair.onClick.AddListener(() =>
+                {
+                    RepairWorkbench.Instance?.FinishRepair();
+                });
+            }
+
             if (btnBuildJaeger != null)
             {
                 btnBuildJaeger.onClick.AddListener(() =>
@@ -116,19 +131,31 @@ namespace HangarGame.UI
 
         private void HandleRoomViewChanged(RoomView view)
         {
-            if (btnExitWorkbench != null)
+            bool isWorkbench = (view == RoomView.WorkbenchFocus);
+
+            if (workbenchPanel != null)
             {
-                btnExitWorkbench.gameObject.SetActive(view == RoomView.WorkbenchFocus);
+                workbenchPanel.SetActive(isWorkbench);
             }
 
             if (btnLookLeft != null)
             {
-                btnLookLeft.gameObject.SetActive(view != RoomView.WorkbenchFocus);
+                btnLookLeft.gameObject.SetActive(!isWorkbench);
             }
 
             if (btnLookRight != null)
             {
-                btnLookRight.gameObject.SetActive(view != RoomView.WorkbenchFocus);
+                btnLookRight.gameObject.SetActive(!isWorkbench);
+            }
+
+            if (txtLookLeft != null)
+            {
+                txtLookLeft.text = (view == RoomView.Hangar) ? "◀ Диспетчерская\n(180° / A / Q)" : "◀ Ангар\n(180° / A / Q)";
+            }
+
+            if (txtLookRight != null)
+            {
+                txtLookRight.text = (view == RoomView.Hangar) ? "Диспетчерская ▶\n(180° / D / E)" : "Ангар ▶\n(180° / D / E)";
             }
         }
 
