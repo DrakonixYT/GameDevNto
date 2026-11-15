@@ -20,6 +20,14 @@ namespace HangarGame.Core
         public static event Action<string> OnEnemyAdapted;
         public static void TriggerEnemyAdapted(string adaptationNote) => OnEnemyAdapted?.Invoke(adaptationNote);
 
+        // Тактические приказы в реальном времени во время боя
+        public static event Action<string, string, float> OnTacticalPromptAppeared; // directiveText, actionButtonText, duration
+        public static void TriggerTacticalPromptAppeared(string directiveText, string actionButtonText, float duration) 
+            => OnTacticalPromptAppeared?.Invoke(directiveText, actionButtonText, duration);
+
+        public static event Action OnTacticalPromptCleared;
+        public static void TriggerTacticalPromptCleared() => OnTacticalPromptCleared?.Invoke();
+
         // Ремонт и детали
         public static event Action<object> OnPartSentToWorkbench;
         public static void TriggerPartSentToWorkbench(object part) => OnPartSentToWorkbench?.Invoke(part);
@@ -48,6 +56,8 @@ namespace HangarGame.Core
             OnResourcesUpdated = null;
             OnJaegerProgressUpdated = null;
             OnGameWon = null;
+            OnTacticalPromptAppeared = null;
+            OnTacticalPromptCleared = null;
         }
     }
 }

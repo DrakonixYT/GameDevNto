@@ -37,6 +37,8 @@ namespace HangarGame.Prototype
             EnemyAdaptationSystem adaptation = coreObj.AddComponent<EnemyAdaptationSystem>();
             JaegerProjectManager jaeger = coreObj.AddComponent<JaegerProjectManager>();
             HangarAudio audio = coreObj.AddComponent<HangarAudio>();
+            HangarAtmosphere atmosphere = coreObj.AddComponent<HangarAtmosphere>();
+            GameAutomatedTester tester = coreObj.AddComponent<GameAutomatedTester>();
 
             // 2. Освещение
             CreateLighting();
@@ -161,6 +163,11 @@ namespace HangarGame.Prototype
                 cam.gameObject.AddComponent<RoomCameraController>();
             }
 
+            if (cam.GetComponent<CameraShaker>() == null)
+            {
+                cam.gameObject.AddComponent<CameraShaker>();
+            }
+
             if (cam.GetComponent<PlayerRaycaster>() == null)
             {
                 cam.gameObject.AddComponent<PlayerRaycaster>();
@@ -206,6 +213,7 @@ namespace HangarGame.Prototype
 
             wbObj.AddComponent<BoltMiniGame>();
             wbObj.AddComponent<WeldingMiniGame>();
+            wbObj.AddComponent<WiringMiniGame>();
 
             return workbench;
         }
@@ -249,64 +257,73 @@ namespace HangarGame.Prototype
             GameObject rightArm = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             rightArm.name = "RightArm_PlasmaCannon";
             rightArm.transform.position = new Vector3(1.3f, 2.7f, 5.3f);
-            rightArm.transform.localScale = new Vector3(0.5f, 0.9f, 0.5f);
-            rightArm.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            rightArm.transform.localScale = new Vector3(0.5f, 1.4f, 0.5f);
             rightArm.transform.SetParent(mechRoot.transform);
-            SetColor(rightArm, new Color(0.85f, 0.2f, 0.2f));
+            SetColor(rightArm, new Color(0.9f, 0.3f, 0.1f));
             SetupMechPart(rightArm, "Плазменная Пушка 'Сверхновая'", PartSlot.RightArm, DamageType.Plasma, DamageType.Thermal, 60f, 20f);
 
-            // 5. Ноги (аккуратно стоят на полу Y = 0)
-            GameObject legLeft = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            legLeft.name = "Leg_Left";
-            legLeft.transform.position = new Vector3(-0.55f, 1.0f, 5.5f);
-            legLeft.transform.localScale = new Vector3(0.5f, 2.0f, 0.6f);
-            legLeft.transform.SetParent(mechRoot.transform);
-            SetColor(legLeft, new Color(0.3f, 0.35f, 0.4f));
-            SetupMechPart(legLeft, "Гидравлическая Опора (Л)", PartSlot.Legs, DamageType.Physical, DamageType.Physical, 10f, 40f);
+            // 5. Ноги / Шасси
+            GameObject legs = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            legs.name = "Legs_Chassis";
+            legs.transform.position = new Vector3(0f, 0.9f, 5.5f);
+            legs.transform.localScale = new Vector3(1.4f, 1.8f, 1.1f);
+            legs.transform.SetParent(mechRoot.transform);
+            SetColor(legs, new Color(0.25f, 0.28f, 0.32f));
+            SetupMechPart(legs, "Гидравлическое Шасси 'Титан'", PartSlot.Legs, DamageType.Physical, DamageType.Physical, 15f, 50f);
 
-            GameObject legRight = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            legRight.name = "Leg_Right";
-            legRight.transform.position = new Vector3(0.55f, 1.0f, 5.5f);
-            legRight.transform.localScale = new Vector3(0.5f, 2.0f, 0.6f);
-            legRight.transform.SetParent(mechRoot.transform);
-            SetColor(legRight, new Color(0.3f, 0.35f, 0.4f));
-            SetupMechPart(legRight, "Гидравлическая Опора (П)", PartSlot.Legs, DamageType.Physical, DamageType.Physical, 10f, 40f);
+            // Леса / Строительные подмости вокруг меха
+            GameObject scaffoldLeft = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            scaffoldLeft.name = "Scaffold_Left";
+            scaffoldLeft.transform.position = new Vector3(-2.2f, 2f, 5.5f);
+            scaffoldLeft.transform.localScale = new Vector3(0.2f, 4f, 2f);
+            scaffoldLeft.transform.SetParent(mechRoot.transform);
+            SetColor(scaffoldLeft, new Color(0.7f, 0.6f, 0.1f));
+
+            GameObject scaffoldRight = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            scaffoldRight.name = "Scaffold_Right";
+            scaffoldRight.transform.position = new Vector3(2.2f, 2f, 5.5f);
+            scaffoldRight.transform.localScale = new Vector3(0.2f, 4f, 2f);
+            scaffoldRight.transform.SetParent(mechRoot.transform);
+            SetColor(scaffoldRight, new Color(0.7f, 0.6f, 0.1f));
 
             return mech;
         }
 
-        private void SetupMechPart(GameObject obj, string partName, PartSlot slot, DamageType defenseType, DamageType attackType, float attackPow, float defensePow)
+        private void SetupMechPart(GameObject obj, string partName, PartSlot slot, DamageType resType, DamageType atkType, float atkPow, float defPow)
         {
-            MechPartData pData = ScriptableObject.CreateInstance<MechPartData>();
-            pData.partName = partName;
-            pData.slot = slot;
-            pData.resistanceType = defenseType;
-            pData.attackType = attackType;
-            pData.attackPower = attackPow;
-            pData.defensePower = defensePow;
-            pData.maxDurability = 100f;
-            pData.repairCreditCost = 40;
-            pData.repairAlloyCost = 20;
+            MechPartInstance part = obj.AddComponent<MechPartInstance>();
 
-            MechPartInstance partInstance = obj.AddComponent<MechPartInstance>();
-            partInstance.Initialize(pData, slot, 100f);
+            MechPartData data = ScriptableObject.CreateInstance<MechPartData>();
+            data.partId = obj.name;
+            data.partName = partName;
+            data.slot = slot;
+            data.resistanceType = resType;
+            data.attackType = atkType;
+            data.attackPower = atkPow;
+            data.defensePower = defPow;
+            data.maxDurability = 100f;
+            data.repairCreditCost = 40;
+            data.repairAlloyCost = 20;
+
+            part.Initialize(data, slot, 100f);
         }
 
         private void CreateDispatchConsole(Transform parent, MechInstance mech)
         {
-            GameObject consoleGroup = new GameObject("Dispatch_Station_180Deg");
-            consoleGroup.transform.position = new Vector3(0f, 0f, -4.5f);
+            GameObject consoleGroup = new GameObject("Dispatch_Station");
+            consoleGroup.transform.position = new Vector3(0f, 0f, -5f);
+            consoleGroup.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
             consoleGroup.transform.SetParent(parent);
 
-            // Пульт управления
+            // Стол диспетчера
             GameObject desk = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            desk.name = "Command_Desk";
-            desk.transform.position = new Vector3(0f, 0.8f, -4.5f);
-            desk.transform.localScale = new Vector3(3.2f, 0.3f, 1.4f);
+            desk.name = "Console_Desk";
+            desk.transform.position = new Vector3(0f, 0.6f, -4.5f);
+            desk.transform.localScale = new Vector3(3.2f, 0.15f, 1.4f);
             desk.transform.SetParent(consoleGroup.transform);
             SetColor(desk, new Color(0.2f, 0.22f, 0.25f));
 
-            // Большой тактический голо-монитор
+            // Большой монитор радара
             GameObject monitor = GameObject.CreatePrimitive(PrimitiveType.Cube);
             monitor.name = "Tactical_Radar_Screen";
             monitor.transform.position = new Vector3(0f, 1.8f, -4.9f);
@@ -388,32 +405,48 @@ namespace HangarGame.Prototype
             wbRect.anchorMax = new Vector2(0.5f, 0f);
             wbRect.pivot = new Vector2(0.5f, 0f);
             wbRect.anchoredPosition = new Vector2(0f, 25f);
-            wbRect.sizeDelta = new Vector2(650f, 140f);
+            wbRect.sizeDelta = new Vector2(840f, 160f);
 
             Image wbBg = wbPanel.AddComponent<Image>();
-            wbBg.color = new Color(0.1f, 0.12f, 0.16f, 0.92f);
+            wbBg.color = new Color(0.1f, 0.12f, 0.16f, 0.95f);
 
             GameObject txtWbTitle = CreateAnchoredText(
                 wbPanel.transform, "Txt_WbTitle", 
-                "🔧 РЕЖИМ ВЕРСТАКА: Кликайте по болтам/сварке", 
+                "🔧 РЕЖИМ ВЕРСТАКА: Кликайте по болтам/сварке/проводам", 
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 
-                new Vector2(0f, -25f), new Vector2(600f, 35f), 
+                new Vector2(0f, -22f), new Vector2(800f, 30f), 
                 18, defaultFont, Color.yellow
+            );
+
+            GameObject txtModInfo = CreateAnchoredText(
+                wbPanel.transform, "Txt_ModuleInfo", 
+                "Атака: Плазма (60)  |  Защита: Физическая (20)", 
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), 
+                new Vector2(0f, -50f), new Vector2(800f, 25f), 
+                15, defaultFont, Color.cyan
             );
 
             GameObject btnExitWb = CreateAnchoredButton(
                 wbPanel.transform, "Btn_ExitWorkbench", 
                 "❌ ВЫЙТИ В АНГАР (ESC)", 
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), 
-                new Vector2(-150f, 40f), new Vector2(260f, 60f), 
+                new Vector2(-270f, 40f), new Vector2(245f, 55f), 
                 defaultFont, new Color(0.85f, 0.2f, 0.2f, 0.95f)
+            );
+
+            GameObject btnSwapMod = CreateAnchoredButton(
+                wbPanel.transform, "Btn_SwapModule", 
+                "🔄 СМЕНИТЬ МОДУЛЬ (T)", 
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), 
+                new Vector2(0f, 40f), new Vector2(255f, 55f), 
+                defaultFont, new Color(0.2f, 0.55f, 0.85f, 0.95f)
             );
 
             GameObject btnInstant = CreateAnchoredButton(
                 wbPanel.transform, "Btn_InstantRepair", 
                 "⚡ БЫСТРЫЙ РЕМОНТ (ПРОБЕЛ)", 
                 new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), 
-                new Vector2(150f, 40f), new Vector2(260f, 60f), 
+                new Vector2(270f, 40f), new Vector2(245f, 55f), 
                 defaultFont, new Color(0.15f, 0.7f, 0.3f, 0.95f)
             );
             wbPanel.SetActive(false);
@@ -526,11 +559,47 @@ namespace HangarGame.Prototype
             mRect.anchorMax = new Vector2(0.5f, 0.5f);
             mRect.pivot = new Vector2(0.5f, 0.5f);
             mRect.anchoredPosition = new Vector2(0f, 40f);
-            mRect.sizeDelta = new Vector2(550f, 160f);
+            mRect.sizeDelta = new Vector2(600f, 220f);
             Image mBg = missionCard.AddComponent<Image>();
             mBg.color = new Color(0.18f, 0.1f, 0.1f, 0.96f);
-            CreateAnchoredText(missionCard.transform, "Txt_MissTitle", "⚔ БОЕВАЯ ОПЕРАЦИЯ В ГОРОДЕ...", new Vector2(0.5f, 0.65f), new Vector2(0.5f, 0.65f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(500f, 40f), 22, defaultFont, Color.yellow);
-            CreateAnchoredText(missionCard.transform, "Txt_MissSub", "Егерь ведет перехват врага. Ожидание завершения боя...", new Vector2(0.5f, 0.35f), new Vector2(0.5f, 0.35f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(500f, 40f), 16, defaultFont, Color.white);
+
+            CreateAnchoredText(missionCard.transform, "Txt_MissTitle", "⚔ БОЕВАЯ ОПЕРАЦИЯ В ГОРОДЕ...", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -25f), new Vector2(550f, 35f), 22, defaultFont, Color.yellow);
+            CreateAnchoredText(missionCard.transform, "Txt_MissSub", "Егерь ведет бой! Контролируйте радиоэфир для отдачи приказов:", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -55f), new Vector2(550f, 25f), 15, defaultFont, Color.white);
+
+            // Тактический контейнер (QTE) внутри MissionProgressCard
+            GameObject tacPanel = new GameObject("TacticalPromptPanel");
+            tacPanel.transform.SetParent(missionCard.transform, false);
+            RectTransform tpRect = tacPanel.AddComponent<RectTransform>();
+            tpRect.anchorMin = new Vector2(0.5f, 0f);
+            tpRect.anchorMax = new Vector2(0.5f, 0f);
+            tpRect.pivot = new Vector2(0.5f, 0f);
+            tpRect.anchoredPosition = new Vector2(0f, 15f);
+            tpRect.sizeDelta = new Vector2(560f, 120f);
+
+            GameObject txtTacDir = CreateAnchoredText(
+                tacPanel.transform, "Txt_TacDir",
+                "«ВРАГ ЗАХВАТИЛ ЦЕЛЬ! ПОДНЯТЬ ЭНЕРГОЩИТЫ?»",
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, -15f), new Vector2(540f, 30f),
+                16, defaultFont, Color.yellow
+            );
+
+            GameObject txtTacTimer = CreateAnchoredText(
+                tacPanel.transform, "Txt_TacTimer",
+                "⏱ Время на приказ: 3.0с",
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, -42f), new Vector2(540f, 22f),
+                14, defaultFont, new Color(1f, 0.4f, 0.4f)
+            );
+
+            GameObject btnTacAction = CreateAnchoredButton(
+                tacPanel.transform, "Btn_TacticalAction",
+                "🛡 ПОДНЯТЬ ЩИТЫ! (ПРОБЕЛ)",
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(0f, 25f), new Vector2(360f, 48f),
+                defaultFont, new Color(0.9f, 0.3f, 0.1f, 0.98f)
+            );
+            tacPanel.SetActive(false);
             missionCard.SetActive(false);
 
             // 10. Экран победы (Victory Panel)
@@ -552,11 +621,11 @@ namespace HangarGame.Prototype
             victoryPanel.SetActive(false);
 
             // Связываем ссылки
-            LinkHudFields(hud, btnLeftObj, btnRightObj, wbPanel, btnExitWb, btnInstant, txtResObj, txtJaegerObj, btnJaeger, txtPromptObj, victoryPanel, txtWbTitle);
-            LinkDispatchFields(dispatchUI, threatCard, missionCard, txtThreatName, txtThreatInfo, btnDeploy, txtLog, txtAdapt);
+            LinkHudFields(hud, btnLeftObj, btnRightObj, wbPanel, btnExitWb, btnInstant, btnSwapMod, txtResObj, txtJaegerObj, btnJaeger, txtPromptObj, victoryPanel, txtWbTitle, txtModInfo);
+            LinkDispatchFields(dispatchUI, threatCard, missionCard, txtThreatName, txtThreatInfo, btnDeploy, txtLog, txtAdapt, tacPanel, txtTacDir, txtTacTimer, btnTacAction);
         }
 
-        private void LinkHudFields(HUDManager hud, GameObject bL, GameObject bR, GameObject wbPanel, GameObject bExit, GameObject bInstant, GameObject tRes, GameObject tJaeger, GameObject bJaeger, GameObject tPrompt, GameObject vPanel, GameObject tWbTitle)
+        private void LinkHudFields(HUDManager hud, GameObject bL, GameObject bR, GameObject wbPanel, GameObject bExit, GameObject bInstant, GameObject bSwap, GameObject tRes, GameObject tJaeger, GameObject bJaeger, GameObject tPrompt, GameObject vPanel, GameObject tWbTitle, GameObject tModInfo)
         {
             var t = typeof(HUDManager);
             SetField(t, hud, "btnLookLeft", bL.GetComponent<Button>());
@@ -566,15 +635,17 @@ namespace HangarGame.Prototype
             SetField(t, hud, "workbenchPanel", wbPanel);
             SetField(t, hud, "btnExitWorkbench", bExit.GetComponent<Button>());
             SetField(t, hud, "btnInstantRepair", bInstant.GetComponent<Button>());
+            SetField(t, hud, "btnSwapModule", bSwap.GetComponent<Button>());
             SetField(t, hud, "txtResources", tRes.GetComponent<Text>());
             SetField(t, hud, "txtJaegerProgress", tJaeger.GetComponent<Text>());
             SetField(t, hud, "btnBuildJaeger", bJaeger.GetComponent<Button>());
             SetField(t, hud, "txtHoverPrompt", tPrompt.GetComponent<Text>());
             SetField(t, hud, "victoryPanel", vPanel);
             SetField(t, hud, "txtWorkbenchTitle", tWbTitle.GetComponent<Text>());
+            SetField(t, hud, "txtModuleInfo", tModInfo.GetComponent<Text>());
         }
 
-        private void LinkDispatchFields(DispatchUI dui, GameObject card, GameObject mCard, GameObject tName, GameObject tInfo, GameObject bDeploy, GameObject tLog, GameObject tAdapt)
+        private void LinkDispatchFields(DispatchUI dui, GameObject card, GameObject mCard, GameObject tName, GameObject tInfo, GameObject bDeploy, GameObject tLog, GameObject tAdapt, GameObject tacPanel, GameObject tTacDir, GameObject tTacTimer, GameObject bTacAction)
         {
             var t = typeof(DispatchUI);
             SetField(t, dui, "activeThreatCard", card);
@@ -584,6 +655,10 @@ namespace HangarGame.Prototype
             SetField(t, dui, "btnDeployMech", bDeploy.GetComponent<Button>());
             SetField(t, dui, "txtMissionLog", tLog.GetComponent<Text>());
             SetField(t, dui, "txtAdaptationAlert", tAdapt.GetComponent<Text>());
+            SetField(t, dui, "tacticalPromptPanel", tacPanel);
+            SetField(t, dui, "txtTacticalDirective", tTacDir.GetComponent<Text>());
+            SetField(t, dui, "txtTacticalTimer", tTacTimer.GetComponent<Text>());
+            SetField(t, dui, "btnTacticalAction", bTacAction.GetComponent<Button>());
         }
 
         private void SetField(System.Type type, object instance, string fieldName, object value)
@@ -658,7 +733,16 @@ namespace HangarGame.Prototype
             Renderer r = go.GetComponent<Renderer>();
             if (r != null)
             {
-                r.material.color = c;
+                if (Application.isPlaying)
+                {
+                    r.material.color = c;
+                }
+                else
+                {
+                    Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+                    mat.color = c;
+                    r.sharedMaterial = mat;
+                }
             }
         }
     }

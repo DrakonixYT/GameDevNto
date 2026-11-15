@@ -4,6 +4,7 @@ using HangarGame.Core;
 using HangarGame.CameraControl;
 using HangarGame.Interaction;
 using HangarGame.Repair;
+using HangarGame.Mechs;
 
 namespace HangarGame.UI
 {
@@ -21,7 +22,9 @@ namespace HangarGame.UI
         [SerializeField] private GameObject workbenchPanel;
         [SerializeField] private Button btnExitWorkbench;
         [SerializeField] private Button btnInstantRepair;
+        [SerializeField] private Button btnSwapModule;
         [SerializeField] private Text txtWorkbenchTitle;
+        [SerializeField] private Text txtModuleInfo;
 
         [Header("Status & Resources UI")]
         [SerializeField] private Text txtResources;
@@ -55,6 +58,7 @@ namespace HangarGame.UI
             EventBus.OnResourcesUpdated += HandleResourcesUpdated;
             EventBus.OnJaegerProgressUpdated += HandleJaegerProgressUpdated;
             EventBus.OnRoomViewChanged += HandleRoomViewChanged;
+            EventBus.OnPartSentToWorkbench += HandlePartSentToWorkbench;
             EventBus.OnGameWon += HandleGameWon;
         }
 
@@ -63,6 +67,7 @@ namespace HangarGame.UI
             EventBus.OnResourcesUpdated -= HandleResourcesUpdated;
             EventBus.OnJaegerProgressUpdated -= HandleJaegerProgressUpdated;
             EventBus.OnRoomViewChanged -= HandleRoomViewChanged;
+            EventBus.OnPartSentToWorkbench -= HandlePartSentToWorkbench;
             EventBus.OnGameWon -= HandleGameWon;
         }
 
@@ -71,12 +76,13 @@ namespace HangarGame.UI
             UpdateHoverPrompt();
         }
 
-        private void SetupButtons()
+        public void SetupButtons()
         {
             if (btnLookLeft == null) btnLookLeft = transform.Find("Btn_TurnLeft")?.GetComponent<Button>();
             if (btnLookRight == null) btnLookRight = transform.Find("Btn_TurnRight")?.GetComponent<Button>();
             if (btnExitWorkbench == null) btnExitWorkbench = transform.Find("Workbench_Panel/Btn_ExitWorkbench")?.GetComponent<Button>();
             if (btnInstantRepair == null) btnInstantRepair = transform.Find("Workbench_Panel/Btn_InstantRepair")?.GetComponent<Button>();
+            if (btnSwapModule == null) btnSwapModule = transform.Find("Workbench_Panel/Btn_SwapModule")?.GetComponent<Button>();
             if (btnBuildJaeger == null) btnBuildJaeger = transform.Find("Btn_BuildJaeger")?.GetComponent<Button>();
             if (workbenchPanel == null) workbenchPanel = transform.Find("Workbench_Panel")?.gameObject;
             if (victoryPanel == null) victoryPanel = transform.Find("Victory_Panel")?.gameObject;
@@ -108,6 +114,16 @@ namespace HangarGame.UI
                 btnInstantRepair.onClick.AddListener(() =>
                 {
                     RepairWorkbench.Instance?.FinishRepair();
+                });
+            }
+
+            if (btnSwapModule != null)
+            {
+                btnSwapModule.onClick.RemoveAllListeners();
+                btnSwapModule.onClick.AddListener(() =>
+                {
+                    RepairWorkbench.Instance?.CycleNextModuleForCurrentPart();
+                    UpdateWorkbenchModuleInfo();
                 });
             }
 
@@ -169,6 +185,33 @@ namespace HangarGame.UI
             if (txtLookRight != null)
             {
                 txtLookRight.text = (view == RoomView.Hangar) ? "Диспетчерская ▶\n(180° / D / E)" : "Ангар ▶\n(180° / D / E)";
+            }
+
+            if (isWorkbench)
+            {
+                UpdateWorkbenchModuleInfo();
+            }
+        }
+
+        private void HandlePartSentToWorkbench(object partObj)
+        {
+            UpdateWorkbenchModuleInfo();
+        }
+
+        public void UpdateWorkbenchModuleInfo()
+        {
+            MechPartInstance part = RepairWorkbench.Instance != null ? RepairWorkbench.Instance.CurrentPart : null;
+            if (part != null)
+            {
+                if (txtWorkbenchTitle != null)
+                {
+                    txtWorkbenchTitle.text = $"🔧 ВЕРСТАК: {part.PartName} (Прочность: {part.DurabilityPercent * 100f:F0}%)";
+                }
+
+                if (txtModuleInfo != null)
+                {
+                    txtModuleInfo.text = $"Атака: {part.AttackType} ({part.AttackPower:F0})  |  Защита: {part.ResistanceType} ({part.DefensePower:F0})";
+                }
             }
         }
 

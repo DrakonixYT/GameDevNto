@@ -38,11 +38,18 @@ namespace HangarGame.EditorTools
         [MenuItem("Pacific Rim / 🚀 1. Сгенерировать сцену прямо сюда (Bake)")]
         public static void BakeIntoCurrentScene()
         {
-            // Строит прямо в текущей открытой сцене
-            GameObject existingRoot = GameObject.Find("Hangar_Room");
-            if (existingRoot != null)
+            // Чистим старые сгенерированные объекты, если они есть
+            string[] objectsToClean = new string[] {
+                "Hangar_Room",
+                "--- CORE MANAGERS ---",
+                "HUD_Canvas",
+                "EventSystem",
+                "--- AUTO TESTER BOT ---"
+            };
+            foreach (var name in objectsToClean)
             {
-                Object.DestroyImmediate(existingRoot);
+                GameObject obj = GameObject.Find(name);
+                if (obj != null) Object.DestroyImmediate(obj);
             }
 
             GameObject builderObj = new GameObject("--- SCENE GENERATOR ---");

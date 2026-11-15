@@ -4,6 +4,10 @@ using UnityEngine;
 using HangarGame.Core;
 using HangarGame.Data;
 using HangarGame.Mechs;
+using HangarGame.CameraControl;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace HangarGame.Dispatch
 {
@@ -20,9 +24,17 @@ namespace HangarGame.Dispatch
         [SerializeField] private bool hasActiveThreat = false;
         [SerializeField] private bool isMissionInProgress = false;
 
+        [Header("Tactical Decision State (QTE)")]
+        [SerializeField] private bool hasActiveTacticalPrompt = false;
+        [SerializeField] private float tacticalPromptTimer = 0f;
+        private bool tacticalSuccess = false;
+        private int currentTacticalType = 0; // 0: Щит, 1: Критический залп, 2: Продувка
+
         public ThreatData CurrentThreat => currentThreat;
         public bool HasActiveThreat => hasActiveThreat;
         public bool IsMissionInProgress => isMissionInProgress;
+        public bool HasActiveTacticalPrompt => hasActiveTacticalPrompt;
+        public float TacticalPromptTimer => tacticalPromptTimer;
 
         private float waveTimer;
 
@@ -45,6 +57,24 @@ namespace HangarGame.Dispatch
                 {
                     SpawnNextThreat();
                     waveTimer = threatIntervalSeconds;
+                }
+            }
+
+            // Обработка горячей клавиши (Space) для быстрого тактического ответа
+            if (hasActiveTacticalPrompt && isMissionInProgress)
+            {
+                bool spacePressed = false;
+#if ENABLE_INPUT_SYSTEM
+                if (Keyboard.current != null)
+                {
+                    spacePressed = Keyboard.current.spaceKey.wasPressedThisFrame;
+                }
+#else
+                spacePressed = Input.GetKeyDown(KeyCode.Space);
+#endif
+                if (spacePressed)
+                {
+                    ExecuteTacticalAction();
                 }
             }
         }
@@ -137,17 +167,94 @@ namespace HangarGame.Dispatch
             return true;
         }
 
+        public void ExecuteTacticalAction()
+        {
+            if (!hasActiveTacticalPrompt || !isMissionInProgress) return;
+
+            tacticalSuccess = true;
+            hasActiveTacticalPrompt = false;
+            EventBus.TriggerTacticalPromptCleared();
+
+            if (currentTacticalType == 0)
+            {
+                HangarAudio.Instance?.PlayBolt();
+                CameraShaker.Instance?.Shake(0.35f, 0.15f);
+                Debug.Log("<color=green>[ТАКТИКА УСПЕХ]</color> Защитные экраны активированы! Урон снижен вдвое.");
+            }
+            else if (currentTacticalType == 1)
+            {
+                HangarAudio.Instance?.PlaySuccess();
+                CameraShaker.Instance?.Shake(0.45f, 0.2f);
+                Debug.Log("<color=green>[ТАКТИКА УСПЕХ]</color> Критический выстрел произведен! Уничтожение подтверждено.");
+            }
+            else
+            {
+                HangarAudio.Instance?.PlaySuccess();
+                CameraShaker.Instance?.Shake(0.25f, 0.1f);
+                Debug.Log("<color=green>[ТАКТИКА УСПЕХ]</color> Реактор охлажден! Избегнут внутренний взрыв.");
+            }
+        }
+
         private IEnumerator MissionRoutine(MechInstance mech, ThreatData threat)
         {
             isMissionInProgress = true;
             hasActiveThreat = false;
+            hasActiveTacticalPrompt = false;
+            tacticalSuccess = false;
             mech.SetDeployed(true);
+
+            CameraShaker.Instance?.Shake(0.3f, 0.1f);
+            HangarAudio.Instance?.PlayClick();
 
             Debug.Log($"<color=cyan>[БОЕВАЯ ОПЕРАЦИЯ]</color> {mech.MechName} вылетел на перехват: {threat.threatName}!");
 
-            float duration = threat.missionDurationSeconds > 0 ? threat.missionDurationSeconds : 5f;
-            yield return new WaitForSeconds(duration);
+            // Фаза 1 боя: сближение
+            yield return new WaitForSeconds(1.8f);
+            if (this == null) yield break;
 
+            // Запуск интерактивного тактического решения (QTE)
+            currentTacticalType = Random.Range(0, 3);
+            string promptText = "";
+            string buttonText = "";
+            float qteDuration = 3.0f;
+
+            switch (currentTacticalType)
+            {
+                case 0:
+                    promptText = "«ВРАГ ЗАХВАТИЛ ЦЕЛЬ! ПОДНЯТЬ ЭНЕРГОЩИТЫ?»";
+                    buttonText = "🛡 ПОДНЯТЬ ЩИТЫ! (ПРОБЕЛ)";
+                    break;
+                case 1:
+                    promptText = "«УЯЗВИМОСТЬ ОТКРЫТА! ПРОИЗВЕСТИ КРИТИЧЕСКИЙ ЗАЛП?»";
+                    buttonText = "⚡ КРИТИЧЕСКИЙ ВЫСТРЕЛ! (ПРОБЕЛ)";
+                    break;
+                case 2:
+                    promptText = "«ПЕРЕГРЕВ СЕРВОПРИВОДОВ! ПРОИЗВЕСТИ ПРОДУВКУ?»";
+                    buttonText = "❄ ПРОДУВКА РЕАКТОРА! (ПРОБЕЛ)";
+                    break;
+            }
+
+            hasActiveTacticalPrompt = true;
+            tacticalPromptTimer = qteDuration;
+            EventBus.TriggerTacticalPromptAppeared(promptText, buttonText, qteDuration);
+            HangarAudio.Instance?.PlayWarning();
+
+            // Ожидание действия игрока
+            while (tacticalPromptTimer > 0f && hasActiveTacticalPrompt)
+            {
+                tacticalPromptTimer -= Time.deltaTime;
+                yield return null;
+            }
+
+            if (hasActiveTacticalPrompt)
+            {
+                hasActiveTacticalPrompt = false;
+                EventBus.TriggerTacticalPromptCleared();
+                Debug.Log("<color=yellow>[ТАКТИКА ПРОПУЩЕНА]</color> Командир не успел отдать приказ вовремя!");
+            }
+
+            // Фаза 2 боя: завершение
+            yield return new WaitForSeconds(1.2f);
             if (this == null) yield break;
 
             // Расчет исхода боя
@@ -162,18 +269,41 @@ namespace HangarGame.Dispatch
             if (hasShieldCounter && hasAttackCounter)
             {
                 damageTaken = Random.Range(5f, 15f);
-                battleLog = $"Блестящая победа! {mech.MechName} идеально нейтрализовал угрозу. Минимум урона ({damageTaken:F0} ед.). Награда: +{finalCredits} кр, +{finalAlloy} спл.";
             }
             else if (hasShieldCounter || hasAttackCounter)
             {
-                damageTaken = Random.Range(25f, 45f);
-                battleLog = $"Победа с повреждениями. {mech.MechName} выполнил задачу, но получил {damageTaken:F0} ед. урона. Награда: +{finalCredits} кр, +{finalAlloy} спл.";
+                damageTaken = Random.Range(25f, 42f);
             }
             else
             {
-                damageTaken = Random.Range(55f, 75f);
-                finalCredits = Mathf.RoundToInt(finalCredits * 0.6f);
-                battleLog = $"Тяжелейший бой! Неподходящее вооружение привело к критическим повреждениям ({damageTaken:F0} ед.). Награда урезана: +{finalCredits} кр.";
+                damageTaken = Random.Range(50f, 70f);
+                finalCredits = Mathf.RoundToInt(finalCredits * 0.7f);
+            }
+
+            // Учитываем тактическое решение игрока
+            if (tacticalSuccess)
+            {
+                if (currentTacticalType == 0) // Щиты
+                {
+                    damageTaken *= 0.45f;
+                    battleLog = $"Блестящая победа! Своевременные щиты спасли {mech.MechName}. Получено {damageTaken:F0} ед. урона. Награда: +{finalCredits} кр, +{finalAlloy} спл.";
+                }
+                else if (currentTacticalType == 1) // Крит выстрел
+                {
+                    finalCredits += 120;
+                    finalAlloy += 60;
+                    battleLog = $"Критическое попадание разнесло врага в щепки! Бонус к награде: +{finalCredits} кр, +{finalAlloy} спл. Урон меха: {damageTaken:F0} ед.";
+                }
+                else // Продувка
+                {
+                    damageTaken *= 0.7f;
+                    finalAlloy += 40;
+                    battleLog = $"Охлаждение предотвратило перегрузку систем {mech.MechName}! Урон: {damageTaken:F0} ед. Награда: +{finalCredits} кр, +{finalAlloy} спл.";
+                }
+            }
+            else
+            {
+                battleLog = $"Бой окончен. {mech.MechName} получил {damageTaken:F0} ед. урона. Награда: +{finalCredits} кр, +{finalAlloy} спл.";
             }
 
             // Наносим повреждения меху
@@ -192,6 +322,7 @@ namespace HangarGame.Dispatch
             isMissionInProgress = false;
             currentThreat = null;
 
+            CameraShaker.Instance?.Shake(0.2f, 0.08f);
             Debug.Log($"<color=yellow>[ОТЧЕТ МИССИИ]</color> {battleLog}");
             EventBus.TriggerThreatResolved(battleLog);
         }

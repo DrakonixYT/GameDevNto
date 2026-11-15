@@ -33,6 +33,12 @@ namespace HangarGame.Mechs
         public float DurabilityPercent => partData != null && partData.maxDurability > 0 ? (currentDurability / partData.maxDurability) : 1f;
         public bool IsOnWorkbench => isOnWorkbench;
 
+        public string PartName => partData != null ? partData.partName : gameObject.name;
+        public DamageType AttackType => partData != null ? partData.attackType : DamageType.Physical;
+        public float AttackPower => partData != null ? partData.attackPower : 0f;
+        public DamageType ResistanceType => partData != null ? partData.resistanceType : DamageType.Physical;
+        public float DefensePower => partData != null ? partData.defensePower : 0f;
+
         private void Awake()
         {
             if (partRenderer == null)

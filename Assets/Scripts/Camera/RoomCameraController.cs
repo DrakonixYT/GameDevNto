@@ -200,7 +200,8 @@ namespace HangarGame.CameraControl
                     break;
             }
 
-            transform.position = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime * moveSmoothSpeed);
+            Vector3 shake = CameraShaker.Instance != null ? CameraShaker.Instance.CurrentOffset : Vector3.zero;
+            transform.position = Vector3.Lerp(transform.position, targetPosition, Time.deltaTime * moveSmoothSpeed) + shake;
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * rotationSmoothSpeed);
         }
     }
