@@ -323,14 +323,7 @@ namespace HangarGame.Prototype
             SetColor(btn3DDeploy, new Color(0.9f, 0.2f, 0.2f));
 
             Clickable3DObject clickDeploy = btn3DDeploy.AddComponent<Clickable3DObject>();
-            if (clickDeploy.onInteract == null) clickDeploy.onInteract = new UnityEngine.Events.UnityEvent();
-            clickDeploy.onInteract.AddListener(() =>
-            {
-                if (DispatchManager.Instance != null && mech != null)
-                {
-                    DispatchManager.Instance.TryDeployMech(mech);
-                }
-            });
+            clickDeploy.ActionType = ClickableActionType.DeployMech;
 
             // 3D Кнопка на пульте: "РАДАР / ВЫЗОВ УГРОЗЫ"
             GameObject btn3DScan = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -341,14 +334,7 @@ namespace HangarGame.Prototype
             SetColor(btn3DScan, new Color(0.2f, 0.8f, 0.3f));
 
             Clickable3DObject clickScan = btn3DScan.AddComponent<Clickable3DObject>();
-            if (clickScan.onInteract == null) clickScan.onInteract = new UnityEngine.Events.UnityEvent();
-            clickScan.onInteract.AddListener(() =>
-            {
-                if (DispatchManager.Instance != null && !DispatchManager.Instance.HasActiveThreat)
-                {
-                    DispatchManager.Instance.SpawnNextThreat();
-                }
-            });
+            clickScan.ActionType = ClickableActionType.ScanRadar;
         }
 
         private void CreateUI(UnityEngine.Camera cam)

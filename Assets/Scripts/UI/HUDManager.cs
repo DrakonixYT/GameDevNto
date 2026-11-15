@@ -73,18 +73,29 @@ namespace HangarGame.UI
 
         private void SetupButtons()
         {
+            if (btnLookLeft == null) btnLookLeft = transform.Find("Btn_TurnLeft")?.GetComponent<Button>();
+            if (btnLookRight == null) btnLookRight = transform.Find("Btn_TurnRight")?.GetComponent<Button>();
+            if (btnExitWorkbench == null) btnExitWorkbench = transform.Find("Workbench_Panel/Btn_ExitWorkbench")?.GetComponent<Button>();
+            if (btnInstantRepair == null) btnInstantRepair = transform.Find("Workbench_Panel/Btn_InstantRepair")?.GetComponent<Button>();
+            if (btnBuildJaeger == null) btnBuildJaeger = transform.Find("Btn_BuildJaeger")?.GetComponent<Button>();
+            if (workbenchPanel == null) workbenchPanel = transform.Find("Workbench_Panel")?.gameObject;
+            if (victoryPanel == null) victoryPanel = transform.Find("Victory_Panel")?.gameObject;
+
             if (btnLookLeft != null)
             {
+                btnLookLeft.onClick.RemoveAllListeners();
                 btnLookLeft.onClick.AddListener(() => cameraController?.Toggle180View());
             }
 
             if (btnLookRight != null)
             {
+                btnLookRight.onClick.RemoveAllListeners();
                 btnLookRight.onClick.AddListener(() => cameraController?.Toggle180View());
             }
 
             if (btnExitWorkbench != null)
             {
+                btnExitWorkbench.onClick.RemoveAllListeners();
                 btnExitWorkbench.onClick.AddListener(() =>
                 {
                     RepairWorkbench.Instance?.ReturnPartToMech();
@@ -93,6 +104,7 @@ namespace HangarGame.UI
 
             if (btnInstantRepair != null)
             {
+                btnInstantRepair.onClick.RemoveAllListeners();
                 btnInstantRepair.onClick.AddListener(() =>
                 {
                     RepairWorkbench.Instance?.FinishRepair();
@@ -101,6 +113,7 @@ namespace HangarGame.UI
 
             if (btnBuildJaeger != null)
             {
+                btnBuildJaeger.onClick.RemoveAllListeners();
                 btnBuildJaeger.onClick.AddListener(() =>
                 {
                     JaegerProjectManager.Instance?.InvestInJaeger();

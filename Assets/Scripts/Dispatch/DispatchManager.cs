@@ -51,6 +51,12 @@ namespace HangarGame.Dispatch
 
         public void SpawnNextThreat()
         {
+            if (isMissionInProgress)
+            {
+                Debug.LogWarning("[DispatchManager] Нельзя вызвать новую угрозу, пока идет текущий бой!");
+                return;
+            }
+
             if (threatDatabase.Count > 0)
             {
                 int idx = Random.Range(0, threatDatabase.Count);
@@ -68,6 +74,7 @@ namespace HangarGame.Dispatch
                 fallback.basePower = 40f;
                 fallback.rewardCredits = 250;
                 fallback.rewardAlloy = 100;
+                fallback.missionDurationSeconds = 5f;
                 currentThreat = fallback;
             }
 
@@ -88,10 +95,41 @@ namespace HangarGame.Dispatch
             );
         }
 
+        public void DeployAvailableMech()
+        {
+            MechInstance mech = FindObjectOfType<MechInstance>();
+            if (mech == null)
+            {
+                Debug.LogError("[DispatchManager] Ошибка: Мех не найден на сцене!");
+                return;
+            }
+
+            TryDeployMech(mech);
+        }
+
         public bool TryDeployMech(MechInstance mech)
         {
-            if (!hasActiveThreat || isMissionInProgress || mech == null || mech.IsDeployed)
+            if (mech == null)
             {
+                Debug.LogWarning("[DispatchManager] Не указан мех для отправки!");
+                return false;
+            }
+
+            if (isMissionInProgress)
+            {
+                Debug.LogWarning("[DispatchManager] Мех уже выполняет боевую задачу в городе! Дождитесь возвращения.");
+                return false;
+            }
+
+            if (!hasActiveThreat || currentThreat == null)
+            {
+                Debug.LogWarning("[DispatchManager] Нет активной угрозы! Нажмите кнопку 'Сканировать радар'.");
+                return false;
+            }
+
+            if (mech.IsDeployed)
+            {
+                Debug.LogWarning("[DispatchManager] Мех уже отправлен на боевое дежурство!");
                 return false;
             }
 
@@ -105,10 +143,12 @@ namespace HangarGame.Dispatch
             hasActiveThreat = false;
             mech.SetDeployed(true);
 
-            Debug.Log($"[Dispatch] {mech.MechName} отправлен на перехват {threat.threatName}...");
+            Debug.Log($"<color=cyan>[БОЕВАЯ ОПЕРАЦИЯ]</color> {mech.MechName} вылетел на перехват: {threat.threatName}!");
 
             float duration = threat.missionDurationSeconds > 0 ? threat.missionDurationSeconds : 5f;
             yield return new WaitForSeconds(duration);
+
+            if (this == null) yield break;
 
             // Расчет исхода боя
             bool hasShieldCounter = mech.HasDefenseAgainst(threat.incomingAttackType);
@@ -121,19 +161,16 @@ namespace HangarGame.Dispatch
 
             if (hasShieldCounter && hasAttackCounter)
             {
-                // Идеальный контр-пик!
                 damageTaken = Random.Range(5f, 15f);
-                battleLog = $"Блестящая победа! {mech.MechName} идеально нейтрализовал угрозу. Получен минимум повреждений ({damageTaken:F0} ед.). Награда: +{finalCredits} кр, +{finalAlloy} спл.";
+                battleLog = $"Блестящая победа! {mech.MechName} идеально нейтрализовал угрозу. Минимум урона ({damageTaken:F0} ед.). Награда: +{finalCredits} кр, +{finalAlloy} спл.";
             }
             else if (hasShieldCounter || hasAttackCounter)
             {
-                // Частичный успех
                 damageTaken = Random.Range(25f, 45f);
                 battleLog = $"Победа с повреждениями. {mech.MechName} выполнил задачу, но получил {damageTaken:F0} ед. урона. Награда: +{finalCredits} кр, +{finalAlloy} спл.";
             }
             else
             {
-                // Плохой подбор снаряжения — тяжелые повреждения
                 damageTaken = Random.Range(55f, 75f);
                 finalCredits = Mathf.RoundToInt(finalCredits * 0.6f);
                 battleLog = $"Тяжелейший бой! Неподходящее вооружение привело к критическим повреждениям ({damageTaken:F0} ед.). Награда урезана: +{finalCredits} кр.";
@@ -144,7 +181,7 @@ namespace HangarGame.Dispatch
             mech.SetDeployed(false);
 
             // Начисляем ресурсы
-            GameManager.Instance.AddResources(finalCredits, finalAlloy);
+            GameManager.Instance?.AddResources(finalCredits, finalAlloy);
 
             // Регистрируем адаптацию врагов
             if (EnemyAdaptationSystem.Instance != null && hasAttackCounter)

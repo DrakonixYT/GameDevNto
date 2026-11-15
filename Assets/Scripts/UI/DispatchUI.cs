@@ -3,6 +3,9 @@ using UnityEngine.UI;
 using HangarGame.Core;
 using HangarGame.Dispatch;
 using HangarGame.Mechs;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace HangarGame.UI
 {
@@ -25,17 +28,14 @@ namespace HangarGame.UI
         [Header("Assigned Mech Reference")]
         [SerializeField] private MechInstance targetMech;
 
+        private void Awake()
+        {
+            FindAndWireElements();
+        }
+
         private void Start()
         {
-            if (targetMech == null)
-            {
-                targetMech = FindObjectOfType<MechInstance>();
-            }
-
-            if (btnDeployMech != null)
-            {
-                btnDeployMech.onClick.AddListener(OnDeployClicked);
-            }
+            FindAndWireElements();
 
             EventBus.OnThreatAppeared += HandleThreatAppeared;
             EventBus.OnThreatResolved += HandleThreatResolved;
@@ -53,6 +53,46 @@ namespace HangarGame.UI
             EventBus.OnRoomViewChanged -= HandleRoomViewChanged;
         }
 
+        public void FindAndWireElements()
+        {
+            if (targetMech == null)
+            {
+                targetMech = FindObjectOfType<MechInstance>();
+            }
+
+            if (btnDeployMech == null)
+            {
+                // Ищем кнопку в дочерних объектах по имени
+                Button[] allButtons = GetComponentsInChildren<Button>(true);
+                foreach (var b in allButtons)
+                {
+                    if (b.name == "Btn_Deploy")
+                    {
+                        btnDeployMech = b;
+                        break;
+                    }
+                }
+            }
+
+            if (btnDeployMech != null)
+            {
+                btnDeployMech.onClick.RemoveAllListeners();
+                btnDeployMech.onClick.AddListener(OnDeployClicked);
+            }
+
+            if (activeThreatCard == null)
+            {
+                Transform card = transform.Find("ThreatCard");
+                if (card != null) activeThreatCard = card.gameObject;
+            }
+
+            if (missionProgressCard == null)
+            {
+                Transform mCard = transform.Find("MissionProgressCard");
+                if (mCard != null) missionProgressCard = mCard.gameObject;
+            }
+        }
+
         private void Update()
         {
             if (targetMech == null)
@@ -60,17 +100,37 @@ namespace HangarGame.UI
                 targetMech = FindObjectOfType<MechInstance>();
             }
 
-            if (DispatchManager.Instance != null && missionProgressCard != null)
+            bool inBattle = DispatchManager.Instance != null && DispatchManager.Instance.IsMissionInProgress;
+
+            if (missionProgressCard != null)
             {
-                missionProgressCard.SetActive(DispatchManager.Instance.IsMissionInProgress);
+                missionProgressCard.SetActive(inBattle);
             }
 
             if (btnDeployMech != null && DispatchManager.Instance != null)
             {
-                bool canDeploy = !DispatchManager.Instance.IsMissionInProgress && 
+                bool canDeploy = !inBattle && 
                                  DispatchManager.Instance.HasActiveThreat && 
                                  (targetMech != null && !targetMech.IsDeployed);
                 btnDeployMech.interactable = canDeploy;
+            }
+
+            // Горячие клавиши (Space или Enter) для отправки в бой при открытом терминале
+            if (GameManager.Instance != null && GameManager.Instance.CurrentView == RoomView.DispatchConsole)
+            {
+                bool enterPressed = false;
+#if ENABLE_INPUT_SYSTEM
+                if (Keyboard.current != null)
+                {
+                    enterPressed = Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.spaceKey.wasPressedThisFrame;
+                }
+#else
+                enterPressed = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space);
+#endif
+                if (enterPressed && btnDeployMech != null && btnDeployMech.interactable)
+                {
+                    OnDeployClicked();
+                }
             }
         }
 
@@ -123,15 +183,16 @@ namespace HangarGame.UI
 
         private void HandleRoomViewChanged(RoomView view)
         {
-            // Можно показывать экран терминала только при взгляде на консоль (180 градусов)
             if (dispatchContainer != null)
             {
                 dispatchContainer.SetActive(view == RoomView.DispatchConsole);
             }
         }
 
-        private void OnDeployClicked()
+        public void OnDeployClicked()
         {
+            Debug.Log("<color=cyan>[DispatchUI]</color> Нажата кнопка 'ОТПРАВИТЬ ЕГЕРЯ В БОЙ'!");
+
             if (targetMech == null)
             {
                 targetMech = FindObjectOfType<MechInstance>();
@@ -144,6 +205,10 @@ namespace HangarGame.UI
                 {
                     btnDeployMech.interactable = false;
                 }
+            }
+            else
+            {
+                Debug.LogError("[DispatchUI] Ошибка: targetMech или DispatchManager.Instance равен null!");
             }
         }
 
