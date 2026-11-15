@@ -55,6 +55,7 @@ namespace HangarGame.Repair
             boltsRemaining--;
 
             // Эффект откручивания
+            HangarGame.Core.HangarAudio.Instance?.PlayBolt();
             Destroy(boltObj);
             Debug.Log($"[BoltMiniGame] Болт выкручен! Осталось: {boltsRemaining}");
 

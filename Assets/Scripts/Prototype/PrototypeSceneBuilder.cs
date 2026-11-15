@@ -36,6 +36,7 @@ namespace HangarGame.Prototype
             DispatchManager dispatch = coreObj.AddComponent<DispatchManager>();
             EnemyAdaptationSystem adaptation = coreObj.AddComponent<EnemyAdaptationSystem>();
             JaegerProjectManager jaeger = coreObj.AddComponent<JaegerProjectManager>();
+            HangarAudio audio = coreObj.AddComponent<HangarAudio>();
 
             // 2. Освещение
             CreateLighting();

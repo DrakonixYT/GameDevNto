@@ -58,6 +58,8 @@ namespace HangarGame.Repair
                 rend.material.color = new Color(0.2f, 0.8f, 1f); // Остывший заваренный металл
             }
 
+            HangarGame.Core.HangarAudio.Instance?.PlayWeld();
+
             // Убираем кликабельность заваренной точки
             Destroy(nodeObj.GetComponent<Clickable3DObject>());
 

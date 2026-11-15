@@ -58,6 +58,8 @@ namespace HangarGame.Interaction
 
         public void OnInteract()
         {
+            HangarGame.Core.HangarAudio.Instance?.PlayClick();
+
             // Визуальный отклик — кратковременное вдавливание кнопки
             StopAllCoroutines();
             StartCoroutine(PressFeedbackRoutine());
