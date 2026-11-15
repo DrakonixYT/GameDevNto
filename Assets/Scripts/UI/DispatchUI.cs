@@ -55,9 +55,22 @@ namespace HangarGame.UI
 
         private void Update()
         {
+            if (targetMech == null)
+            {
+                targetMech = FindObjectOfType<MechInstance>();
+            }
+
             if (DispatchManager.Instance != null && missionProgressCard != null)
             {
                 missionProgressCard.SetActive(DispatchManager.Instance.IsMissionInProgress);
+            }
+
+            if (btnDeployMech != null && DispatchManager.Instance != null)
+            {
+                bool canDeploy = !DispatchManager.Instance.IsMissionInProgress && 
+                                 DispatchManager.Instance.HasActiveThreat && 
+                                 (targetMech != null && !targetMech.IsDeployed);
+                btnDeployMech.interactable = canDeploy;
             }
         }
 

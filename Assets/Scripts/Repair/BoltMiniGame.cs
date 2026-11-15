@@ -51,6 +51,7 @@ namespace HangarGame.Repair
                 if (col == null) boltObj.AddComponent<BoxCollider>();
 
                 Clickable3DObject clickable = boltObj.AddComponent<Clickable3DObject>();
+                if (clickable.onInteract == null) clickable.onInteract = new UnityEngine.Events.UnityEvent();
                 clickable.onInteract.AddListener(() => OnBoltClicked(boltObj));
 
                 activeBolts.Add(boltObj);

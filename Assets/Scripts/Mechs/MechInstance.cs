@@ -43,7 +43,7 @@ namespace HangarGame.Mechs
             float total = 0f;
             foreach (var part in parts)
             {
-                if (part.Data != null)
+                if (part != null && part.Data != null)
                 {
                     total += part.Data.attackPower * part.DurabilityPercent;
                 }
@@ -55,7 +55,7 @@ namespace HangarGame.Mechs
         {
             foreach (var part in parts)
             {
-                if (part.Data != null && part.Data.resistanceType == attackType && part.DurabilityPercent > 0.2f)
+                if (part != null && part.Data != null && part.Data.resistanceType == attackType && part.DurabilityPercent > 0.2f)
                 {
                     return true;
                 }
@@ -67,7 +67,7 @@ namespace HangarGame.Mechs
         {
             foreach (var part in parts)
             {
-                if (part.Data != null && part.Data.attackType == weakness && part.DurabilityPercent > 0.2f)
+                if (part != null && part.Data != null && part.Data.attackType == weakness && part.DurabilityPercent > 0.2f)
                 {
                     return true;
                 }
@@ -89,9 +89,12 @@ namespace HangarGame.Mechs
             float damagePerPart = totalDamage / parts.Count;
             foreach (var part in parts)
             {
-                // Небольшой разброс повреждений по деталям
-                float randomMod = Random.Range(0.7f, 1.3f);
-                part.ApplyDamage(damagePerPart * randomMod);
+                if (part != null)
+                {
+                    // Небольшой разброс повреждений по деталям
+                    float randomMod = Random.Range(0.7f, 1.3f);
+                    part.ApplyDamage(damagePerPart * randomMod);
+                }
             }
         }
 
@@ -99,11 +102,16 @@ namespace HangarGame.Mechs
         {
             if (parts.Count == 0) return 1f;
             float sum = 0f;
+            int validCount = 0;
             foreach (var part in parts)
             {
-                sum += part.DurabilityPercent;
+                if (part != null)
+                {
+                    sum += part.DurabilityPercent;
+                    validCount++;
+                }
             }
-            return sum / parts.Count;
+            return validCount > 0 ? (sum / validCount) : 1f;
         }
     }
 }

@@ -323,6 +323,7 @@ namespace HangarGame.Prototype
             SetColor(btn3DDeploy, new Color(0.9f, 0.2f, 0.2f));
 
             Clickable3DObject clickDeploy = btn3DDeploy.AddComponent<Clickable3DObject>();
+            if (clickDeploy.onInteract == null) clickDeploy.onInteract = new UnityEngine.Events.UnityEvent();
             clickDeploy.onInteract.AddListener(() =>
             {
                 if (DispatchManager.Instance != null && mech != null)
@@ -340,6 +341,7 @@ namespace HangarGame.Prototype
             SetColor(btn3DScan, new Color(0.2f, 0.8f, 0.3f));
 
             Clickable3DObject clickScan = btn3DScan.AddComponent<Clickable3DObject>();
+            if (clickScan.onInteract == null) clickScan.onInteract = new UnityEngine.Events.UnityEvent();
             clickScan.onInteract.AddListener(() =>
             {
                 if (DispatchManager.Instance != null && !DispatchManager.Instance.HasActiveThreat)
@@ -530,12 +532,45 @@ namespace HangarGame.Prototype
                 17, defaultFont, new Color(1f, 0.55f, 0.1f)
             );
 
+            // 9. Карточка активного боя (Mission Progress)
+            GameObject missionCard = new GameObject("MissionProgressCard");
+            missionCard.transform.SetParent(canvasObj.transform, false);
+            RectTransform mRect = missionCard.AddComponent<RectTransform>();
+            mRect.anchorMin = new Vector2(0.5f, 0.5f);
+            mRect.anchorMax = new Vector2(0.5f, 0.5f);
+            mRect.pivot = new Vector2(0.5f, 0.5f);
+            mRect.anchoredPosition = new Vector2(0f, 40f);
+            mRect.sizeDelta = new Vector2(550f, 160f);
+            Image mBg = missionCard.AddComponent<Image>();
+            mBg.color = new Color(0.18f, 0.1f, 0.1f, 0.96f);
+            CreateAnchoredText(missionCard.transform, "Txt_MissTitle", "⚔ БОЕВАЯ ОПЕРАЦИЯ В ГОРОДЕ...", new Vector2(0.5f, 0.65f), new Vector2(0.5f, 0.65f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(500f, 40f), 22, defaultFont, Color.yellow);
+            CreateAnchoredText(missionCard.transform, "Txt_MissSub", "Егерь ведет перехват врага. Ожидание завершения боя...", new Vector2(0.5f, 0.35f), new Vector2(0.5f, 0.35f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(500f, 40f), 16, defaultFont, Color.white);
+            missionCard.SetActive(false);
+
+            // 10. Экран победы (Victory Panel)
+            GameObject victoryPanel = new GameObject("Victory_Panel");
+            victoryPanel.transform.SetParent(canvasObj.transform, false);
+            RectTransform vRect = victoryPanel.AddComponent<RectTransform>();
+            vRect.anchorMin = new Vector2(0.5f, 0.5f);
+            vRect.anchorMax = new Vector2(0.5f, 0.5f);
+            vRect.pivot = new Vector2(0.5f, 0.5f);
+            vRect.anchoredPosition = Vector2.zero;
+            vRect.sizeDelta = new Vector2(620f, 320f);
+            Image vBg = victoryPanel.AddComponent<Image>();
+            vBg.color = new Color(0.08f, 0.12f, 0.22f, 0.98f);
+
+            CreateAnchoredText(victoryPanel.transform, "Txt_WinTitle", "🏆 ПОБЕДА!", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(500f, 50f), 34, defaultFont, Color.yellow);
+            CreateAnchoredText(victoryPanel.transform, "Txt_WinDesc", "ПРОЕКТ 'ЕГЕРЬ' ЗАВЕРШЕН!\nГород спасен от вторжения!", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 15f), new Vector2(520f, 70f), 20, defaultFont, Color.white);
+            GameObject btnRestart = CreateAnchoredButton(victoryPanel.transform, "Btn_Restart", "🔄 Играть снова", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 40f), new Vector2(240f, 50f), defaultFont, new Color(0.2f, 0.7f, 0.3f, 0.95f));
+            btnRestart.GetComponent<Button>().onClick.AddListener(() => UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex));
+            victoryPanel.SetActive(false);
+
             // Связываем ссылки
-            LinkHudFields(hud, btnLeftObj, btnRightObj, wbPanel, btnExitWb, btnInstant, txtResObj, txtJaegerObj, btnJaeger, txtPromptObj);
-            LinkDispatchFields(dispatchUI, threatCard, txtThreatName, txtThreatInfo, btnDeploy, txtLog, txtAdapt);
+            LinkHudFields(hud, btnLeftObj, btnRightObj, wbPanel, btnExitWb, btnInstant, txtResObj, txtJaegerObj, btnJaeger, txtPromptObj, victoryPanel, txtWbTitle);
+            LinkDispatchFields(dispatchUI, threatCard, missionCard, txtThreatName, txtThreatInfo, btnDeploy, txtLog, txtAdapt);
         }
 
-        private void LinkHudFields(HUDManager hud, GameObject bL, GameObject bR, GameObject wbPanel, GameObject bExit, GameObject bInstant, GameObject tRes, GameObject tJaeger, GameObject bJaeger, GameObject tPrompt)
+        private void LinkHudFields(HUDManager hud, GameObject bL, GameObject bR, GameObject wbPanel, GameObject bExit, GameObject bInstant, GameObject tRes, GameObject tJaeger, GameObject bJaeger, GameObject tPrompt, GameObject vPanel, GameObject tWbTitle)
         {
             var t = typeof(HUDManager);
             SetField(t, hud, "btnLookLeft", bL.GetComponent<Button>());
@@ -549,12 +584,15 @@ namespace HangarGame.Prototype
             SetField(t, hud, "txtJaegerProgress", tJaeger.GetComponent<Text>());
             SetField(t, hud, "btnBuildJaeger", bJaeger.GetComponent<Button>());
             SetField(t, hud, "txtHoverPrompt", tPrompt.GetComponent<Text>());
+            SetField(t, hud, "victoryPanel", vPanel);
+            SetField(t, hud, "txtWorkbenchTitle", tWbTitle.GetComponent<Text>());
         }
 
-        private void LinkDispatchFields(DispatchUI dui, GameObject card, GameObject tName, GameObject tInfo, GameObject bDeploy, GameObject tLog, GameObject tAdapt)
+        private void LinkDispatchFields(DispatchUI dui, GameObject card, GameObject mCard, GameObject tName, GameObject tInfo, GameObject bDeploy, GameObject tLog, GameObject tAdapt)
         {
             var t = typeof(DispatchUI);
             SetField(t, dui, "activeThreatCard", card);
+            SetField(t, dui, "missionProgressCard", mCard);
             SetField(t, dui, "txtThreatName", tName.GetComponent<Text>());
             SetField(t, dui, "txtThreatDetails", tInfo.GetComponent<Text>());
             SetField(t, dui, "btnDeployMech", bDeploy.GetComponent<Button>());

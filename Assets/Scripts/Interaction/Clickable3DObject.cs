@@ -12,7 +12,7 @@ namespace HangarGame.Interaction
 
         [Header("Event Callback")]
         [Tooltip("Сюда можно подключить ЛЮБУЮ функцию любого объекта из 100500 вариантов")]
-        public UnityEvent onInteract;
+        public UnityEvent onInteract = new UnityEvent();
 
         [Header("Visual Feedback")]
         [SerializeField] private Renderer targetRenderer;

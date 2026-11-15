@@ -48,6 +48,7 @@ namespace HangarGame.Repair
                 rend.material.color = new Color(1f, 0.35f, 0f); // Раскаленный оранжевый
 
                 Clickable3DObject clickable = nodeObj.AddComponent<Clickable3DObject>();
+                if (clickable.onInteract == null) clickable.onInteract = new UnityEngine.Events.UnityEvent();
                 clickable.onInteract.AddListener(() => OnNodeWelded(nodeObj));
 
                 seamNodes.Add(nodeObj);
