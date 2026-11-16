@@ -3,8 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using HangarGame.Core;
 using HangarGame.Mechs;
-using HangarGame.Data;
-using HangarGame.CameraControl;
+using HangarGame.Interaction;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -14,451 +13,157 @@ namespace HangarGame.Repair
     public class RepairWorkbench : MonoBehaviour
     {
         public static RepairWorkbench Instance { get; private set; }
+        public MechPart CurrentPart { get; private set; }
+        public GameObject CurrentJaegerModule { get; private set; }
+        public string CurrentItemName => CurrentPart != null ? CurrentPart.Data.partName : currentJaegerName;
+        public bool HasItem => CurrentPart != null || CurrentJaegerModule != null;
+        public bool IsJaegerModule => CurrentJaegerModule != null;
 
-        [Header("Workbench Mount")]
-        [SerializeField] private Transform partMountPoint;
-        [SerializeField] private float tableSurfaceY = 0.82f;
+        private float targetYaw = 180f, targetPitch = 0f, curYaw = 180f, curPitch = 0f;
+        private string currentJaegerName;
+        private Action onJaegerDone;
+        private readonly List<GameObject> activeMiniNodes = new List<GameObject>();
+        private int nodesRemaining = 0;
 
-        [Header("2-Axis Inspection Rotation")]
-        [SerializeField] private float keyboardRotateSpeed = 100f;
-        [SerializeField] private float mouseRotateSensitivity = 0.5f;
-
-        [Header("Mini-games")]
-        [SerializeField] private BoltMiniGame boltGame;
-        [SerializeField] private WeldingMiniGame weldingGame;
-        [SerializeField] private WiringMiniGame wiringGame;
-
-        private MechPartInstance currentPart;
-        private Vector3 originalPartPosition;
-        private Quaternion originalPartRotation;
-        private Transform originalPartParent;
-        private bool originalPartKinematic = true;
-
-        // Вращение детали по 2 осям
-        private float currentYaw = 0f;
-        private float currentPitch = 0f;
-        private float targetYaw = 0f;
-        private float targetPitch = 0f;
-        private Quaternion initialRotationOnTable;
-
-        // Поддержка сборки модулей Егеря на верстаке
-        private GameObject currentJaegerModule;
-        private string currentJaegerModuleName;
-        private Action onJaegerModuleCompleted;
-
-        public MechPartInstance CurrentPart => currentPart;
-        public GameObject CurrentJaegerModule => currentJaegerModule;
-        public bool HasPart => currentPart != null || currentJaegerModule != null;
-        public bool IsJaegerModule => currentJaegerModule != null;
-        public string CurrentItemName => currentPart != null ? currentPart.PartName : (currentJaegerModule != null ? currentJaegerModuleName : string.Empty);
-        public Transform MountPoint => partMountPoint;
-
-        private void Awake()
-        {
-            Instance = this;
-
-            if (boltGame == null) boltGame = GetComponentInChildren<BoltMiniGame>(true);
-            if (weldingGame == null) weldingGame = GetComponentInChildren<WeldingMiniGame>(true);
-            if (wiringGame == null) wiringGame = GetComponentInChildren<WiringMiniGame>(true);
-
-            if (partMountPoint == null)
-            {
-                Transform existing = transform.Find("Part_Mount_Point");
-                if (existing != null)
-                {
-                    partMountPoint = existing;
-                }
-                else
-                {
-                    GameObject mountObj = new GameObject("Part_Mount_Point");
-                    mountObj.transform.position = new Vector3(transform.position.x, tableSurfaceY, transform.position.z);
-                    mountObj.transform.SetParent(transform);
-                    partMountPoint = mountObj.transform;
-                }
-            }
-        }
-
-        private void Start()
-        {
-            if (boltGame != null) boltGame.OnAllBoltsCompleted += HandleBoltsDone;
-            if (weldingGame != null) weldingGame.OnWeldingCompleted += HandleWeldingDone;
-            if (wiringGame != null) wiringGame.OnWiringCompleted += HandleWiringDone;
-        }
-
-        private void OnDestroy()
-        {
-            if (boltGame != null) boltGame.OnAllBoltsCompleted -= HandleBoltsDone;
-            if (weldingGame != null) weldingGame.OnWeldingCompleted -= HandleWeldingDone;
-            if (wiringGame != null) wiringGame.OnWiringCompleted -= HandleWiringDone;
-        }
+        private void Awake() => Instance = this;
 
         private void Update()
         {
-            if (!HasPart) return;
+            if (!HasItem) return;
 
-            HandleInput();
-            Update2AxisRotation();
-        }
-
-        private void HandleInput()
-        {
-            bool esc = false;
-            bool space = false;
-            bool swapKey = false;
-
+            // Hotkeys
+            bool esc = false, space = false, tKey = false;
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null)
             {
-                esc = Keyboard.current.escapeKey.wasPressedThisFrame || Keyboard.current.backspaceKey.wasPressedThisFrame;
+                esc = Keyboard.current.escapeKey.wasPressedThisFrame;
                 space = Keyboard.current.spaceKey.wasPressedThisFrame;
-                swapKey = Keyboard.current.tKey.wasPressedThisFrame;
+                tKey = Keyboard.current.tKey.wasPressedThisFrame;
             }
 #else
-            esc = Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Backspace);
-            space = Input.GetKeyDown(KeyCode.Space);
-            swapKey = Input.GetKeyDown(KeyCode.T);
+            esc = Input.GetKeyDown(KeyCode.Escape); space = Input.GetKeyDown(KeyCode.Space); tKey = Input.GetKeyDown(KeyCode.T);
 #endif
+            if (esc) CancelWork(); else if (space) FinishWork(); else if (tKey && CurrentPart != null) CycleModule();
 
-            if (esc)
-            {
-                CancelOrReturnCurrentPart();
-            }
-            else if (space)
-            {
-                FinishRepair();
-            }
-            else if (swapKey && currentPart != null)
-            {
-                CycleNextModuleForCurrentPart();
-            }
-        }
-
-        private void Update2AxisRotation()
-        {
-            // Управление клавишами (A/D/Left/Right - Yaw, W/S/Up/Down - Pitch)
-            float hInput = 0f;
-            float vInput = 0f;
-
+            // 2-Axis Rotation
+            float h = 0f, v = 0f;
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null)
             {
-                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) hInput -= 1f;
-                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) hInput += 1f;
-                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) vInput += 1f;
-                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) vInput -= 1f;
+                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) h -= 1f;
+                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) h += 1f;
+                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) v += 1f;
+                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) v -= 1f;
             }
-#else
-            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) hInput -= 1f;
-            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) hInput += 1f;
-            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) vInput += 1f;
-            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) vInput -= 1f;
-#endif
-
-            // Вращение перетаскиванием мыши (ПКМ или СКМ)
-            bool isMouseDragging = false;
-            Vector2 mouseDelta = Vector2.zero;
-
-#if ENABLE_INPUT_SYSTEM
             if (Mouse.current != null && (Mouse.current.rightButton.isPressed || Mouse.current.middleButton.isPressed))
             {
-                isMouseDragging = true;
-                mouseDelta = Mouse.current.delta.ReadValue();
+                Vector2 d = Mouse.current.delta.ReadValue();
+                targetYaw += d.x * 0.4f; targetPitch = Mathf.Clamp(targetPitch - d.y * 0.4f, -70f, 70f);
             }
 #else
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) h -= 1f;
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) h += 1f;
+            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) v += 1f;
+            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) v -= 1f;
             if (Input.GetMouseButton(1) || Input.GetMouseButton(2))
             {
-                isMouseDragging = true;
-                mouseDelta = new Vector2(Input.GetAxis("Mouse X") * 8f, Input.GetAxis("Mouse Y") * 8f);
+                targetYaw += Input.GetAxis("Mouse X") * 4f; targetPitch = Mathf.Clamp(targetPitch - Input.GetAxis("Mouse Y") * 4f, -70f, 70f);
             }
 #endif
+            targetYaw += h * 90f * Time.deltaTime;
+            targetPitch = Mathf.Clamp(targetPitch - v * 90f * Time.deltaTime, -70f, 70f);
+            curYaw = Mathf.Lerp(curYaw, targetYaw, Time.deltaTime * 12f);
+            curPitch = Mathf.Lerp(curPitch, targetPitch, Time.deltaTime * 12f);
 
-            if (isMouseDragging)
-            {
-                targetYaw += mouseDelta.x * mouseRotateSensitivity;
-                targetPitch -= mouseDelta.y * mouseRotateSensitivity;
-            }
-
-            if (Mathf.Abs(hInput) > 0.01f || Mathf.Abs(vInput) > 0.01f)
-            {
-                targetYaw += hInput * keyboardRotateSpeed * Time.deltaTime;
-                targetPitch -= vInput * keyboardRotateSpeed * Time.deltaTime;
-            }
-
-            targetPitch = Mathf.Clamp(targetPitch, -75f, 75f);
-            currentYaw = Mathf.Lerp(currentYaw, targetYaw, Time.deltaTime * 14f);
-            currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.deltaTime * 14f);
-
-            Transform targetTransform = currentPart != null ? currentPart.transform : (currentJaegerModule != null ? currentJaegerModule.transform : null);
-            if (targetTransform != null)
-            {
-                targetTransform.rotation = Quaternion.Euler(currentPitch, currentYaw, 0f);
-            }
+            var t = CurrentPart != null ? CurrentPart.transform : (CurrentJaegerModule != null ? CurrentJaegerModule.transform : null);
+            if (t != null) t.rotation = Quaternion.Euler(curPitch, curYaw, 0f);
         }
 
-        #region Public 2-Axis Rotation Controls (Для кнопок UI)
+        public void RotateYaw(float d) => targetYaw += d;
+        public void RotatePitch(float d) => targetPitch = Mathf.Clamp(targetPitch + d, -70f, 70f);
+        public void ResetRotation() { targetYaw = 180f; targetPitch = 0f; }
 
-        public void RotatePartYaw(float deltaYaw)
+        public void ReceivePart(MechPart p)
         {
-            targetYaw += deltaYaw;
+            if (HasItem) return;
+            CurrentPart = p; p.IsOnWorkbench = true;
+            ResetRotation(); GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
+            StartCoroutine(SlideToWorkbench(p.transform, new Vector3(0f, 1.05f, 2.2f), Quaternion.Euler(0f, 180f, 0f), () =>
+            {
+                SpawnMiniNodes(new Color(1f, 0.8f, 0.1f), "Болт фиксатора");
+            }));
         }
 
-        public void RotatePartPitch(float deltaPitch)
+        public void ReceiveJaegerModule(GameObject mod, string name, Action onDone)
         {
-            targetPitch = Mathf.Clamp(targetPitch + deltaPitch, -75f, 75f);
+            if (HasItem) return;
+            CurrentJaegerModule = mod; currentJaegerName = name; onJaegerDone = onDone;
+            ResetRotation(); GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
+            mod.transform.position = new Vector3(0f, 2.2f, 2.2f);
+            StartCoroutine(SlideToWorkbench(mod.transform, new Vector3(0f, 1.05f, 2.2f), Quaternion.Euler(0f, 180f, 0f), () =>
+            {
+                SpawnMiniNodes(new Color(0.2f, 0.8f, 1f), "Калибровочный контакт");
+            }));
         }
 
-        public void ResetPartRotation()
+        private System.Collections.IEnumerator SlideToWorkbench(Transform t, Vector3 targetPos, Quaternion targetRot, Action onDone)
         {
-            targetYaw = initialRotationOnTable.eulerAngles.y;
-            targetPitch = initialRotationOnTable.eulerAngles.x;
+            Vector3 sP = t.position; Quaternion sR = t.rotation;
+            float el = 0f, d = 0.28f;
+            while (el < d && t != null) { el += Time.deltaTime; float p = Mathf.SmoothStep(0f, 1f, el / d); t.position = Vector3.Lerp(sP, targetPos, p); t.rotation = Quaternion.Slerp(sR, targetRot, p); yield return null; }
+            if (t != null) { t.position = targetPos; t.rotation = targetRot; }
+            onDone?.Invoke();
         }
 
-        #endregion
-
-        public void ReceivePartForRepair(MechPartInstance part)
+        private void SpawnMiniNodes(Color c, string prompt)
         {
-            if (HasPart)
+            ClearNodes(); nodesRemaining = 3;
+            for (int i = 0; i < 3; i++)
             {
-                Debug.LogWarning("[RepairWorkbench] На верстаке уже лежит объект!");
-                return;
+                var n = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                n.transform.position = new Vector3((i - 1) * 0.45f, 0.88f, 2.2f);
+                n.transform.localScale = new Vector3(0.12f, 0.04f, 0.12f);
+                n.GetComponent<Renderer>().material.color = c;
+                var clk = n.AddComponent<ClickableObject>();
+                clk.promptText = $"{prompt}: кликните для монтажа";
+                clk.onClick = () => { HangarAudioLight.Instance?.PlayBolt(); activeMiniNodes.Remove(n); Destroy(n); if (--nodesRemaining <= 0) FinishWork(); };
+                activeMiniNodes.Add(n);
             }
-
-            currentPart = part;
-            originalPartPosition = part.transform.position;
-            originalPartRotation = part.transform.rotation;
-            originalPartParent = part.transform.parent;
-
-            Rigidbody rb = part.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                originalPartKinematic = rb.isKinematic;
-                rb.isKinematic = true;
-                rb.linearVelocity = Vector3.zero;
-            }
-
-            Collider col = part.GetComponent<Collider>();
-            float halfHeight = 0.25f;
-            if (col != null)
-            {
-                halfHeight = col.bounds.extents.y;
-            }
-
-            Vector3 tableCenter = partMountPoint != null ? partMountPoint.position : new Vector3(0f, tableSurfaceY, 2.2f);
-            
-            if (part.Slot == PartSlot.Legs)
-            {
-                part.transform.rotation = Quaternion.Euler(0f, 90f, 90f);
-                part.transform.position = new Vector3(tableCenter.x, tableSurfaceY + 0.25f, tableCenter.z);
-            }
-            else if (part.Slot == PartSlot.RightArm)
-            {
-                part.transform.rotation = Quaternion.Euler(0f, 0f, 90f);
-                part.transform.position = new Vector3(tableCenter.x, tableSurfaceY + 0.25f, tableCenter.z);
-            }
-            else
-            {
-                part.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
-                part.transform.position = new Vector3(tableCenter.x, tableSurfaceY + halfHeight + 0.05f, tableCenter.z);
-            }
-
-            initialRotationOnTable = part.transform.rotation;
-            targetYaw = initialRotationOnTable.eulerAngles.y;
-            targetPitch = initialRotationOnTable.eulerAngles.x;
-            currentYaw = targetYaw;
-            currentPitch = targetPitch;
-
-            GameManager.Instance?.SwitchRoomView(RoomView.WorkbenchFocus);
-
-            Vector3 miniGameCenter = new Vector3(tableCenter.x, tableSurfaceY + 0.35f, tableCenter.z);
-
-            // Разнообразие мини-игр в зависимости от слота и урона
-            if (part.Slot == PartSlot.Head && wiringGame != null)
-            {
-                wiringGame.StartMiniGameAt(miniGameCenter);
-            }
-            else if (part.DurabilityPercent < 0.5f && weldingGame != null)
-            {
-                weldingGame.StartMiniGameAt(miniGameCenter);
-            }
-            else if (boltGame != null)
-            {
-                boltGame.StartMiniGameAt(miniGameCenter);
-            }
-
-            EventBus.TriggerPartSentToWorkbench(part);
-            Debug.Log($"<color=cyan>[RepairWorkbench]</color> Деталь {part.name} на верстаке. (A/D/W/S или ПКМ - вращение, Пробел - ремонт, T - смена модуля, Esc - выход).");
         }
 
-        public void ReceiveJaegerModule(GameObject moduleObj, string moduleName, int miniGameType, Action onComplete)
+        public void CycleModule()
         {
-            if (HasPart)
-            {
-                Debug.LogWarning("[RepairWorkbench] На верстаке уже лежит объект!");
-                return;
-            }
-
-            currentJaegerModule = moduleObj;
-            currentJaegerModuleName = moduleName;
-            onJaegerModuleCompleted = onComplete;
-
-            Vector3 tableCenter = partMountPoint != null ? partMountPoint.position : new Vector3(0f, tableSurfaceY, 2.2f);
-            currentJaegerModule.transform.position = new Vector3(tableCenter.x, tableSurfaceY + 0.3f, tableCenter.z);
-            currentJaegerModule.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
-
-            initialRotationOnTable = currentJaegerModule.transform.rotation;
-            targetYaw = 180f;
-            targetPitch = 0f;
-            currentYaw = 180f;
-            currentPitch = 0f;
-
-            GameManager.Instance?.SwitchRoomView(RoomView.WorkbenchFocus);
-
-            Vector3 miniGameCenter = new Vector3(tableCenter.x, tableSurfaceY + 0.35f, tableCenter.z);
-            if (miniGameType == 0 && wiringGame != null)
-            {
-                wiringGame.StartMiniGameAt(miniGameCenter);
-            }
-            else if (miniGameType == 1 && weldingGame != null)
-            {
-                weldingGame.StartMiniGameAt(miniGameCenter);
-            }
-            else if (boltGame != null)
-            {
-                boltGame.StartMiniGameAt(miniGameCenter);
-            }
-
-            Debug.Log($"<color=cyan>[RepairWorkbench]</color> Сборка модуля Егеря: <b>{moduleName}</b>. Вращайте A/D/W/S или ПКМ, выполните мини-игру!");
+            if (CurrentPart == null) return;
+            CurrentPart.Setup(ModuleCatalog.GetNextModule(CurrentPart.Data));
+            HangarAudioLight.Instance?.PlayBolt();
         }
 
-        public void CycleNextModuleForCurrentPart()
+        public void FinishWork()
         {
-            if (currentPart == null) return;
-
-            List<MechPartData> availableModules = ModuleCatalog.GetModulesForSlot(currentPart.Slot);
-            if (availableModules.Count <= 1)
+            ClearNodes();
+            if (CurrentJaegerModule != null)
             {
-                Debug.LogWarning("[RepairWorkbench] Для этого слота нет других доступных модулей!");
-                return;
+                Destroy(CurrentJaegerModule); CurrentJaegerModule = null;
+                onJaegerDone?.Invoke(); HangarAudioLight.Instance?.PlaySuccess();
+                GameManager.Instance?.SwitchView(RoomView.Hangar);
             }
-
-            int currentIndex = -1;
-            for (int i = 0; i < availableModules.Count; i++)
+            else if (CurrentPart != null)
             {
-                if (currentPart.Data != null && currentPart.Data.partId == availableModules[i].partId)
-                {
-                    currentIndex = i;
-                    break;
-                }
-            }
-
-            int nextIndex = (currentIndex + 1) % availableModules.Count;
-            MechPartData nextModule = availableModules[nextIndex];
-
-            // Устанавливаем новый модуль
-            currentPart.Initialize(nextModule, currentPart.Slot, 100f);
-
-            HangarAudio.Instance?.PlayBolt();
-            CameraShaker.Instance?.Shake(0.2f, 0.08f);
-
-            Debug.Log($"<color=green>[КАСТОМИЗАЦИЯ]</color> Установлен новый модуль: <b>{nextModule.partName}</b>! Урон: {nextModule.attackType} ({nextModule.attackPower}), Защита: {nextModule.resistanceType} ({nextModule.defensePower})");
-        }
-
-        private void HandleWeldingDone()
-        {
-            Vector3 center = partMountPoint != null ? partMountPoint.position : new Vector3(0f, tableSurfaceY, 2.2f);
-            if (boltGame != null && currentPart != null && currentPart.DurabilityPercent < 0.3f)
-            {
-                boltGame.StartMiniGameAt(new Vector3(center.x, tableSurfaceY + 0.35f, center.z));
-            }
-            else
-            {
-                FinishRepair();
+                GameManager.Instance?.TrySpend(CurrentPart.Data.repairCredits, CurrentPart.Data.repairAlloy);
+                CurrentPart.RepairFull(); CurrentPart.ReturnToSocket(); CurrentPart = null;
+                HangarAudioLight.Instance?.PlaySuccess();
+                GameManager.Instance?.SwitchView(RoomView.Hangar);
             }
         }
 
-        private void HandleWiringDone()
+        public void CancelWork()
         {
-            FinishRepair();
+            ClearNodes();
+            if (CurrentJaegerModule != null) { Destroy(CurrentJaegerModule); CurrentJaegerModule = null; }
+            if (CurrentPart != null) { CurrentPart.ReturnToSocket(); CurrentPart = null; }
+            GameManager.Instance?.SwitchView(RoomView.Hangar);
         }
 
-        private void HandleBoltsDone()
-        {
-            FinishRepair();
-        }
-
-        public void FinishRepair()
-        {
-            if (currentJaegerModule != null)
-            {
-                CleanupMiniGames();
-                Action callback = onJaegerModuleCompleted;
-                GameObject modObj = currentJaegerModule;
-                currentJaegerModule = null;
-                currentJaegerModuleName = null;
-                onJaegerModuleCompleted = null;
-
-                if (modObj != null) Destroy(modObj);
-
-                HangarAudio.Instance?.PlaySuccess();
-                callback?.Invoke();
-                GameManager.Instance?.SwitchRoomView(RoomView.Hangar);
-                return;
-            }
-
-            if (currentPart == null) return;
-
-            int creditCost = currentPart.Data != null ? currentPart.Data.repairCreditCost : 30;
-            int alloyCost = currentPart.Data != null ? currentPart.Data.repairAlloyCost : 15;
-
-            GameManager.Instance?.TrySpendResources(creditCost, alloyCost);
-            currentPart.RepairFull();
-
-            HangarAudio.Instance?.PlaySuccess();
-            Debug.Log($"<color=green>[RepairWorkbench] Деталь {currentPart.name} отремонтирована на 100%!</color>");
-
-            EventBus.TriggerPartRepairFinished(currentPart);
-            ReturnPartToMech();
-        }
-
-        public void CancelOrReturnCurrentPart()
-        {
-            if (currentJaegerModule != null)
-            {
-                CleanupMiniGames();
-                Destroy(currentJaegerModule);
-                currentJaegerModule = null;
-                currentJaegerModuleName = null;
-                onJaegerModuleCompleted = null;
-                GameManager.Instance?.SwitchRoomView(RoomView.Hangar);
-                return;
-            }
-
-            ReturnPartToMech();
-        }
-
-        public void ReturnPartToMech()
-        {
-            if (currentPart == null) return;
-
-            CleanupMiniGames();
-
-            Rigidbody rb = currentPart.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.isKinematic = originalPartKinematic;
-            }
-
-            currentPart.ReturnToSocket();
-            currentPart = null;
-
-            GameManager.Instance?.SwitchRoomView(RoomView.Hangar);
-        }
-
-        private void CleanupMiniGames()
-        {
-            if (boltGame != null) boltGame.Cleanup();
-            if (weldingGame != null) weldingGame.Cleanup();
-            if (wiringGame != null) wiringGame.Cleanup();
-        }
+        private void ClearNodes() { foreach (var n in activeMiniNodes) if (n != null) Destroy(n); activeMiniNodes.Clear(); }
     }
 }
