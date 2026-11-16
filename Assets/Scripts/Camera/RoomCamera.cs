@@ -1,5 +1,6 @@
 using UnityEngine;
 using HangarGame.Core;
+using HangarGame.Repair;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
