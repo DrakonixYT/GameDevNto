@@ -17,7 +17,7 @@ namespace HangarGame.Prototype
         public static GameAutomatedTester Instance { get; private set; }
 
         [Header("Test Settings")]
-        [SerializeField] private bool runTestOnStart = true;
+        [SerializeField] private bool runTestOnStart = false;
 
         private void Awake()
         {
