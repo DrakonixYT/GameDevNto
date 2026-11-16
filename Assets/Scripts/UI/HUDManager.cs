@@ -12,7 +12,7 @@ namespace HangarGame.UI
     {
         public static HUDManager Instance { get; private set; }
 
-        [Header("Room Navigation Buttons (FNAF-style 180 deg)")]
+        [Header("Room Navigation Buttons (180 deg)")]
         [SerializeField] private Button btnLookLeft;
         [SerializeField] private Button btnLookRight;
         [SerializeField] private Text txtLookLeft;
@@ -26,11 +26,16 @@ namespace HangarGame.UI
         [SerializeField] private Text txtWorkbenchTitle;
         [SerializeField] private Text txtModuleInfo;
 
+        [Header("Workbench 2-Axis Rotation Controls")]
+        [SerializeField] private Button btnRotateYawMinus;
+        [SerializeField] private Button btnRotateYawPlus;
+        [SerializeField] private Button btnRotatePitchMinus;
+        [SerializeField] private Button btnRotatePitchPlus;
+        [SerializeField] private Button btnResetRotation;
+
         [Header("Status & Resources UI")]
         [SerializeField] private Text txtResources;
-        [SerializeField] private Text txtJaegerProgress;
-        [SerializeField] private Slider sliderJaeger;
-        [SerializeField] private Button btnBuildJaeger;
+        [SerializeField] private Text txtRoomIndicator;
 
         [Header("Hover Prompt UI")]
         [SerializeField] private Text txtHoverPrompt;
@@ -56,7 +61,6 @@ namespace HangarGame.UI
         private void OnEnable()
         {
             EventBus.OnResourcesUpdated += HandleResourcesUpdated;
-            EventBus.OnJaegerProgressUpdated += HandleJaegerProgressUpdated;
             EventBus.OnRoomViewChanged += HandleRoomViewChanged;
             EventBus.OnPartSentToWorkbench += HandlePartSentToWorkbench;
             EventBus.OnGameWon += HandleGameWon;
@@ -65,7 +69,6 @@ namespace HangarGame.UI
         private void OnDisable()
         {
             EventBus.OnResourcesUpdated -= HandleResourcesUpdated;
-            EventBus.OnJaegerProgressUpdated -= HandleJaegerProgressUpdated;
             EventBus.OnRoomViewChanged -= HandleRoomViewChanged;
             EventBus.OnPartSentToWorkbench -= HandlePartSentToWorkbench;
             EventBus.OnGameWon -= HandleGameWon;
@@ -83,9 +86,15 @@ namespace HangarGame.UI
             if (btnExitWorkbench == null) btnExitWorkbench = transform.Find("Workbench_Panel/Btn_ExitWorkbench")?.GetComponent<Button>();
             if (btnInstantRepair == null) btnInstantRepair = transform.Find("Workbench_Panel/Btn_InstantRepair")?.GetComponent<Button>();
             if (btnSwapModule == null) btnSwapModule = transform.Find("Workbench_Panel/Btn_SwapModule")?.GetComponent<Button>();
-            if (btnBuildJaeger == null) btnBuildJaeger = transform.Find("Btn_BuildJaeger")?.GetComponent<Button>();
             if (workbenchPanel == null) workbenchPanel = transform.Find("Workbench_Panel")?.gameObject;
             if (victoryPanel == null) victoryPanel = transform.Find("Victory_Panel")?.gameObject;
+
+            // Кнопки вращения детали
+            if (btnRotateYawMinus == null) btnRotateYawMinus = transform.Find("Workbench_Panel/Btn_RotYawMinus")?.GetComponent<Button>();
+            if (btnRotateYawPlus == null) btnRotateYawPlus = transform.Find("Workbench_Panel/Btn_RotYawPlus")?.GetComponent<Button>();
+            if (btnRotatePitchMinus == null) btnRotatePitchMinus = transform.Find("Workbench_Panel/Btn_RotPitchMinus")?.GetComponent<Button>();
+            if (btnRotatePitchPlus == null) btnRotatePitchPlus = transform.Find("Workbench_Panel/Btn_RotPitchPlus")?.GetComponent<Button>();
+            if (btnResetRotation == null) btnResetRotation = transform.Find("Workbench_Panel/Btn_RotReset")?.GetComponent<Button>();
 
             if (btnLookLeft != null)
             {
@@ -104,7 +113,7 @@ namespace HangarGame.UI
                 btnExitWorkbench.onClick.RemoveAllListeners();
                 btnExitWorkbench.onClick.AddListener(() =>
                 {
-                    RepairWorkbench.Instance?.ReturnPartToMech();
+                    RepairWorkbench.Instance?.CancelOrReturnCurrentPart();
                 });
             }
 
@@ -127,13 +136,35 @@ namespace HangarGame.UI
                 });
             }
 
-            if (btnBuildJaeger != null)
+            // Биндинг кнопок вращения детали по 2 осям
+            if (btnRotateYawMinus != null)
             {
-                btnBuildJaeger.onClick.RemoveAllListeners();
-                btnBuildJaeger.onClick.AddListener(() =>
-                {
-                    JaegerProjectManager.Instance?.InvestInJaeger();
-                });
+                btnRotateYawMinus.onClick.RemoveAllListeners();
+                btnRotateYawMinus.onClick.AddListener(() => RepairWorkbench.Instance?.RotatePartYaw(-30f));
+            }
+
+            if (btnRotateYawPlus != null)
+            {
+                btnRotateYawPlus.onClick.RemoveAllListeners();
+                btnRotateYawPlus.onClick.AddListener(() => RepairWorkbench.Instance?.RotatePartYaw(30f));
+            }
+
+            if (btnRotatePitchMinus != null)
+            {
+                btnRotatePitchMinus.onClick.RemoveAllListeners();
+                btnRotatePitchMinus.onClick.AddListener(() => RepairWorkbench.Instance?.RotatePartPitch(-20f));
+            }
+
+            if (btnRotatePitchPlus != null)
+            {
+                btnRotatePitchPlus.onClick.RemoveAllListeners();
+                btnRotatePitchPlus.onClick.AddListener(() => RepairWorkbench.Instance?.RotatePartPitch(20f));
+            }
+
+            if (btnResetRotation != null)
+            {
+                btnResetRotation.onClick.RemoveAllListeners();
+                btnResetRotation.onClick.AddListener(() => RepairWorkbench.Instance?.ResetPartRotation());
             }
         }
 
@@ -142,19 +173,6 @@ namespace HangarGame.UI
             if (txtResources != null)
             {
                 txtResources.text = $"КРЕДИТЫ: {credits} ¢   |   СПЛАВ: {alloy} т.";
-            }
-        }
-
-        private void HandleJaegerProgressUpdated(float progress01)
-        {
-            if (sliderJaeger != null)
-            {
-                sliderJaeger.value = progress01;
-            }
-
-            if (txtJaegerProgress != null)
-            {
-                txtJaegerProgress.text = $"ПРОЕКТ 'ЕГЕРЬ': {Mathf.RoundToInt(progress01 * 100f)}% (Собрать 100% для победы)";
             }
         }
 
@@ -187,6 +205,13 @@ namespace HangarGame.UI
                 txtLookRight.text = (view == RoomView.Hangar) ? "Диспетчерская ▶\n(180° / D / E)" : "Ангар ▶\n(180° / D / E)";
             }
 
+            if (txtRoomIndicator != null)
+            {
+                if (view == RoomView.Hangar) txtRoomIndicator.text = "СЕКТОР: АНГАР [0°]";
+                else if (view == RoomView.DispatchConsole) txtRoomIndicator.text = "СЕКТОР: ДИСПЕТЧЕРСКАЯ [180°]";
+                else txtRoomIndicator.text = "РЕЖИМ: ВЕРСТАК ТО";
+            }
+
             if (isWorkbench)
             {
                 UpdateWorkbenchModuleInfo();
@@ -200,17 +225,56 @@ namespace HangarGame.UI
 
         public void UpdateWorkbenchModuleInfo()
         {
-            MechPartInstance part = RepairWorkbench.Instance != null ? RepairWorkbench.Instance.CurrentPart : null;
-            if (part != null)
+            if (RepairWorkbench.Instance == null) return;
+
+            if (RepairWorkbench.Instance.IsJaegerModule)
             {
                 if (txtWorkbenchTitle != null)
                 {
-                    txtWorkbenchTitle.text = $"🔧 ВЕРСТАК: {part.PartName} (Прочность: {part.DurabilityPercent * 100f:F0}%)";
+                    txtWorkbenchTitle.text = $"🔨 СБОРКА МОДУЛЯ ЕГЕРЯ: {RepairWorkbench.Instance.CurrentItemName}";
                 }
 
                 if (txtModuleInfo != null)
                 {
-                    txtModuleInfo.text = $"Атака: {part.AttackType} ({part.AttackPower:F0})  |  Защита: {part.ResistanceType} ({part.DefensePower:F0})";
+                    txtModuleInfo.text = "Осмотрите деталь (A/D/W/S или ПКМ). Выполните мини-игру для установки на каркас Егеря.";
+                }
+
+                if (btnSwapModule != null)
+                {
+                    btnSwapModule.gameObject.SetActive(false);
+                }
+
+                if (btnInstantRepair != null)
+                {
+                    Text t = btnInstantRepair.GetComponentInChildren<Text>();
+                    if (t != null) t.text = "⚡ УСТАНОВИТЬ НА КАРКАС (SPACE)";
+                }
+            }
+            else
+            {
+                MechPartInstance part = RepairWorkbench.Instance.CurrentPart;
+                if (part != null)
+                {
+                    if (txtWorkbenchTitle != null)
+                    {
+                        txtWorkbenchTitle.text = $"🔧 ВЕРСТАК: {part.PartName} (Прочность: {part.DurabilityPercent * 100f:F0}%)";
+                    }
+
+                    if (txtModuleInfo != null)
+                    {
+                        txtModuleInfo.text = $"Атака: {part.AttackType} ({part.AttackPower:F0})  |  Защита: {part.ResistanceType} ({part.DefensePower:F0})";
+                    }
+
+                    if (btnSwapModule != null)
+                    {
+                        btnSwapModule.gameObject.SetActive(true);
+                    }
+
+                    if (btnInstantRepair != null)
+                    {
+                        Text t = btnInstantRepair.GetComponentInChildren<Text>();
+                        if (t != null) t.text = "⚡ БЫСТРЫЙ РЕМОНТ (SPACE)";
+                    }
                 }
             }
         }

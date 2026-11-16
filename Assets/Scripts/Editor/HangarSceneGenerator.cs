@@ -40,6 +40,14 @@ namespace HangarGame.EditorTools
         {
             // Чистим старые сгенерированные объекты, если они есть
             string[] objectsToClean = new string[] {
+                "--- 01_MANAGERS ---",
+                "--- 02_LIGHTING_AND_VFX ---",
+                "--- 03_HANGAR_ROOM ---",
+                "--- 04_MECH_ATLANT ---",
+                "--- 05_JAEGER_FRAME ---",
+                "--- 06_WORKBENCH ---",
+                "--- 07_DISPATCH_CONSOLE ---",
+                "--- 08_MINIMAL_HUD ---",
                 "Hangar_Room",
                 "--- CORE MANAGERS ---",
                 "HUD_Canvas",

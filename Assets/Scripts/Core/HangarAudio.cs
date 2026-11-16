@@ -41,7 +41,7 @@ namespace HangarGame.Core
             proceduralClips["Click"] = CreateToneClip("Click", 800f, 0.05f, 0.4f);
             proceduralClips["Bolt"] = CreateToneClip("Bolt", 350f, 0.08f, 0.5f);
             proceduralClips["Weld"] = CreateNoiseClip("Weld", 0.15f, 0.3f);
-            proceduralClips["Alarm"] = CreateDualToneClip("Alarm", 440f, 880f, 0.4f);
+            proceduralClips["Alarm"] = CreateAlarmKlaxonClip("Alarm", 1.2f);
             proceduralClips["Success"] = CreateMajorChordClip("Success", 440f, 0.35f);
             proceduralClips["Warning"] = CreateToneClip("Warning", 220f, 0.3f, 0.6f);
             proceduralClips["Victory"] = CreateMajorChordClip("Victory", 523.25f, 0.8f);
@@ -76,6 +76,26 @@ namespace HangarGame.Core
                 float t = (float)i / sampleRate;
                 float envelope = 1f - (float)i / samplesCount; // Linear decay
                 data[i] = Mathf.Sin(2f * Mathf.PI * freq * t) * envelope * volume;
+            }
+
+            AudioClip clip = AudioClip.Create(name, samplesCount, 1, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private AudioClip CreateAlarmKlaxonClip(string name, float duration)
+        {
+            int sampleRate = 44100;
+            int samplesCount = Mathf.CeilToInt(sampleRate * duration);
+            float[] data = new float[samplesCount];
+
+            for (int i = 0; i < samplesCount; i++)
+            {
+                float t = (float)i / sampleRate;
+                float cycle = (t % 0.35f) / 0.35f;
+                float freq = (cycle < 0.5f) ? 520f : 860f;
+                float envelope = 0.5f + 0.5f * Mathf.Sin(t * Mathf.PI / duration);
+                data[i] = Mathf.Sin(2f * Mathf.PI * freq * t) * envelope * 0.6f;
             }
 
             AudioClip clip = AudioClip.Create(name, samplesCount, 1, sampleRate, false);

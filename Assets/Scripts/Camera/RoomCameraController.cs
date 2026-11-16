@@ -90,9 +90,14 @@ namespace HangarGame.CameraControl
             escape = Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Backspace);
 #endif
 
-            if (turnLeft || turnRight)
+            // Поворот комнаты 180° доступен только в обычном виде (Ангар <-> Диспетчерская).
+            // В режиме верстака клавиши A, D, W, S используются для вращения детали!
+            if (currentView != RoomView.WorkbenchFocus)
             {
-                Toggle180View();
+                if (turnLeft || turnRight)
+                {
+                    Toggle180View();
+                }
             }
 
             if (escape && currentView == RoomView.WorkbenchFocus)
@@ -191,7 +196,7 @@ namespace HangarGame.CameraControl
 
                 case RoomView.DispatchConsole:
                     targetPosition = roomPosition;
-                    targetRotation = Quaternion.Euler(currentLean.y, dispatchYaw - currentLean.x, 0f);
+                    targetRotation = Quaternion.Euler(currentLean.y, dispatchYaw + currentLean.x, 0f);
                     break;
 
                 case RoomView.WorkbenchFocus:

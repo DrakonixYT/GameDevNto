@@ -4,6 +4,7 @@ using UnityEngine;
 using HangarGame.Core;
 using HangarGame.Data;
 using HangarGame.Mechs;
+using HangarGame.Repair;
 using HangarGame.CameraControl;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -160,6 +161,20 @@ namespace HangarGame.Dispatch
             if (mech.IsDeployed)
             {
                 Debug.LogWarning("[DispatchManager] Мех уже отправлен на боевое дежурство!");
+                return false;
+            }
+
+            if (RepairWorkbench.Instance != null && RepairWorkbench.Instance.HasPart)
+            {
+                Debug.LogWarning("[DispatchManager] Нельзя отправить робота в бой: деталь находится на верстаке!");
+                EventBus.TriggerThreatResolved("⚠ ОШИБКА: Робот разобран! Установите модуль на стапель перед вылетом.");
+                return false;
+            }
+
+            if (mech.HasMissingOrDetachedParts())
+            {
+                Debug.LogWarning("[DispatchManager] Нельзя отправить робота в бой: робот разобран!");
+                EventBus.TriggerThreatResolved("⚠ ОШИБКА: Робот разобран! Не все боевые модули установлены на корпус.");
                 return false;
             }
 

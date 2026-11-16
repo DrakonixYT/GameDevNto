@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using HangarGame.Core;
@@ -18,6 +19,10 @@ namespace HangarGame.Repair
         [SerializeField] private Transform partMountPoint;
         [SerializeField] private float tableSurfaceY = 0.82f;
 
+        [Header("2-Axis Inspection Rotation")]
+        [SerializeField] private float keyboardRotateSpeed = 100f;
+        [SerializeField] private float mouseRotateSensitivity = 0.5f;
+
         [Header("Mini-games")]
         [SerializeField] private BoltMiniGame boltGame;
         [SerializeField] private WeldingMiniGame weldingGame;
@@ -29,8 +34,23 @@ namespace HangarGame.Repair
         private Transform originalPartParent;
         private bool originalPartKinematic = true;
 
+        // Вращение детали по 2 осям
+        private float currentYaw = 0f;
+        private float currentPitch = 0f;
+        private float targetYaw = 0f;
+        private float targetPitch = 0f;
+        private Quaternion initialRotationOnTable;
+
+        // Поддержка сборки модулей Егеря на верстаке
+        private GameObject currentJaegerModule;
+        private string currentJaegerModuleName;
+        private Action onJaegerModuleCompleted;
+
         public MechPartInstance CurrentPart => currentPart;
-        public bool HasPart => currentPart != null;
+        public GameObject CurrentJaegerModule => currentJaegerModule;
+        public bool HasPart => currentPart != null || currentJaegerModule != null;
+        public bool IsJaegerModule => currentJaegerModule != null;
+        public string CurrentItemName => currentPart != null ? currentPart.PartName : (currentJaegerModule != null ? currentJaegerModuleName : string.Empty);
         public Transform MountPoint => partMountPoint;
 
         private void Awake()
@@ -74,8 +94,14 @@ namespace HangarGame.Repair
 
         private void Update()
         {
-            if (currentPart == null) return;
+            if (!HasPart) return;
 
+            HandleInput();
+            Update2AxisRotation();
+        }
+
+        private void HandleInput()
+        {
             bool esc = false;
             bool space = false;
             bool swapKey = false;
@@ -95,23 +121,105 @@ namespace HangarGame.Repair
 
             if (esc)
             {
-                ReturnPartToMech();
+                CancelOrReturnCurrentPart();
             }
             else if (space)
             {
                 FinishRepair();
             }
-            else if (swapKey)
+            else if (swapKey && currentPart != null)
             {
                 CycleNextModuleForCurrentPart();
             }
         }
 
+        private void Update2AxisRotation()
+        {
+            // Управление клавишами (A/D/Left/Right - Yaw, W/S/Up/Down - Pitch)
+            float hInput = 0f;
+            float vInput = 0f;
+
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null)
+            {
+                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) hInput -= 1f;
+                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) hInput += 1f;
+                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) vInput += 1f;
+                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) vInput -= 1f;
+            }
+#else
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) hInput -= 1f;
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) hInput += 1f;
+            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) vInput += 1f;
+            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) vInput -= 1f;
+#endif
+
+            // Вращение перетаскиванием мыши (ПКМ или СКМ)
+            bool isMouseDragging = false;
+            Vector2 mouseDelta = Vector2.zero;
+
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null && (Mouse.current.rightButton.isPressed || Mouse.current.middleButton.isPressed))
+            {
+                isMouseDragging = true;
+                mouseDelta = Mouse.current.delta.ReadValue();
+            }
+#else
+            if (Input.GetMouseButton(1) || Input.GetMouseButton(2))
+            {
+                isMouseDragging = true;
+                mouseDelta = new Vector2(Input.GetAxis("Mouse X") * 8f, Input.GetAxis("Mouse Y") * 8f);
+            }
+#endif
+
+            if (isMouseDragging)
+            {
+                targetYaw += mouseDelta.x * mouseRotateSensitivity;
+                targetPitch -= mouseDelta.y * mouseRotateSensitivity;
+            }
+
+            if (Mathf.Abs(hInput) > 0.01f || Mathf.Abs(vInput) > 0.01f)
+            {
+                targetYaw += hInput * keyboardRotateSpeed * Time.deltaTime;
+                targetPitch -= vInput * keyboardRotateSpeed * Time.deltaTime;
+            }
+
+            targetPitch = Mathf.Clamp(targetPitch, -75f, 75f);
+            currentYaw = Mathf.Lerp(currentYaw, targetYaw, Time.deltaTime * 14f);
+            currentPitch = Mathf.Lerp(currentPitch, targetPitch, Time.deltaTime * 14f);
+
+            Transform targetTransform = currentPart != null ? currentPart.transform : (currentJaegerModule != null ? currentJaegerModule.transform : null);
+            if (targetTransform != null)
+            {
+                targetTransform.rotation = Quaternion.Euler(currentPitch, currentYaw, 0f);
+            }
+        }
+
+        #region Public 2-Axis Rotation Controls (Для кнопок UI)
+
+        public void RotatePartYaw(float deltaYaw)
+        {
+            targetYaw += deltaYaw;
+        }
+
+        public void RotatePartPitch(float deltaPitch)
+        {
+            targetPitch = Mathf.Clamp(targetPitch + deltaPitch, -75f, 75f);
+        }
+
+        public void ResetPartRotation()
+        {
+            targetYaw = initialRotationOnTable.eulerAngles.y;
+            targetPitch = initialRotationOnTable.eulerAngles.x;
+        }
+
+        #endregion
+
         public void ReceivePartForRepair(MechPartInstance part)
         {
-            if (currentPart != null)
+            if (HasPart)
             {
-                Debug.LogWarning("[RepairWorkbench] На верстаке уже лежит деталь!");
+                Debug.LogWarning("[RepairWorkbench] На верстаке уже лежит объект!");
                 return;
             }
 
@@ -153,6 +261,12 @@ namespace HangarGame.Repair
                 part.transform.position = new Vector3(tableCenter.x, tableSurfaceY + halfHeight + 0.05f, tableCenter.z);
             }
 
+            initialRotationOnTable = part.transform.rotation;
+            targetYaw = initialRotationOnTable.eulerAngles.y;
+            targetPitch = initialRotationOnTable.eulerAngles.x;
+            currentYaw = targetYaw;
+            currentPitch = targetPitch;
+
             GameManager.Instance?.SwitchRoomView(RoomView.WorkbenchFocus);
 
             Vector3 miniGameCenter = new Vector3(tableCenter.x, tableSurfaceY + 0.35f, tableCenter.z);
@@ -172,7 +286,48 @@ namespace HangarGame.Repair
             }
 
             EventBus.TriggerPartSentToWorkbench(part);
-            Debug.Log($"<color=cyan>[RepairWorkbench]</color> Деталь {part.name} на верстаке. (Пробел - ремонт, T - сменить модуль, Esc - выход).");
+            Debug.Log($"<color=cyan>[RepairWorkbench]</color> Деталь {part.name} на верстаке. (A/D/W/S или ПКМ - вращение, Пробел - ремонт, T - смена модуля, Esc - выход).");
+        }
+
+        public void ReceiveJaegerModule(GameObject moduleObj, string moduleName, int miniGameType, Action onComplete)
+        {
+            if (HasPart)
+            {
+                Debug.LogWarning("[RepairWorkbench] На верстаке уже лежит объект!");
+                return;
+            }
+
+            currentJaegerModule = moduleObj;
+            currentJaegerModuleName = moduleName;
+            onJaegerModuleCompleted = onComplete;
+
+            Vector3 tableCenter = partMountPoint != null ? partMountPoint.position : new Vector3(0f, tableSurfaceY, 2.2f);
+            currentJaegerModule.transform.position = new Vector3(tableCenter.x, tableSurfaceY + 0.3f, tableCenter.z);
+            currentJaegerModule.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+
+            initialRotationOnTable = currentJaegerModule.transform.rotation;
+            targetYaw = 180f;
+            targetPitch = 0f;
+            currentYaw = 180f;
+            currentPitch = 0f;
+
+            GameManager.Instance?.SwitchRoomView(RoomView.WorkbenchFocus);
+
+            Vector3 miniGameCenter = new Vector3(tableCenter.x, tableSurfaceY + 0.35f, tableCenter.z);
+            if (miniGameType == 0 && wiringGame != null)
+            {
+                wiringGame.StartMiniGameAt(miniGameCenter);
+            }
+            else if (miniGameType == 1 && weldingGame != null)
+            {
+                weldingGame.StartMiniGameAt(miniGameCenter);
+            }
+            else if (boltGame != null)
+            {
+                boltGame.StartMiniGameAt(miniGameCenter);
+            }
+
+            Debug.Log($"<color=cyan>[RepairWorkbench]</color> Сборка модуля Егеря: <b>{moduleName}</b>. Вращайте A/D/W/S или ПКМ, выполните мини-игру!");
         }
 
         public void CycleNextModuleForCurrentPart()
@@ -211,7 +366,7 @@ namespace HangarGame.Repair
         private void HandleWeldingDone()
         {
             Vector3 center = partMountPoint != null ? partMountPoint.position : new Vector3(0f, tableSurfaceY, 2.2f);
-            if (boltGame != null)
+            if (boltGame != null && currentPart != null && currentPart.DurabilityPercent < 0.3f)
             {
                 boltGame.StartMiniGameAt(new Vector3(center.x, tableSurfaceY + 0.35f, center.z));
             }
@@ -233,6 +388,23 @@ namespace HangarGame.Repair
 
         public void FinishRepair()
         {
+            if (currentJaegerModule != null)
+            {
+                CleanupMiniGames();
+                Action callback = onJaegerModuleCompleted;
+                GameObject modObj = currentJaegerModule;
+                currentJaegerModule = null;
+                currentJaegerModuleName = null;
+                onJaegerModuleCompleted = null;
+
+                if (modObj != null) Destroy(modObj);
+
+                HangarAudio.Instance?.PlaySuccess();
+                callback?.Invoke();
+                GameManager.Instance?.SwitchRoomView(RoomView.Hangar);
+                return;
+            }
+
             if (currentPart == null) return;
 
             int creditCost = currentPart.Data != null ? currentPart.Data.repairCreditCost : 30;
@@ -248,13 +420,27 @@ namespace HangarGame.Repair
             ReturnPartToMech();
         }
 
+        public void CancelOrReturnCurrentPart()
+        {
+            if (currentJaegerModule != null)
+            {
+                CleanupMiniGames();
+                Destroy(currentJaegerModule);
+                currentJaegerModule = null;
+                currentJaegerModuleName = null;
+                onJaegerModuleCompleted = null;
+                GameManager.Instance?.SwitchRoomView(RoomView.Hangar);
+                return;
+            }
+
+            ReturnPartToMech();
+        }
+
         public void ReturnPartToMech()
         {
             if (currentPart == null) return;
 
-            if (boltGame != null) boltGame.Cleanup();
-            if (weldingGame != null) weldingGame.Cleanup();
-            if (wiringGame != null) wiringGame.Cleanup();
+            CleanupMiniGames();
 
             Rigidbody rb = currentPart.GetComponent<Rigidbody>();
             if (rb != null)
@@ -266,6 +452,13 @@ namespace HangarGame.Repair
             currentPart = null;
 
             GameManager.Instance?.SwitchRoomView(RoomView.Hangar);
+        }
+
+        private void CleanupMiniGames()
+        {
+            if (boltGame != null) boltGame.Cleanup();
+            if (weldingGame != null) weldingGame.Cleanup();
+            if (wiringGame != null) wiringGame.Cleanup();
         }
     }
 }

@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using HangarGame.Core;
 using HangarGame.Dispatch;
 using HangarGame.Mechs;
+using HangarGame.Repair;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -11,25 +12,30 @@ namespace HangarGame.UI
 {
     public class DispatchUI : MonoBehaviour
     {
-        [Header("Containers")]
-        [SerializeField] private GameObject dispatchContainer;
-        [SerializeField] private GameObject activeThreatCard;
-        [SerializeField] private GameObject missionProgressCard;
-
-        [Header("Threat UI Elements")]
+        [Header("Terminal Header & State")]
+        [SerializeField] private Text txtTerminalStatus;
         [SerializeField] private Text txtThreatName;
         [SerializeField] private Text txtThreatDetails;
-        [SerializeField] private Button btnDeployMech;
+        [SerializeField] private Text txtMechStatusAlert;
 
-        [Header("Adaptation & Logs")]
-        [SerializeField] private Text txtAdaptationAlert;
-        [SerializeField] private Text txtMissionLog;
-
-        [Header("Tactical In-Battle Decision UI")]
+        [Header("Tactical Decision State (QTE)")]
         [SerializeField] private GameObject tacticalPromptPanel;
         [SerializeField] private Text txtTacticalDirective;
         [SerializeField] private Text txtTacticalTimer;
         [SerializeField] private Button btnTacticalAction;
+
+        [Header("Dispatch Controls")]
+        [SerializeField] private Button btnDeployMech;
+        [SerializeField] private Button btnScanRadar;
+        [SerializeField] private Text txtDeployBtnLabel;
+
+        [Header("Jaeger Construction Section on Terminal")]
+        [SerializeField] private Text txtJaegerProjectInfo;
+        [SerializeField] private Button btnBuildJaegerModule;
+
+        [Header("Logs & Radio")]
+        [SerializeField] private Text txtMissionLog;
+        [SerializeField] private Text txtAdaptationAlert;
 
         [Header("Assigned Mech Reference")]
         [SerializeField] private MechInstance targetMech;
@@ -46,9 +52,9 @@ namespace HangarGame.UI
             EventBus.OnThreatAppeared += HandleThreatAppeared;
             EventBus.OnThreatResolved += HandleThreatResolved;
             EventBus.OnEnemyAdapted += HandleEnemyAdapted;
-            EventBus.OnRoomViewChanged += HandleRoomViewChanged;
             EventBus.OnTacticalPromptAppeared += HandleTacticalPromptAppeared;
             EventBus.OnTacticalPromptCleared += HandleTacticalPromptCleared;
+            EventBus.OnJaegerProgressUpdated += HandleJaegerProgressUpdated;
 
             UpdateUIState();
         }
@@ -58,9 +64,9 @@ namespace HangarGame.UI
             EventBus.OnThreatAppeared -= HandleThreatAppeared;
             EventBus.OnThreatResolved -= HandleThreatResolved;
             EventBus.OnEnemyAdapted -= HandleEnemyAdapted;
-            EventBus.OnRoomViewChanged -= HandleRoomViewChanged;
             EventBus.OnTacticalPromptAppeared -= HandleTacticalPromptAppeared;
             EventBus.OnTacticalPromptCleared -= HandleTacticalPromptCleared;
+            EventBus.OnJaegerProgressUpdated -= HandleJaegerProgressUpdated;
         }
 
         public void FindAndWireElements()
@@ -70,18 +76,10 @@ namespace HangarGame.UI
                 targetMech = FindObjectOfType<MechInstance>();
             }
 
-            if (btnDeployMech == null)
-            {
-                Button[] allButtons = GetComponentsInChildren<Button>(true);
-                foreach (var b in allButtons)
-                {
-                    if (b.name == "Btn_Deploy")
-                    {
-                        btnDeployMech = b;
-                        break;
-                    }
-                }
-            }
+            if (btnDeployMech == null) btnDeployMech = transform.Find("Btn_Deploy")?.GetComponent<Button>();
+            if (btnScanRadar == null) btnScanRadar = transform.Find("Btn_ScanRadar")?.GetComponent<Button>();
+            if (btnTacticalAction == null) btnTacticalAction = transform.Find("TacticalPromptPanel/Btn_TacticalAction")?.GetComponent<Button>();
+            if (btnBuildJaegerModule == null) btnBuildJaegerModule = transform.Find("Btn_BuildJaegerModule")?.GetComponent<Button>();
 
             if (btnDeployMech != null)
             {
@@ -89,29 +87,10 @@ namespace HangarGame.UI
                 btnDeployMech.onClick.AddListener(OnDeployClicked);
             }
 
-            if (activeThreatCard == null)
+            if (btnScanRadar != null)
             {
-                Transform card = transform.Find("ThreatCard");
-                if (card != null) activeThreatCard = card.gameObject;
-            }
-
-            if (missionProgressCard == null)
-            {
-                Transform mCard = transform.Find("MissionProgressCard");
-                if (mCard != null) missionProgressCard = mCard.gameObject;
-            }
-
-            if (btnTacticalAction == null)
-            {
-                Button[] allButtons = GetComponentsInChildren<Button>(true);
-                foreach (var b in allButtons)
-                {
-                    if (b.name == "Btn_TacticalAction")
-                    {
-                        btnTacticalAction = b;
-                        break;
-                    }
-                }
+                btnScanRadar.onClick.RemoveAllListeners();
+                btnScanRadar.onClick.AddListener(OnScanRadarClicked);
             }
 
             if (btnTacticalAction != null)
@@ -120,10 +99,10 @@ namespace HangarGame.UI
                 btnTacticalAction.onClick.AddListener(OnTacticalActionClicked);
             }
 
-            if (tacticalPromptPanel == null && missionProgressCard != null)
+            if (btnBuildJaegerModule != null)
             {
-                Transform tacPanel = missionProgressCard.transform.Find("TacticalPromptPanel");
-                if (tacPanel != null) tacticalPromptPanel = tacPanel.gameObject;
+                btnBuildJaegerModule.onClick.RemoveAllListeners();
+                btnBuildJaegerModule.onClick.AddListener(OnBuildJaegerModuleClicked);
             }
         }
 
@@ -134,22 +113,54 @@ namespace HangarGame.UI
                 targetMech = FindObjectOfType<MechInstance>();
             }
 
+            UpdateUIState();
+        }
+
+        private void UpdateUIState()
+        {
             bool inBattle = DispatchManager.Instance != null && DispatchManager.Instance.IsMissionInProgress;
+            bool hasThreat = DispatchManager.Instance != null && DispatchManager.Instance.HasActiveThreat;
 
-            if (missionProgressCard != null)
+            bool partOnWorkbench = RepairWorkbench.Instance != null && RepairWorkbench.Instance.HasPart;
+            bool mechDismantled = targetMech != null && targetMech.HasMissingOrDetachedParts();
+            bool mechReady = targetMech != null && !targetMech.IsDeployed && !partOnWorkbench && !mechDismantled;
+
+            // Статус готовности меха
+            if (txtMechStatusAlert != null)
             {
-                missionProgressCard.SetActive(inBattle);
+                if (inBattle)
+                {
+                    txtMechStatusAlert.text = "⚡ МЕХ ВЕДЕТ БОЕВЫЕ ДЕЙСТВИЯ В ГОРОДЕ...";
+                    txtMechStatusAlert.color = Color.yellow;
+                }
+                else if (partOnWorkbench || mechDismantled)
+                {
+                    txtMechStatusAlert.text = "⚠ ВНИМАНИЕ: РОБОТ РАЗОБРАН НА ВЕРСТАКЕ! ВЫЛЕТ ЗАПРЕЩЕН!";
+                    txtMechStatusAlert.color = new Color(1f, 0.25f, 0.25f);
+                }
+                else
+                {
+                    txtMechStatusAlert.text = "✔ СТАТУС: БОЕГОТОВЕН (Все 5 модулей смонтированы)";
+                    txtMechStatusAlert.color = new Color(0.2f, 1f, 0.4f);
+                }
             }
 
-            if (btnDeployMech != null && DispatchManager.Instance != null)
+            // Кнопка вылета
+            if (btnDeployMech != null)
             {
-                bool canDeploy = !inBattle && 
-                                 DispatchManager.Instance.HasActiveThreat && 
-                                 (targetMech != null && !targetMech.IsDeployed);
+                bool canDeploy = !inBattle && hasThreat && mechReady;
                 btnDeployMech.interactable = canDeploy;
+
+                if (txtDeployBtnLabel != null)
+                {
+                    if (inBattle) txtDeployBtnLabel.text = "МИССИЯ В ПРОЦЕССЕ...";
+                    else if (!hasThreat) txtDeployBtnLabel.text = "НЕТ АКТИВНЫХ ЦЕЛЕЙ";
+                    else if (!mechReady) txtDeployBtnLabel.text = "⚠ РОБОТ НЕ СОБРАН";
+                    else txtDeployBtnLabel.text = "⚔ ВЫЛЕТ НА ПЕРЕХВАТ (SPACE)";
+                }
             }
 
-            // Обновление таймера тактического QTE решения
+            // Тактическое QTE решение
             if (DispatchManager.Instance != null && DispatchManager.Instance.HasActiveTacticalPrompt)
             {
                 if (tacticalPromptPanel != null && !tacticalPromptPanel.activeSelf)
@@ -170,60 +181,73 @@ namespace HangarGame.UI
                 }
             }
 
-            // Горячие клавиши (Space или Enter) для отправки в бой при открытом терминале
-            if (GameManager.Instance != null && GameManager.Instance.CurrentView == RoomView.DispatchConsole)
+            // Обновление секции Егеря на терминале
+            UpdateJaegerSection();
+        }
+
+        private void UpdateJaegerSection()
+        {
+            if (JaegerProjectManager.Instance == null) return;
+
+            if (txtJaegerProjectInfo != null)
             {
-                bool enterPressed = false;
-#if ENABLE_INPUT_SYSTEM
-                if (Keyboard.current != null)
+                int cur = JaegerProjectManager.Instance.CurrentStageIndex;
+                int total = JaegerProjectManager.Instance.TotalStages;
+                if (JaegerProjectManager.Instance.IsCompleted)
                 {
-                    enterPressed = Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.spaceKey.wasPressedThisFrame;
+                    txtJaegerProjectInfo.text = "ПРОЕКТ 'ЕГЕРЬ': 100% [ПОЛНОСТЬЮ БОЕСПОСОБЕН]";
                 }
-#else
-                enterPressed = Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space);
-#endif
-                if (enterPressed && btnDeployMech != null && btnDeployMech.interactable && !inBattle)
+                else
                 {
-                    OnDeployClicked();
+                    var stage = JaegerProjectManager.Instance.CurrentStage;
+                    string sName = stage != null ? stage.stageName : $"Модуль {cur + 1}";
+                    int cCost = stage != null ? stage.creditCost : 200;
+                    int aCost = stage != null ? stage.alloyCost : 100;
+                    txtJaegerProjectInfo.text = $"ПРОЕКТ 'ЕГЕРЬ' ({cur}/{total}): {sName}\n[Требуется: {cCost}¢, {aCost}т]";
                 }
+            }
+
+            if (btnBuildJaegerModule != null)
+            {
+                btnBuildJaegerModule.interactable = JaegerProjectManager.Instance.CanStartNextStage();
             }
         }
 
         private void HandleThreatAppeared(string tName, DamageType attackType, DamageType weakness, float power)
         {
-            if (activeThreatCard != null)
+            if (txtTerminalStatus != null)
             {
-                activeThreatCard.SetActive(true);
+                txtTerminalStatus.text = "🚨 ТАКТИЧЕСКАЯ ТРЕВОГА // СЕКТОР-7 🚨";
+                txtTerminalStatus.color = Color.red;
             }
 
             if (txtThreatName != null)
             {
-                txtThreatName.text = $"ТРЕВОГА: {tName.ToUpper()}";
+                txtThreatName.text = $"ОБНАРУЖЕН: {tName.ToUpper()}";
             }
 
             if (txtThreatDetails != null)
             {
-                txtThreatDetails.text = $"Тип атаки врага: {attackType} (Нужен щит!)\n" +
-                                       $"Уязвимость врага: {weakness}\n" +
-                                       $"Мощь: {power:F0} ед.";
-            }
-
-            if (btnDeployMech != null)
-            {
-                btnDeployMech.interactable = true;
+                txtThreatDetails.text = $"Атака врага: {attackType}  |  Уязвимость: {weakness}  |  Мощь: {power:F0}";
             }
         }
 
         private void HandleThreatResolved(string logMessage)
         {
-            if (activeThreatCard != null)
+            if (txtTerminalStatus != null)
             {
-                activeThreatCard.SetActive(false);
+                txtTerminalStatus.text = "СЕКТОР СТАБИЛЕН // ОЖИДАНИЕ УГРОЗ";
+                txtTerminalStatus.color = Color.cyan;
             }
 
-            if (tacticalPromptPanel != null)
+            if (txtThreatName != null)
             {
-                tacticalPromptPanel.SetActive(false);
+                txtThreatName.text = "РАДАР СКАНИРУЕТ ГОРОДСКОЙ ПЕРИМЕТР";
+            }
+
+            if (txtThreatDetails != null)
+            {
+                txtThreatDetails.text = "Сигнатур кайдзю не обнаружено. Проводите ТО роботов.";
             }
 
             if (txtMissionLog != null)
@@ -237,7 +261,7 @@ namespace HangarGame.UI
             if (txtAdaptationAlert != null)
             {
                 txtAdaptationAlert.gameObject.SetActive(true);
-                txtAdaptationAlert.text = $"⚠ ВНИМАНИЕ: {adaptationNote}";
+                txtAdaptationAlert.text = $"⚠ АДАПТАЦИЯ ВРАГА: {adaptationNote}";
             }
         }
 
@@ -255,8 +279,8 @@ namespace HangarGame.UI
 
             if (btnTacticalAction != null)
             {
-                Text bText = btnTacticalAction.GetComponentInChildren<Text>();
-                if (bText != null) bText.text = btnText;
+                Text t = btnTacticalAction.GetComponentInChildren<Text>();
+                if (t != null) t.text = btnText;
             }
         }
 
@@ -268,48 +292,46 @@ namespace HangarGame.UI
             }
         }
 
-        private void HandleRoomViewChanged(RoomView view)
+        private void HandleJaegerProgressUpdated(float progress)
         {
-            if (dispatchContainer != null)
-            {
-                dispatchContainer.SetActive(view == RoomView.DispatchConsole);
-            }
+            UpdateJaegerSection();
         }
 
         public void OnDeployClicked()
         {
-            Debug.Log("<color=cyan>[DispatchUI]</color> Нажата кнопка 'ОТПРАВИТЬ ЕГЕРЯ В БОЙ'!");
+            HangarAudio.Instance?.PlayClick();
+
+            if (DispatchManager.Instance == null) return;
 
             if (targetMech == null)
             {
                 targetMech = FindObjectOfType<MechInstance>();
             }
 
-            if (targetMech != null && DispatchManager.Instance != null)
+            if (targetMech != null)
             {
-                bool success = DispatchManager.Instance.TryDeployMech(targetMech);
-                if (success && btnDeployMech != null)
-                {
-                    btnDeployMech.interactable = false;
-                }
+                DispatchManager.Instance.TryDeployMech(targetMech);
             }
-            else
-            {
-                Debug.LogError("[DispatchUI] Ошибка: targetMech или DispatchManager.Instance равен null!");
-            }
+        }
+
+        public void OnScanRadarClicked()
+        {
+            HangarAudio.Instance?.PlayClick();
+            DispatchManager.Instance?.SpawnNextThreat();
         }
 
         public void OnTacticalActionClicked()
         {
-            Debug.Log("<color=yellow>[DispatchUI]</color> Выполнен тактический приказ командира!");
+            HangarAudio.Instance?.PlayClick();
             DispatchManager.Instance?.ExecuteTacticalAction();
         }
 
-        private void UpdateUIState()
+        public void OnBuildJaegerModuleClicked()
         {
-            if (activeThreatCard != null)
+            HangarAudio.Instance?.PlayClick();
+            if (JaegerProjectManager.Instance != null)
             {
-                activeThreatCard.SetActive(DispatchManager.Instance != null && DispatchManager.Instance.HasActiveThreat);
+                JaegerProjectManager.Instance.StartAssemblingCurrentStage();
             }
         }
     }

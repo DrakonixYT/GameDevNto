@@ -75,6 +75,21 @@ namespace HangarGame.Mechs
             return false;
         }
 
+        public bool HasMissingOrDetachedParts()
+        {
+            if (parts.Count < 5) return true;
+            foreach (var part in parts)
+            {
+                if (part == null || part.IsOnWorkbench || !part.gameObject.activeInHierarchy)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public bool CanDeploy => !HasMissingOrDetachedParts() && !isDeployed;
+
         public void SetDeployed(bool deployed)
         {
             isDeployed = deployed;
