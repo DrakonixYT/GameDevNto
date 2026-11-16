@@ -15,7 +15,7 @@ namespace HangarGame.Repair
         public static RepairWorkbench Instance { get; private set; }
         public MechPart CurrentPart { get; private set; }
         public GameObject CurrentJaegerModule { get; private set; }
-        public string CurrentItemName => CurrentPart != null ? CurrentPart.Data.partName : currentJaegerName;
+        public string CurrentItemName => (CurrentPart != null && CurrentPart.Data != null) ? CurrentPart.Data.partName : (currentJaegerName ?? "Модуль");
         public bool HasItem => CurrentPart != null || CurrentJaegerModule != null;
         public bool IsJaegerModule => CurrentJaegerModule != null;
 
@@ -133,7 +133,7 @@ namespace HangarGame.Repair
 
         public void CycleModule()
         {
-            if (CurrentPart == null) return;
+            if (CurrentPart == null || CurrentPart.Data == null) return;
             CurrentPart.Setup(ModuleCatalog.GetNextModule(CurrentPart.Data));
             HangarAudioLight.Instance?.PlayBolt();
         }
@@ -149,7 +149,8 @@ namespace HangarGame.Repair
             }
             else if (CurrentPart != null)
             {
-                GameManager.Instance?.TrySpend(CurrentPart.Data.repairCredits, CurrentPart.Data.repairAlloy);
+                if (CurrentPart.Data != null)
+                    GameManager.Instance?.TrySpend(CurrentPart.Data.repairCredits, CurrentPart.Data.repairAlloy);
                 CurrentPart.RepairFull(); CurrentPart.ReturnToSocket(); CurrentPart = null;
                 HangarAudioLight.Instance?.PlaySuccess();
                 GameManager.Instance?.SwitchView(RoomView.Hangar);

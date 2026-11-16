@@ -8,8 +8,9 @@ namespace HangarGame.Mechs
 {
     public class MechPart : MonoBehaviour, IInteractable
     {
-        public MechPartData Data { get; set; }
-        public float DurabilityPercent => maxHp > 0 ? (currentHp / maxHp) : 1f;
+        [SerializeField] private MechPartData data;
+        public MechPartData Data { get => data; set => data = value; }
+        public float DurabilityPercent => maxHp > 0 ? Mathf.Clamp01(currentHp / maxHp) : 1f;
         public bool IsOnWorkbench { get; set; } = false;
 
         private float maxHp = 100f, currentHp = 100f;
@@ -21,9 +22,10 @@ namespace HangarGame.Mechs
             rend = GetComponent<Renderer>();
             if (rend != null) baseColor = rend.material.color;
             socketPos = transform.localPosition; socketRot = transform.localRotation; socketParent = transform.parent;
+            if (data == null) data = new MechPartData { partName = gameObject.name };
         }
 
-        public void Setup(MechPartData d) { Data = d; currentHp = maxHp; UpdateVis(); }
+        public void Setup(MechPartData d) { data = d; currentHp = maxHp; UpdateVis(); }
         public void Damage(float a) { currentHp = Mathf.Max(0f, currentHp - a); UpdateVis(); }
         public void RepairFull() { currentHp = maxHp; UpdateVis(); }
         public void ReturnToSocket()
@@ -43,7 +45,7 @@ namespace HangarGame.Mechs
         }
         private void UpdateVis() { if (rend != null) rend.material.color = Color.Lerp(Color.red, baseColor, DurabilityPercent); }
 
-        public string GetPrompt() => $"[{Data?.partName}] Прочность: {Mathf.RoundToInt(DurabilityPercent * 100f)}%. Нажмите для ТО.";
+        public string GetPrompt() => $"[{(Data != null ? Data.partName : gameObject.name)}] Прочность: {Mathf.RoundToInt(DurabilityPercent * 100f)}%. Нажмите для ТО.";
         public void OnHover(bool h) { if (!IsOnWorkbench && rend != null) rend.material.color = h ? Color.cyan : Color.Lerp(Color.red, baseColor, DurabilityPercent); }
         public void OnInteract() { if (!IsOnWorkbench && !CombatMech.Instance.IsDeployed) RepairWorkbench.Instance?.ReceivePart(this); }
     }

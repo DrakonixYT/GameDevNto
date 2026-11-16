@@ -73,7 +73,8 @@ namespace HangarGame.UI
 
             if (isWb && RepairWorkbench.Instance != null)
             {
-                if (txtWbTitle != null) txtWbTitle.text = $"🔧 ВЕРСТАК: {RepairWorkbench.Instance.CurrentItemName}";
+                string name = RepairWorkbench.Instance.CurrentItemName ?? "Модуль";
+                if (txtWbTitle != null) txtWbTitle.text = $"🔧 ВЕРСТАК: {name}";
                 if (txtWbInfo != null) txtWbInfo.text = RepairWorkbench.Instance.IsJaegerModule
                     ? "Сборка модуля Егеря. Вращайте деталь (A/D/W/S или ПКМ), выполните калибровку."
                     : "Осмотр модуля робота. Вращайте (A/D/W/S или ПКМ), устраните дефекты.";

@@ -30,27 +30,14 @@ namespace HangarGame.EditorTools
             Object.DestroyImmediate(builderObj);
 
             EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-            Debug.Log("<color=green><b>[Pacific Rim]</b> Сцена успешно запечена в чистой иерархии!</color>");
+            EditorSceneManager.SaveScene(SceneManager.GetActiveScene());
+            Debug.Log("<color=green><b>[Pacific Rim]</b> Сцена успешно запечена и сохранена!</color>");
         }
 
         [MenuItem("Pacific Rim/💾 2. Пересоздать файл сцены 'HangarMainScene'")]
         public static void GenerateSceneMenu()
         {
-            Scene newScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-
-            GameObject builderObj = new GameObject("--- SCENE GENERATOR ---");
-            PrototypeSceneBuilder builder = builderObj.AddComponent<PrototypeSceneBuilder>();
-            builder.BuildCompleteHangarPrototype();
-            Object.DestroyImmediate(builderObj);
-
-            if (!AssetDatabase.IsValidFolder("Assets/Scenes")) AssetDatabase.CreateFolder("Assets", "Scenes");
-
-            string scenePath = "Assets/Scenes/HangarMainScene.unity";
-            EditorSceneManager.SaveScene(newScene, scenePath);
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-
-            Debug.Log($"<color=green><b>[HangarSceneGenerator] УСПЕХ!</b> Сцена сохранена в {scenePath}.</color>");
+            BakeIntoCurrentScene();
         }
     }
 }
