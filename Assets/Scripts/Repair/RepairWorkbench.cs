@@ -88,7 +88,7 @@ namespace HangarGame.Repair
             if (HasItem) return;
             CurrentPart = p; p.IsOnWorkbench = true;
             ResetRotation(); GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            StartCoroutine(SlideToWorkbench(p.transform, new Vector3(0f, 1.05f, 2.2f), Quaternion.Euler(0f, 180f, 0f), () =>
+            StartCoroutine(SlideToWorkbench(p.transform, new Vector3(0f, 1.05f, 2.3f), Quaternion.Euler(0f, 180f, 0f), () =>
             {
                 SpawnMiniNodes(new Color(1f, 0.8f, 0.1f), "Болт фиксатора");
             }));
@@ -99,8 +99,8 @@ namespace HangarGame.Repair
             if (HasItem) return;
             CurrentJaegerModule = mod; currentJaegerName = name; onJaegerDone = onDone;
             ResetRotation(); GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            mod.transform.position = new Vector3(0f, 2.2f, 2.2f);
-            StartCoroutine(SlideToWorkbench(mod.transform, new Vector3(0f, 1.05f, 2.2f), Quaternion.Euler(0f, 180f, 0f), () =>
+            mod.transform.position = new Vector3(0f, 2.2f, 2.3f);
+            StartCoroutine(SlideToWorkbench(mod.transform, new Vector3(0f, 1.05f, 2.3f), Quaternion.Euler(0f, 180f, 0f), () =>
             {
                 SpawnMiniNodes(new Color(0.2f, 0.8f, 1f), "Калибровочный контакт");
             }));
@@ -121,7 +121,7 @@ namespace HangarGame.Repair
             for (int i = 0; i < 3; i++)
             {
                 var n = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                n.transform.position = new Vector3((i - 1) * 0.45f, 0.88f, 2.2f);
+                n.transform.position = new Vector3((i - 1) * 0.45f, 0.88f, 2.3f);
                 n.transform.localScale = new Vector3(0.12f, 0.04f, 0.12f);
                 n.GetComponent<Renderer>().material.color = c;
                 var clk = n.AddComponent<ClickableObject>();

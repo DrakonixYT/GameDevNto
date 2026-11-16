@@ -20,6 +20,8 @@ namespace HangarGame.Prototype
 
             // 1. MANAGERS
             GameObject mgr = new GameObject("--- 01_MANAGERS ---");
+            mgr.transform.position = Vector3.zero;
+            mgr.transform.rotation = Quaternion.identity;
             mgr.AddComponent<GameManager>();
             mgr.AddComponent<DispatchSystem>();
             mgr.AddComponent<JaegerProject>();
@@ -43,8 +45,8 @@ namespace HangarGame.Prototype
                 cam.tag = "MainCamera";
             }
             cam.transform.SetParent(mgr.transform, false);
-            cam.transform.position = new Vector3(0f, 1.6f, 0f);
-            cam.transform.rotation = Quaternion.Euler(0f, 0f, 0f);
+            cam.transform.localPosition = new Vector3(0f, 1.6f, -0.6f);
+            cam.transform.localRotation = Quaternion.identity;
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.06f, 0.08f, 0.11f);
 
@@ -78,6 +80,7 @@ namespace HangarGame.Prototype
         private void CreateLighting(HangarAudioLight audioLight)
         {
             GameObject grp = new GameObject("--- 02_LIGHTING_AND_VFX ---");
+            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
 
             GameObject dir = new GameObject("Directional Light");
             dir.transform.SetParent(grp.transform, false);
@@ -123,6 +126,7 @@ namespace HangarGame.Prototype
         private void CreateHangarRoom()
         {
             GameObject grp = new GameObject("--- 03_HANGAR_ROOM ---");
+            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
 
             CreateBox(grp.transform, "Floor", new Vector3(0f, -0.5f, 0f), new Vector3(18f, 1f, 18f), new Color(0.18f, 0.2f, 0.23f));
             CreateBox(grp.transform, "Ceiling", new Vector3(0f, 5.5f, 0f), new Vector3(18f, 0.5f, 18f), new Color(0.12f, 0.14f, 0.16f));
@@ -143,7 +147,8 @@ namespace HangarGame.Prototype
         private void CreateMechAtlant()
         {
             GameObject grp = new GameObject("--- 04_MECH_ATLANT ---");
-            grp.transform.position = new Vector3(0f, 0f, 5.5f);
+            grp.transform.position = Vector3.zero;
+            grp.transform.rotation = Quaternion.identity;
             grp.AddComponent<CombatMech>();
 
             SetupPart(grp.transform, "Torso_Core", PrimitiveType.Cube, new Vector3(0f, 2.8f, 5.5f), new Vector3(1.6f, 1.8f, 1.2f), new Color(0.2f, 0.45f, 0.7f),
@@ -169,9 +174,9 @@ namespace HangarGame.Prototype
         {
             GameObject obj = GameObject.CreatePrimitive(prim);
             obj.name = name;
-            obj.transform.position = pos;
-            obj.transform.localScale = scale;
             obj.transform.SetParent(parent, false);
+            obj.transform.localPosition = pos;
+            obj.transform.localScale = scale;
             SetColor(obj, color);
 
             MechPart p = obj.AddComponent<MechPart>();
@@ -181,7 +186,8 @@ namespace HangarGame.Prototype
         private void CreateJaegerFrame()
         {
             GameObject grp = new GameObject("--- 05_JAEGER_FRAME ---");
-            grp.transform.position = new Vector3(4.8f, 0f, 4.8f);
+            grp.transform.position = Vector3.zero;
+            grp.transform.rotation = Quaternion.identity;
 
             CreateBox(grp.transform, "Tower_L", new Vector3(3.2f, 3.5f, 4.8f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
             CreateBox(grp.transform, "Tower_R", new Vector3(6.4f, 3.5f, 4.8f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
@@ -212,41 +218,43 @@ namespace HangarGame.Prototype
         private void CreateWorkbench()
         {
             GameObject grp = new GameObject("--- 06_WORKBENCH ---");
-            grp.transform.position = new Vector3(0f, 0f, 2.2f);
+            grp.transform.position = Vector3.zero;
+            grp.transform.rotation = Quaternion.identity;
             grp.AddComponent<RepairWorkbench>();
 
-            CreateBox(grp.transform, "Tabletop", new Vector3(0f, 0.76f, 2.2f), new Vector3(2.6f, 0.12f, 1.3f), new Color(0.22f, 0.24f, 0.27f));
-            CreateBox(grp.transform, "Vice", new Vector3(-1.1f, 0.88f, 2.2f), new Vector3(0.25f, 0.2f, 0.3f), new Color(0.7f, 0.2f, 0.2f));
-            CreateCyl(grp.transform, "Lamp", new Vector3(1.1f, 1.15f, 2.5f), new Vector3(0.08f, 0.6f, 0.08f), new Color(0.8f, 0.8f, 0.2f));
+            CreateBox(grp.transform, "Tabletop", new Vector3(0f, 0.75f, 2.3f), new Vector3(2.4f, 0.12f, 1.1f), new Color(0.22f, 0.24f, 0.27f));
+            CreateBox(grp.transform, "Vice", new Vector3(-0.95f, 0.88f, 2.3f), new Vector3(0.25f, 0.2f, 0.3f), new Color(0.7f, 0.2f, 0.2f));
+            CreateCyl(grp.transform, "Lamp", new Vector3(0.95f, 1.15f, 2.5f), new Vector3(0.08f, 0.6f, 0.08f), new Color(0.8f, 0.8f, 0.2f));
 
             for (int x = -1; x <= 1; x += 2)
                 for (int z = -1; z <= 1; z += 2)
-                    CreateBox(grp.transform, $"Leg_{x}_{z}", new Vector3(x * 1.15f, 0.35f, 2.2f + z * 0.5f), new Vector3(0.14f, 0.7f, 0.14f), Color.black);
+                    CreateBox(grp.transform, $"Leg_{x}_{z}", new Vector3(x * 1.05f, 0.35f, 2.3f + z * 0.45f), new Vector3(0.12f, 0.7f, 0.12f), Color.black);
         }
 
         private void CreateDispatchConsole(UnityEngine.Camera cam)
         {
             GameObject grp = new GameObject("--- 07_DISPATCH_CONSOLE ---");
-            grp.transform.position = new Vector3(0f, 0f, -5.2f);
-            grp.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+            grp.transform.position = Vector3.zero;
+            grp.transform.rotation = Quaternion.identity;
 
             CreateBox(grp.transform, "Desk", new Vector3(0f, 0.75f, -5.2f), new Vector3(3.6f, 0.15f, 1.5f), new Color(0.18f, 0.2f, 0.24f));
-            CreateBox(grp.transform, "Chair", new Vector3(0f, 0.55f, -4.2f), new Vector3(0.7f, 0.8f, 0.7f), new Color(0.1f, 0.1f, 0.12f));
+            CreateBox(grp.transform, "Chair", new Vector3(0f, 0.55f, -4.0f), new Vector3(0.7f, 0.8f, 0.7f), new Color(0.1f, 0.1f, 0.12f));
             CreateBox(grp.transform, "Rack_L", new Vector3(-2.2f, 1.4f, -5.3f), new Vector3(0.8f, 2.8f, 0.9f), new Color(0.12f, 0.14f, 0.18f));
             CreateBox(grp.transform, "Rack_R", new Vector3(2.2f, 1.4f, -5.3f), new Vector3(0.8f, 2.8f, 0.9f), new Color(0.12f, 0.14f, 0.18f));
 
-            // Monitor & Diegetic WorldSpace Canvas
-            GameObject monitor = CreateBox(grp.transform, "Tactical_Radar_Screen", new Vector3(0f, 1.95f, -5.45f), new Vector3(3.0f, 1.7f, 0.12f), new Color(0.04f, 0.08f, 0.12f));
+            // Monitor Bezel & WorldSpace Canvas
+            CreateBox(grp.transform, "Monitor_Bezel", new Vector3(0f, 1.85f, -5.45f), new Vector3(2.8f, 1.55f, 0.15f), new Color(0.04f, 0.08f, 0.12f));
 
             GameObject cObj = new GameObject("Terminal_Canvas");
-            cObj.transform.SetParent(monitor.transform, false);
-            cObj.transform.localPosition = new Vector3(0f, 0f, -0.65f);
-            cObj.transform.localScale = new Vector3(0.0017f, 0.0017f, 1f);
+            cObj.transform.SetParent(grp.transform, false);
+            cObj.transform.position = new Vector3(0f, 1.85f, -5.36f);
+            cObj.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+            cObj.transform.localScale = new Vector3(0.00135f, 0.00135f, 1f);
 
             Canvas c = cObj.AddComponent<Canvas>();
             c.renderMode = RenderMode.WorldSpace;
             c.worldCamera = cam;
-            cObj.GetComponent<RectTransform>().sizeDelta = new Vector2(1650f, 950f);
+            cObj.GetComponent<RectTransform>().sizeDelta = new Vector2(1920f, 1050f);
             cObj.AddComponent<GraphicRaycaster>();
 
             Font font = Font.CreateDynamicFontFromOSFont("Arial", 16) ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -254,22 +262,22 @@ namespace HangarGame.Prototype
             // UI Elements
             GameObject bg = CreatePanel(cObj.transform, "BG", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(0.05f, 0.09f, 0.14f, 0.98f));
 
-            Text tTitle = CreateTxt(bg.transform, "Txt_ThreatTitle", "СЕКТОР-7: РАДАР СКАНИРУЕТ ПЕРИМЕТР", new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(1500f, 50f), 26, font, Color.cyan);
-            Text tDetails = CreateTxt(bg.transform, "Txt_ThreatDetails", "Угроз нет. Проводите ТО робота на верстаке.", new Vector2(0f, 1f), new Vector2(40f, -110f), new Vector2(750f, 75f), 18, font, Color.white);
-            Text tAdapt = CreateTxt(bg.transform, "Txt_Adaptation", "", new Vector2(0f, 1f), new Vector2(40f, -195f), new Vector2(750f, 45f), 17, font, new Color(1f, 0.55f, 0.15f));
+            Text tTitle = CreateTxt(bg.transform, "Txt_ThreatTitle", "СЕКТОР-7: РАДАР СКАНИРУЕТ ПЕРИМЕТР", new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(1800f, 50f), 28, font, Color.cyan);
+            Text tDetails = CreateTxt(bg.transform, "Txt_ThreatDetails", "Угроз нет. Проводите ТО робота на верстаке.", new Vector2(0f, 1f), new Vector2(50f, -120f), new Vector2(850f, 75f), 20, font, Color.white);
+            Text tAdapt = CreateTxt(bg.transform, "Txt_Adaptation", "", new Vector2(0f, 1f), new Vector2(50f, -200f), new Vector2(850f, 45f), 18, font, new Color(1f, 0.55f, 0.15f));
 
-            Text tStatus = CreateTxt(bg.transform, "Txt_MechStatus", "✔ СТАТУС: БОЕГОТОВЕН (Все 5 модулей смонтированы)", new Vector2(1f, 1f), new Vector2(-40f, -110f), new Vector2(750f, 45f), 20, font, Color.green);
-            Text tJaeger = CreateTxt(bg.transform, "Txt_JaegerInfo", "ПРОЕКТ 'ЕГЕРЬ' (0/4)", new Vector2(1f, 1f), new Vector2(-40f, -170f), new Vector2(750f, 55f), 19, font, Color.yellow);
-            Button bJaeger = CreateBtn(bg.transform, "Btn_BuildJaeger", "🔨 СОБРАТЬ МОДУЛЬ НА ВЕРСТАКЕ", new Vector2(1f, 1f), new Vector2(-40f, -240f), new Vector2(650f, 55f), font, new Color(0.18f, 0.45f, 0.7f));
+            Text tStatus = CreateTxt(bg.transform, "Txt_MechStatus", "✔ СТАТУС: БОЕГОТОВЕН (Все 5 модулей смонтированы)", new Vector2(1f, 1f), new Vector2(-50f, -120f), new Vector2(850f, 45f), 20, font, Color.green);
+            Text tJaeger = CreateTxt(bg.transform, "Txt_JaegerInfo", "ПРОЕКТ 'ЕГЕРЬ' (0/4)", new Vector2(1f, 1f), new Vector2(-50f, -180f), new Vector2(850f, 55f), 19, font, Color.yellow);
+            Button bJaeger = CreateBtn(bg.transform, "Btn_BuildJaeger", "🔨 СОБРАТЬ МОДУЛЬ НА ВЕРСТАКЕ", new Vector2(1f, 1f), new Vector2(-50f, -250f), new Vector2(750f, 55f), font, new Color(0.18f, 0.45f, 0.7f));
 
-            Text tLog = CreateTxt(bg.transform, "Txt_MissionLog", "База готова к дежурству.", new Vector2(0.5f, 0f), new Vector2(0f, 185f), new Vector2(1500f, 55f), 18, font, new Color(0.85f, 0.9f, 0.95f));
+            Text tLog = CreateTxt(bg.transform, "Txt_MissionLog", "База готова к дежурству.", new Vector2(0.5f, 0f), new Vector2(0f, 185f), new Vector2(1800f, 55f), 20, font, new Color(0.85f, 0.9f, 0.95f));
 
-            Button bDeploy = CreateBtn(bg.transform, "Btn_Deploy", "⚔ ВЫЛЕТ НА ПЕРЕХВАТ (SPACE)", new Vector2(0.5f, 0f), new Vector2(-280f, 75f), new Vector2(520f, 85f), font, new Color(0.9f, 0.2f, 0.2f));
-            Button bScan = CreateBtn(bg.transform, "Btn_Scan", "📡 СКАНИРОВАТЬ РАДАР", new Vector2(0.5f, 0f), new Vector2(280f, 75f), new Vector2(520f, 85f), font, new Color(0.15f, 0.65f, 0.4f));
+            Button bDeploy = CreateBtn(bg.transform, "Btn_Deploy", "⚔ ВЫЛЕТ НА ПЕРЕХВАТ (SPACE)", new Vector2(0.5f, 0f), new Vector2(-300f, 75f), new Vector2(550f, 85f), font, new Color(0.9f, 0.2f, 0.2f));
+            Button bScan = CreateBtn(bg.transform, "Btn_Scan", "📡 СКАНИРОВАТЬ РАДАР", new Vector2(0.5f, 0f), new Vector2(300f, 75f), new Vector2(550f, 85f), font, new Color(0.15f, 0.65f, 0.4f));
 
-            GameObject qte = CreatePanel(bg.transform, "QtePanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 255f), new Vector2(1000f, 110f), new Color(0.7f, 0.15f, 0.15f));
+            GameObject qte = CreatePanel(bg.transform, "QtePanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 260f), new Vector2(1100f, 100f), new Color(0.7f, 0.15f, 0.15f));
             Text tQteTimer = CreateTxt(qte.transform, "Txt_QteTimer", "⏱ 3.5с", new Vector2(0f, 0.5f), new Vector2(30f, 0f), new Vector2(250f, 40f), 20, font, Color.white);
-            Button bQte = CreateBtn(qte.transform, "Btn_Qte", "⚡ АКТИВИРОВАТЬ ЭНЕРГОЩИТ (ПРОБЕЛ)", new Vector2(1f, 0.5f), new Vector2(-30f, 0f), new Vector2(550f, 55f), font, new Color(0.15f, 0.8f, 0.35f));
+            Button bQte = CreateBtn(qte.transform, "Btn_Qte", "⚡ АКТИВИРОВАТЬ ЭНЕРГОЩИТ (ПРОБЕЛ)", new Vector2(1f, 0.5f), new Vector2(-30f, 0f), new Vector2(600f, 55f), font, new Color(0.15f, 0.8f, 0.35f));
             qte.SetActive(false);
 
             TerminalUI ui = cObj.AddComponent<TerminalUI>();
