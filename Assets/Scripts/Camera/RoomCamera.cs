@@ -12,7 +12,11 @@ namespace HangarGame.CameraControl
         public static RoomCamera Instance { get; private set; }
         private readonly Vector3 hangarPos = new Vector3(0f, 1.6f, -0.6f);
         private readonly Vector3 dispatchPos = new Vector3(0f, 1.55f, -3.2f);
-        private readonly Vector3 wbPos = new Vector3(0f, 1.35f, 1.35f);
+        private readonly Vector3 wbPos = new Vector3(0f, 1.45f, 0.7f);
+
+        private float targetBaseYaw = 0f;
+        private float curBaseYaw = 0f;
+        private float wbZoom = 0f;
         private float shakeTime = 0f, shakeMag = 0f;
 
         private void Awake() => Instance = this;
@@ -25,25 +29,39 @@ namespace HangarGame.CameraControl
 
         private void Update()
         {
+            RoomView v = GameManager.Instance != null ? GameManager.Instance.CurrentView : RoomView.Hangar;
+
             bool turnL = false, turnR = false;
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null)
             {
-                turnL = Keyboard.current.qKey.wasPressedThisFrame || Keyboard.current.leftArrowKey.wasPressedThisFrame;
-                turnR = Keyboard.current.eKey.wasPressedThisFrame || Keyboard.current.rightArrowKey.wasPressedThisFrame;
-                if (GameManager.Instance != null && GameManager.Instance.CurrentView != RoomView.WorkbenchFocus)
-                {
-                    turnL |= Keyboard.current.aKey.wasPressedThisFrame;
-                    turnR |= Keyboard.current.dKey.wasPressedThisFrame;
-                }
+                turnL = Keyboard.current.qKey.wasPressedThisFrame;
+                turnR = Keyboard.current.eKey.wasPressedThisFrame;
             }
 #else
-            turnL = Input.GetKeyDown(KeyCode.Q) || Input.GetKeyDown(KeyCode.LeftArrow) || (GameManager.Instance != null && GameManager.Instance.CurrentView != RoomView.WorkbenchFocus && Input.GetKeyDown(KeyCode.A));
-            turnR = Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.RightArrow) || (GameManager.Instance != null && GameManager.Instance.CurrentView != RoomView.WorkbenchFocus && Input.GetKeyDown(KeyCode.D));
+            turnL = Input.GetKeyDown(KeyCode.Q);
+            turnR = Input.GetKeyDown(KeyCode.E);
 #endif
-            if (turnL || turnR) Toggle180();
+            if (v != RoomView.WorkbenchFocus)
+            {
+                if (turnL) TurnLeft();
+                if (turnR) TurnRight();
+            }
 
-            RoomView v = GameManager.Instance != null ? GameManager.Instance.CurrentView : RoomView.Hangar;
+            if (v == RoomView.WorkbenchFocus)
+            {
+                float scroll = 0f;
+#if ENABLE_INPUT_SYSTEM
+                if (Mouse.current != null) scroll = Mouse.current.scroll.ReadValue().y;
+#else
+                scroll = Input.GetAxis("Mouse ScrollWheel");
+#endif
+                if (Mathf.Abs(scroll) > 0.01f)
+                {
+                    wbZoom = Mathf.Clamp(wbZoom - Mathf.Sign(scroll) * 0.15f, -0.4f, 0.6f);
+                }
+            }
+
             Vector2 m = Vector2.zero;
 #if ENABLE_INPUT_SYSTEM
             if (Mouse.current != null) m = Mouse.current.position.ReadValue();
@@ -53,17 +71,22 @@ namespace HangarGame.CameraControl
             float nx = Mathf.Clamp((m.x / Mathf.Max(1, Screen.width)) * 2f - 1f, -1f, 1f);
             float ny = Mathf.Clamp((m.y / Mathf.Max(1, Screen.height)) * 2f - 1f, -1f, 1f);
 
-            float p = (v == RoomView.WorkbenchFocus) ? (28f - ny * 5f) : (-ny * 7f);
-            float y = (v == RoomView.DispatchConsole) ? (180f + nx * 12f) : (nx * (v == RoomView.WorkbenchFocus ? 8f : 12f));
+            curBaseYaw = Mathf.Lerp(curBaseYaw, targetBaseYaw, Time.deltaTime * 8f);
 
-            Vector3 targetPos = (v == RoomView.WorkbenchFocus) ? wbPos : (v == RoomView.DispatchConsole ? dispatchPos : hangarPos);
+            float p = (v == RoomView.WorkbenchFocus) ? (14f - ny * 5f) : (-ny * 7f);
+            float y = curBaseYaw + nx * (v == RoomView.WorkbenchFocus ? 5f : 12f);
+
+            Vector3 targetPos = hangarPos;
+            if (v == RoomView.WorkbenchFocus) targetPos = wbPos + new Vector3(0f, wbZoom * 0.2f, -wbZoom);
+            else if (v == RoomView.DispatchConsole) targetPos = dispatchPos;
+
             transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 6f);
-            transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(p, y, 0f), Time.deltaTime * 7f);
+            transform.rotation = Quaternion.Euler(p, y, 0f);
 
             if (shakeTime > 0f) { transform.position += Random.insideUnitSphere * shakeMag; shakeTime -= Time.deltaTime; }
         }
 
-        public void Toggle180()
+        public void TurnLeft()
         {
             if (GameManager.Instance == null) return;
             if (GameManager.Instance.CurrentView == RoomView.WorkbenchFocus)
@@ -71,7 +94,27 @@ namespace HangarGame.CameraControl
                 RepairWorkbench.Instance?.CancelWork();
                 return;
             }
-            GameManager.Instance.SwitchView(GameManager.Instance.CurrentView == RoomView.Hangar ? RoomView.DispatchConsole : RoomView.Hangar);
+            targetBaseYaw -= 180f;
+            var nextView = (GameManager.Instance.CurrentView == RoomView.Hangar) ? RoomView.DispatchConsole : RoomView.Hangar;
+            GameManager.Instance.SwitchView(nextView);
+        }
+
+        public void TurnRight()
+        {
+            if (GameManager.Instance == null) return;
+            if (GameManager.Instance.CurrentView == RoomView.WorkbenchFocus)
+            {
+                RepairWorkbench.Instance?.CancelWork();
+                return;
+            }
+            targetBaseYaw += 180f;
+            var nextView = (GameManager.Instance.CurrentView == RoomView.Hangar) ? RoomView.DispatchConsole : RoomView.Hangar;
+            GameManager.Instance.SwitchView(nextView);
+        }
+
+        public void Toggle180()
+        {
+            TurnRight();
         }
 
         public void Shake(float d, float m) { shakeTime = d; shakeMag = m; }

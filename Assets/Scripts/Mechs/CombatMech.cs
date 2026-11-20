@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using HangarGame.Core;
@@ -28,63 +30,162 @@ namespace HangarGame.Mechs
         public void Setup(MechPartData d) { data = d; currentHp = maxHp; UpdateVis(); }
         public void Damage(float a) { currentHp = Mathf.Max(0f, currentHp - a); UpdateVis(); }
         public void RepairFull() { currentHp = maxHp; UpdateVis(); }
+
         public void ReturnToSocket()
         {
             if (gameObject.activeInHierarchy) StartCoroutine(SlideBack());
             else InstantReturn();
         }
-        private void InstantReturn() { transform.SetParent(socketParent); transform.localPosition = socketPos; transform.localRotation = socketRot; IsOnWorkbench = false; UpdateVis(); }
-        private System.Collections.IEnumerator SlideBack()
+
+        private void InstantReturn()
+        {
+            transform.SetParent(socketParent); transform.localPosition = socketPos; transform.localRotation = socketRot;
+            IsOnWorkbench = false; UpdateVis();
+        }
+
+        private IEnumerator SlideBack()
         {
             Vector3 sP = transform.position; Quaternion sR = transform.rotation;
             Vector3 eP = socketParent != null ? socketParent.TransformPoint(socketPos) : socketPos;
             Quaternion eR = socketParent != null ? socketParent.rotation * socketRot : socketRot;
             float el = 0f, d = 0.3f;
-            while (el < d) { el += Time.deltaTime; float t = Mathf.SmoothStep(0f, 1f, el / d); transform.position = Vector3.Lerp(sP, eP, t); transform.rotation = Quaternion.Slerp(sR, eR, t); yield return null; }
+            while (el < d)
+            {
+                el += Time.deltaTime; float t = Mathf.SmoothStep(0f, 1f, el / d);
+                transform.position = Vector3.Lerp(sP, eP, t); transform.rotation = Quaternion.Slerp(sR, eR, t);
+                yield return null;
+            }
             InstantReturn();
         }
-        private void UpdateVis() { if (rend != null) rend.material.color = Color.Lerp(Color.red, baseColor, DurabilityPercent); }
 
-        public string GetPrompt() => $"[{(Data != null ? Data.partName : gameObject.name)}] Прочность: {Mathf.RoundToInt(DurabilityPercent * 100f)}%. Нажмите для ТО.";
+        public void UpdateVis() { if (rend != null) rend.material.color = Color.Lerp(Color.red, baseColor, DurabilityPercent); }
+        public string GetPrompt() => $"[{(Data != null ? Data.partName : gameObject.name)}] {Mathf.RoundToInt(DurabilityPercent * 100f)}% HP. Клик для ТО.";
         public void OnHover(bool h) { if (!IsOnWorkbench && rend != null) rend.material.color = h ? Color.cyan : Color.Lerp(Color.red, baseColor, DurabilityPercent); }
-        public void OnInteract() { if (!IsOnWorkbench && !CombatMech.Instance.IsDeployed) RepairWorkbench.Instance?.ReceivePart(this); }
+        public void OnInteract() { if (!IsOnWorkbench && HangarMechManager.Instance != null && !HangarMechManager.Instance.CurrentMech.isDeployed) RepairWorkbench.Instance?.ReceivePart(this); }
     }
 
-    public class CombatMech : MonoBehaviour
+    public class MechUnit : MonoBehaviour
     {
-        public static CombatMech Instance { get; private set; }
-        public List<MechPart> Parts = new List<MechPart>();
-        public bool IsDeployed { get; private set; } = false;
+        public int id;
+        public string mechName;
+        public Color themeColor;
+        public List<MechPart> parts = new List<MechPart>();
+        public bool isDeployed = false;
+        public float currentHp = 100f, maxHp = 100f;
+        public Vector2 battlefieldPos, targetPos;
+        public bool hasTarget = false;
+        public float attackPower = 25f;
+        public float moveSpeed = 65f;
 
-        private void Awake() { Instance = this; Parts.AddRange(GetComponentsInChildren<MechPart>()); }
+        private void Awake()
+        {
+            EnsurePartsLoaded();
+        }
+
+        public void EnsurePartsLoaded()
+        {
+            if (parts == null) parts = new List<MechPart>();
+            if (parts.Count == 0)
+            {
+                parts.AddRange(GetComponentsInChildren<MechPart>(true));
+            }
+        }
 
         public bool HasMissingOrDetachedParts()
         {
-            if (Parts.Count < 5) return true;
-            foreach (var p in Parts) if (p == null || p.IsOnWorkbench) return true;
+            EnsurePartsLoaded();
+            if (parts.Count == 0) return false;
+            foreach (var p in parts) if (p != null && p.IsOnWorkbench) return true;
             return false;
         }
 
-        public void SetDeployed(bool dep) { IsDeployed = dep; gameObject.SetActive(!dep); }
+        public bool CanDeploy() => !isDeployed && !HasMissingOrDetachedParts() && currentHp > 5f;
 
-        public float GetTotalDefense(DamageType incoming)
+        public void SetDeployed(bool dep, Vector2 startPos = default)
         {
-            float def = 0f;
-            foreach (var p in Parts) if (p != null && p.Data != null && p.Data.defenseType == incoming) def += p.Data.defensePower;
-            return def;
+            isDeployed = dep;
+            battlefieldPos = startPos;
+            targetPos = startPos;
+            hasTarget = false;
+            gameObject.SetActive(!dep && HangarMechManager.Instance != null && HangarMechManager.Instance.CurrentMech == this);
         }
 
-        public float GetTotalAttack(DamageType weakness)
+        public void ApplyDamage(float dmg)
         {
-            float atk = 0f;
-            foreach (var p in Parts) if (p != null && p.Data != null) atk += p.Data.attackPower * (p.Data.attackType == weakness ? 1.5f : 1f);
-            return atk;
+            currentHp = Mathf.Max(0f, currentHp - dmg);
+            float perPart = (dmg * 0.5f) / Mathf.Max(1, parts.Count);
+            foreach (var p in parts) if (p != null) p.Damage(perPart);
         }
 
-        public void ApplyMissionDamage(float dmg)
+        public void RepairAll()
         {
-            float per = dmg / Mathf.Max(1, Parts.Count);
-            foreach (var p in Parts) if (p != null) p.Damage(per * Random.Range(0.7f, 1.3f));
+            currentHp = maxHp;
+            foreach (var p in parts) if (p != null) p.RepairFull();
+        }
+
+        public float GetTotalHpPercent() => maxHp > 0 ? (currentHp / maxHp) : 1f;
+    }
+
+    public class HangarMechManager : MonoBehaviour
+    {
+        public static HangarMechManager Instance { get; private set; }
+        public List<MechUnit> Mechs = new List<MechUnit>();
+        public int CurrentIndex { get; private set; } = 0;
+        public MechUnit CurrentMech => (Mechs.Count > 0 && CurrentIndex >= 0 && CurrentIndex < Mechs.Count) ? Mechs[CurrentIndex] : null;
+
+        public event Action<int> OnMechSwitched;
+
+        private void Awake()
+        {
+            Instance = this;
+            Mechs.Clear();
+            Mechs.AddRange(GetComponentsInChildren<MechUnit>(true));
+            for (int i = 0; i < Mechs.Count; i++)
+            {
+                if (Mechs[i] != null) Mechs[i].EnsurePartsLoaded();
+            }
+            UpdatePodiumDisplay();
+        }
+
+        public void NextMech()
+        {
+            if (Mechs.Count <= 1) return;
+            CurrentIndex = (CurrentIndex + 1) % Mechs.Count;
+            UpdatePodiumDisplay();
+            HangarAudioLight.Instance?.PlayBolt();
+            OnMechSwitched?.Invoke(CurrentIndex);
+        }
+
+        public void PrevMech()
+        {
+            if (Mechs.Count <= 1) return;
+            CurrentIndex = (CurrentIndex - 1 + Mechs.Count) % Mechs.Count;
+            UpdatePodiumDisplay();
+            HangarAudioLight.Instance?.PlayBolt();
+            OnMechSwitched?.Invoke(CurrentIndex);
+        }
+
+        public void SelectMech(int idx)
+        {
+            if (idx < 0 || idx >= Mechs.Count) return;
+            CurrentIndex = idx;
+            UpdatePodiumDisplay();
+            OnMechSwitched?.Invoke(CurrentIndex);
+        }
+
+        public void UpdatePodiumDisplay()
+        {
+            for (int i = 0; i < Mechs.Count; i++)
+            {
+                if (Mechs[i] == null) continue;
+                bool shouldShow = (i == CurrentIndex) && !Mechs[i].isDeployed;
+                Mechs[i].gameObject.SetActive(shouldShow);
+            }
+        }
+
+        public MechUnit GetMechById(int id)
+        {
+            return Mechs.Find(m => m.id == id);
         }
     }
 }

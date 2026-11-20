@@ -16,9 +16,6 @@ namespace HangarGame.Prototype
         [ContextMenu("Build Prototype Hangar Scene")]
         public void BuildCompleteHangarPrototype()
         {
-            Debug.Log("<color=cyan>[PrototypeSceneBuilder] Генерация чистой 3D сцены (8 модульных папок)...</color>");
-
-            // 1. MANAGERS
             GameObject mgr = new GameObject("--- 01_MANAGERS ---");
             mgr.transform.position = Vector3.zero;
             mgr.transform.rotation = Quaternion.identity;
@@ -36,7 +33,6 @@ namespace HangarGame.Prototype
             es.AddComponent<StandaloneInputModule>();
 #endif
 
-            // Camera
             UnityEngine.Camera cam = UnityEngine.Camera.main;
             if (cam == null)
             {
@@ -53,28 +49,13 @@ namespace HangarGame.Prototype
             if (cam.GetComponent<RoomCamera>() == null) cam.gameObject.AddComponent<RoomCamera>();
             if (cam.GetComponent<PlayerRaycaster>() == null) cam.gameObject.AddComponent<PlayerRaycaster>();
 
-            // 2. LIGHTING
             CreateLighting(audioLight);
-
-            // 3. ROOM
             CreateHangarRoom();
-
-            // 4. COMBAT MECH ATLANT
-            CreateMechAtlant();
-
-            // 5. JAEGER FRAME
+            CreateMechsHangar();
             CreateJaegerFrame();
-
-            // 6. WORKBENCH
             CreateWorkbench();
-
-            // 7. DISPATCH CONSOLE
             CreateDispatchConsole(cam);
-
-            // 8. MINIMAL HUD
             CreateHUD();
-
-            Debug.Log("<color=green>[PrototypeSceneBuilder] Сцена собрана идеально!</color>");
         }
 
         private void CreateLighting(HangarAudioLight audioLight)
@@ -105,9 +86,18 @@ namespace HangarGame.Prototype
                 if (f != null) f.SetValue(audioLight, lAlarm);
             }
 
-            CreateSpotlight(grp.transform, "Spotlight_Workbench", new Vector3(0f, 3.2f, 1.8f), Quaternion.Euler(55f, 0f, 0f), 2.2f);
+            CreateSpotlight(grp.transform, "Spotlight_Workbench", new Vector3(0f, 2.8f, 1.0f), Quaternion.Euler(42f, 0f, 0f), 3.5f);
             CreateSpotlight(grp.transform, "Spotlight_Mech", new Vector3(0f, 4.5f, 3.2f), Quaternion.Euler(35f, 0f, 0f), 2.0f);
             CreateSpotlight(grp.transform, "Spotlight_Jaeger", new Vector3(3.8f, 4.8f, 2.8f), Quaternion.Euler(35f, 25f, 0f), 2.4f);
+
+            GameObject wbFill = new GameObject("PointLight_Workbench");
+            wbFill.transform.SetParent(grp.transform, false);
+            wbFill.transform.position = new Vector3(0f, 2.2f, 1.8f);
+            Light lFill = wbFill.AddComponent<Light>();
+            lFill.type = LightType.Point;
+            lFill.range = 7f;
+            lFill.intensity = 2.2f;
+            lFill.color = new Color(1f, 0.96f, 0.9f);
         }
 
         private void CreateSpotlight(Transform parent, string name, Vector3 pos, Quaternion rot, float intensity)
@@ -144,33 +134,76 @@ namespace HangarGame.Prototype
             CreateBox(grp.transform, "Pillar_4", new Vector3(5.5f, 2.5f, -5.5f), new Vector3(0.8f, 5.5f, 0.8f), new Color(0.24f, 0.26f, 0.3f));
         }
 
-        private void CreateMechAtlant()
+        private void CreateMechsHangar()
         {
             GameObject grp = new GameObject("--- 04_MECH_ATLANT ---");
-            grp.transform.position = Vector3.zero;
-            grp.transform.rotation = Quaternion.identity;
-            grp.AddComponent<CombatMech>();
+            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
 
-            SetupPart(grp.transform, "Torso_Core", PrimitiveType.Cube, new Vector3(0f, 2.8f, 5.5f), new Vector3(1.6f, 1.8f, 1.2f), new Color(0.2f, 0.45f, 0.7f),
-                new MechPartData { partName = "Тяжелый Бронекорпус", slot = PartSlot.Torso, attackType = DamageType.Physical, attackPower = 20f, defenseType = DamageType.Physical, defensePower = 60f });
+            var mgr = grp.AddComponent<HangarMechManager>();
 
-            SetupPart(grp.transform, "Cockpit_Head", PrimitiveType.Sphere, new Vector3(0f, 3.9f, 5.4f), new Vector3(0.8f, 0.6f, 0.8f), new Color(0.9f, 0.6f, 0.1f),
-                new MechPartData { partName = "Командный Сенсорный Модуль", slot = PartSlot.Head, attackType = DamageType.Plasma, attackPower = 15f, defenseType = DamageType.Plasma, defensePower = 30f });
-
-            SetupPart(grp.transform, "LeftArm_Shield", PrimitiveType.Cube, new Vector3(-1.3f, 2.7f, 5.3f), new Vector3(0.6f, 1.6f, 0.7f), new Color(0.2f, 0.7f, 0.9f),
-                new MechPartData { partName = "Тяжелый Щит 'Бастион'", slot = PartSlot.LeftArm, attackType = DamageType.Physical, attackPower = 10f, defenseType = DamageType.Physical, defensePower = 80f });
-
-            SetupPart(grp.transform, "RightArm_PlasmaCannon", PrimitiveType.Cylinder, new Vector3(1.3f, 2.7f, 5.3f), new Vector3(0.5f, 1.4f, 0.5f), new Color(0.9f, 0.3f, 0.1f),
-                new MechPartData { partName = "Плазменная Пушка 'Сверхновая'", slot = PartSlot.RightArm, attackType = DamageType.Plasma, attackPower = 60f, defenseType = DamageType.Thermal, defensePower = 20f });
-
-            SetupPart(grp.transform, "Legs_Chassis", PrimitiveType.Cube, new Vector3(0f, 0.9f, 5.5f), new Vector3(1.4f, 1.8f, 1.1f), new Color(0.25f, 0.28f, 0.32f),
-                new MechPartData { partName = "Гидравлическое Шасси 'Титан'", slot = PartSlot.Legs, attackType = DamageType.Physical, attackPower = 15f, defenseType = DamageType.Physical, defensePower = 50f });
-
+            CreateCyl(grp.transform, "Podium_Pedestal", new Vector3(0f, 0.1f, 5.5f), new Vector3(4f, 0.18f, 4f), new Color(0.22f, 0.25f, 0.28f));
             CreateBox(grp.transform, "Scaffold_L", new Vector3(-2.2f, 2.2f, 5.5f), new Vector3(0.2f, 4.4f, 2.4f), new Color(0.85f, 0.65f, 0.1f));
             CreateBox(grp.transform, "Scaffold_R", new Vector3(2.2f, 2.2f, 5.5f), new Vector3(0.2f, 4.4f, 2.4f), new Color(0.85f, 0.65f, 0.1f));
+
+            var m0 = BuildMechUnit(grp.transform, 0, "Страж-1 (Лёгкий)", new Color(0.15f, 0.75f, 0.85f), 80f, 32f, 85f,
+                new Vector3(1.3f, 1.5f, 1.0f), new Vector3(0.65f, 0.55f, 0.65f), new Vector3(0.45f, 1.4f, 0.45f), new Vector3(1.1f, 1.6f, 0.9f));
+
+            var m1 = BuildMechUnit(grp.transform, 1, "Атлант-2 (Штурм)", new Color(0.2f, 0.45f, 0.85f), 110f, 45f, 60f,
+                new Vector3(1.6f, 1.8f, 1.2f), new Vector3(0.8f, 0.6f, 0.8f), new Vector3(0.55f, 1.6f, 0.6f), new Vector3(1.4f, 1.8f, 1.1f));
+
+            var m2 = BuildMechUnit(grp.transform, 2, "Голиаф-3 (Тяжёлый)", new Color(0.85f, 0.5f, 0.15f), 160f, 62f, 42f,
+                new Vector3(2.1f, 2.0f, 1.5f), new Vector3(0.95f, 0.75f, 0.95f), new Vector3(0.75f, 1.8f, 0.8f), new Vector3(1.7f, 1.9f, 1.3f));
+
+            mgr.Mechs.Add(m0);
+            mgr.Mechs.Add(m1);
+            mgr.Mechs.Add(m2);
+
+            m0.gameObject.SetActive(true);
+            m1.gameObject.SetActive(false);
+            m2.gameObject.SetActive(false);
         }
 
-        private void SetupPart(Transform parent, string name, PrimitiveType prim, Vector3 pos, Vector3 scale, Color color, MechPartData data)
+        private MechUnit BuildMechUnit(Transform parent, int id, string name, Color theme, float hp, float atk, float spd,
+            Vector3 torScale, Vector3 headScale, Vector3 armScale, Vector3 legScale)
+        {
+            GameObject obj = new GameObject($"Mech_{id}_{name}");
+            obj.transform.SetParent(parent, false);
+            obj.transform.position = Vector3.zero;
+
+            MechUnit unit = obj.AddComponent<MechUnit>();
+            unit.id = id;
+            unit.mechName = name;
+            unit.themeColor = theme;
+            unit.maxHp = hp;
+            unit.currentHp = hp;
+            unit.attackPower = atk;
+            unit.moveSpeed = spd;
+
+            var pTorso = SetupPart(obj.transform, "Torso_Core", PrimitiveType.Cube, new Vector3(0f, 2.8f, 5.5f), torScale, theme,
+                new MechPartData { partName = $"{name}: Корпус", slot = PartSlot.Torso, attackType = DamageType.Physical, attackPower = 15f, defenseType = DamageType.Physical, defensePower = 60f });
+
+            var pHead = SetupPart(obj.transform, "Cockpit_Head", PrimitiveType.Sphere, new Vector3(0f, 3.8f, 5.4f), headScale, new Color(0.95f, 0.7f, 0.2f),
+                new MechPartData { partName = $"{name}: Сенсорная Рубка", slot = PartSlot.Head, attackType = DamageType.Plasma, attackPower = 10f, defenseType = DamageType.Plasma, defensePower = 30f });
+
+            var pArmL = SetupPart(obj.transform, "LeftArm_Shield", PrimitiveType.Cube, new Vector3(-torScale.x * 0.75f, 2.7f, 5.3f), armScale, theme * 0.85f,
+                new MechPartData { partName = $"{name}: Энергощит", slot = PartSlot.LeftArm, attackType = DamageType.Physical, attackPower = 10f, defenseType = DamageType.Physical, defensePower = 70f });
+
+            var pArmR = SetupPart(obj.transform, "RightArm_Cannon", PrimitiveType.Cylinder, new Vector3(torScale.x * 0.75f, 2.7f, 5.3f), armScale, new Color(0.9f, 0.35f, 0.15f),
+                new MechPartData { partName = $"{name}: Пушка", slot = PartSlot.RightArm, attackType = DamageType.Plasma, attackPower = atk, defenseType = DamageType.Thermal, defensePower = 20f });
+
+            var pLegs = SetupPart(obj.transform, "Legs_Chassis", PrimitiveType.Cube, new Vector3(0f, 0.9f, 5.5f), legScale, new Color(0.22f, 0.25f, 0.28f),
+                new MechPartData { partName = $"{name}: Приводное Шасси", slot = PartSlot.Legs, attackType = DamageType.Physical, attackPower = 10f, defenseType = DamageType.Physical, defensePower = 50f });
+
+            unit.parts.Add(pTorso);
+            unit.parts.Add(pHead);
+            unit.parts.Add(pArmL);
+            unit.parts.Add(pArmR);
+            unit.parts.Add(pLegs);
+
+            return unit;
+        }
+
+        private MechPart SetupPart(Transform parent, string name, PrimitiveType prim, Vector3 pos, Vector3 scale, Color color, MechPartData data)
         {
             GameObject obj = GameObject.CreatePrimitive(prim);
             obj.name = name;
@@ -181,13 +214,13 @@ namespace HangarGame.Prototype
 
             MechPart p = obj.AddComponent<MechPart>();
             p.Setup(data);
+            return p;
         }
 
         private void CreateJaegerFrame()
         {
             GameObject grp = new GameObject("--- 05_JAEGER_FRAME ---");
-            grp.transform.position = Vector3.zero;
-            grp.transform.rotation = Quaternion.identity;
+            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
 
             CreateBox(grp.transform, "Tower_L", new Vector3(3.2f, 3.5f, 4.8f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
             CreateBox(grp.transform, "Tower_R", new Vector3(6.4f, 3.5f, 4.8f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
@@ -197,7 +230,6 @@ namespace HangarGame.Prototype
             CreateBox(grp.transform, "Leg_R", new Vector3(5.5f, 1.1f, 4.8f), new Vector3(0.7f, 2.2f, 0.8f), new Color(0.18f, 0.2f, 0.22f));
             CreateCyl(grp.transform, "Spine", new Vector3(4.8f, 3.4f, 4.8f), new Vector3(0.4f, 1.4f, 0.4f), new Color(0.3f, 0.32f, 0.35f));
 
-            // 4 Модуля стапеля
             GameObject m1 = CreateCyl(grp.transform, "Stage1_Reactor", new Vector3(4.8f, 3.4f, 4.5f), new Vector3(0.85f, 0.35f, 0.85f), Color.cyan);
             m1.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
             m1.SetActive(false);
@@ -218,8 +250,7 @@ namespace HangarGame.Prototype
         private void CreateWorkbench()
         {
             GameObject grp = new GameObject("--- 06_WORKBENCH ---");
-            grp.transform.position = Vector3.zero;
-            grp.transform.rotation = Quaternion.identity;
+            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
             grp.AddComponent<RepairWorkbench>();
 
             CreateBox(grp.transform, "Tabletop", new Vector3(0f, 0.75f, 2.3f), new Vector3(2.4f, 0.12f, 1.1f), new Color(0.22f, 0.24f, 0.27f));
@@ -234,15 +265,13 @@ namespace HangarGame.Prototype
         private void CreateDispatchConsole(UnityEngine.Camera cam)
         {
             GameObject grp = new GameObject("--- 07_DISPATCH_CONSOLE ---");
-            grp.transform.position = Vector3.zero;
-            grp.transform.rotation = Quaternion.identity;
+            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
 
             CreateBox(grp.transform, "Desk", new Vector3(0f, 0.75f, -5.2f), new Vector3(3.6f, 0.15f, 1.5f), new Color(0.18f, 0.2f, 0.24f));
             CreateBox(grp.transform, "Chair", new Vector3(0f, 0.55f, -4.0f), new Vector3(0.7f, 0.8f, 0.7f), new Color(0.1f, 0.1f, 0.12f));
             CreateBox(grp.transform, "Rack_L", new Vector3(-2.2f, 1.4f, -5.3f), new Vector3(0.8f, 2.8f, 0.9f), new Color(0.12f, 0.14f, 0.18f));
             CreateBox(grp.transform, "Rack_R", new Vector3(2.2f, 1.4f, -5.3f), new Vector3(0.8f, 2.8f, 0.9f), new Color(0.12f, 0.14f, 0.18f));
 
-            // Monitor Bezel & WorldSpace Canvas
             CreateBox(grp.transform, "Monitor_Bezel", new Vector3(0f, 1.85f, -5.45f), new Vector3(2.8f, 1.55f, 0.15f), new Color(0.04f, 0.08f, 0.12f));
 
             GameObject cObj = new GameObject("Terminal_Canvas");
@@ -259,50 +288,49 @@ namespace HangarGame.Prototype
 
             Font font = Font.CreateDynamicFontFromOSFont("Arial", 16) ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-            // UI Elements
-            GameObject bg = CreatePanel(cObj.transform, "BG", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(0.05f, 0.09f, 0.14f, 0.98f));
+            GameObject bg = CreatePanel(cObj.transform, "BG", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(0.04f, 0.07f, 0.12f, 0.98f));
 
-            Text tTitle = CreateTxt(bg.transform, "Txt_ThreatTitle", "СЕКТОР-7: РАДАР СКАНИРУЕТ ПЕРИМЕТР", new Vector2(0.5f, 1f), new Vector2(0f, -40f), new Vector2(1800f, 50f), 28, font, Color.cyan);
-            Text tDetails = CreateTxt(bg.transform, "Txt_ThreatDetails", "Угроз нет. Проводите ТО робота на верстаке.", new Vector2(0f, 1f), new Vector2(50f, -120f), new Vector2(850f, 75f), 20, font, Color.white);
-            Text tAdapt = CreateTxt(bg.transform, "Txt_Adaptation", "", new Vector2(0f, 1f), new Vector2(50f, -200f), new Vector2(850f, 45f), 18, font, new Color(1f, 0.55f, 0.15f));
+            Text tTitle = CreateTxt(bg.transform, "Txt_RadarTitle", "СЕКТОР-7: РАДАР СКАНИРУЕТ ПЕРИМЕТР", new Vector2(0f, 1f), new Vector2(50f, -40f), new Vector2(850f, 50f), 24, font, Color.cyan);
+            Text tJaeger = CreateTxt(bg.transform, "Txt_JaegerInfo", "ПРОЕКТ 'ЕГЕРЬ' (0/4)", new Vector2(1f, 1f), new Vector2(-480f, -30f), new Vector2(600f, 35f), 18, font, Color.yellow);
+            Button bJaeger = CreateBtn(bg.transform, "Btn_BuildJaeger", "🔨 СОБРАТЬ МОДУЛЬ НА ВЕРСТАКЕ", new Vector2(1f, 1f), new Vector2(-480f, -70f), new Vector2(400f, 45f), font, new Color(0.18f, 0.45f, 0.7f));
+            Button bScan = CreateBtn(bg.transform, "Btn_ScanThreat", "📡 ВЫЗВАТЬ ВОЛНУ", new Vector2(1f, 1f), new Vector2(-150f, -70f), new Vector2(220f, 45f), font, new Color(0.2f, 0.6f, 0.35f));
 
-            Text tStatus = CreateTxt(bg.transform, "Txt_MechStatus", "✔ СТАТУС: БОЕГОТОВЕН (Все 5 модулей смонтированы)", new Vector2(1f, 1f), new Vector2(-50f, -120f), new Vector2(850f, 45f), 20, font, Color.green);
-            Text tJaeger = CreateTxt(bg.transform, "Txt_JaegerInfo", "ПРОЕКТ 'ЕГЕРЬ' (0/4)", new Vector2(1f, 1f), new Vector2(-50f, -180f), new Vector2(850f, 55f), 19, font, Color.yellow);
-            Button bJaeger = CreateBtn(bg.transform, "Btn_BuildJaeger", "🔨 СОБРАТЬ МОДУЛЬ НА ВЕРСТАКЕ", new Vector2(1f, 1f), new Vector2(-50f, -250f), new Vector2(750f, 55f), font, new Color(0.18f, 0.45f, 0.7f));
+            GameObject rBox = CreatePanel(bg.transform, "Radar_Screen", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 55f), new Vector2(1300f, 620f), new Color(0.02f, 0.05f, 0.08f, 1f));
+            rBox.AddComponent<Button>();
+            RadarClickHandler rClick = rBox.AddComponent<RadarClickHandler>();
 
-            Text tLog = CreateTxt(bg.transform, "Txt_MissionLog", "База готова к дежурству.", new Vector2(0.5f, 0f), new Vector2(0f, 185f), new Vector2(1800f, 55f), 20, font, new Color(0.85f, 0.9f, 0.95f));
+            GameObject mContainer = new GameObject("Marker_Container");
+            mContainer.transform.SetParent(rBox.transform, false);
+            var mRect = mContainer.AddComponent<RectTransform>();
+            mRect.anchorMin = Vector2.zero; mRect.anchorMax = Vector2.one; mRect.sizeDelta = Vector2.zero;
 
-            Button bDeploy = CreateBtn(bg.transform, "Btn_Deploy", "⚔ ВЫЛЕТ НА ПЕРЕХВАТ (SPACE)", new Vector2(0.5f, 0f), new Vector2(-300f, 75f), new Vector2(550f, 85f), font, new Color(0.9f, 0.2f, 0.2f));
-            Button bScan = CreateBtn(bg.transform, "Btn_Scan", "📡 СКАНИРОВАТЬ РАДАР", new Vector2(0.5f, 0f), new Vector2(300f, 75f), new Vector2(550f, 85f), font, new Color(0.15f, 0.65f, 0.4f));
+            Button[] bSlots = new Button[3];
+            Text[] tSlots = new Text[3];
+            Image[] iSlots = new Image[3];
 
-            GameObject qte = CreatePanel(bg.transform, "QtePanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 260f), new Vector2(1100f, 100f), new Color(0.7f, 0.15f, 0.15f));
-            Text tQteTimer = CreateTxt(qte.transform, "Txt_QteTimer", "⏱ 3.5с", new Vector2(0f, 0.5f), new Vector2(30f, 0f), new Vector2(250f, 40f), 20, font, Color.white);
-            Button bQte = CreateBtn(qte.transform, "Btn_Qte", "⚡ АКТИВИРОВАТЬ ЭНЕРГОЩИТ (ПРОБЕЛ)", new Vector2(1f, 0.5f), new Vector2(-30f, 0f), new Vector2(600f, 55f), font, new Color(0.15f, 0.8f, 0.35f));
-            qte.SetActive(false);
+            float[] xOffsets = { -560f, 0f, 560f };
+            for (int i = 0; i < 3; i++)
+            {
+                Button b = CreateBtn(bg.transform, $"Btn_MechSlot_{i}", "", new Vector2(0.5f, 0f), new Vector2(xOffsets[i], 125f), new Vector2(530f, 115f), font, new Color(0.12f, 0.45f, 0.35f));
+                bSlots[i] = b;
+                iSlots[i] = b.GetComponent<Image>();
+                tSlots[i] = b.GetComponentInChildren<Text>();
+            }
+
+            Text tLog = CreateTxt(bg.transform, "Txt_BattleLog", "База готова к дежурству. Радар чист.", new Vector2(0.5f, 0f), new Vector2(0f, 35f), new Vector2(1800f, 40f), 19, font, new Color(0.85f, 0.9f, 0.95f));
 
             TerminalUI ui = cObj.AddComponent<TerminalUI>();
-            SetRef(ui, "txtThreatTitle", tTitle);
-            SetRef(ui, "txtThreatDetails", tDetails);
-            SetRef(ui, "txtMechStatus", tStatus);
-            SetRef(ui, "txtMissionLog", tLog);
-            SetRef(ui, "txtAdaptation", tAdapt);
+            SetRef(ui, "txtRadarTitle", tTitle);
+            SetRef(ui, "txtBattleLog", tLog);
             SetRef(ui, "txtJaegerInfo", tJaeger);
-            SetRef(ui, "btnDeploy", bDeploy);
-            SetRef(ui, "txtDeployLabel", bDeploy.GetComponentInChildren<Text>());
-            SetRef(ui, "btnScan", bScan);
             SetRef(ui, "btnBuildJaeger", bJaeger);
-            SetRef(ui, "qtePanel", qte);
-            SetRef(ui, "txtQteTimer", tQteTimer);
-            SetRef(ui, "btnQteAction", bQte);
-
-            // 3D Physical buttons on desk
-            GameObject b3d1 = CreateCyl(grp.transform, "3D_Btn_Deploy", new Vector3(-1.0f, 0.88f, -4.8f), new Vector3(0.3f, 0.1f, 0.3f), Color.red);
-            b3d1.AddComponent<ClickableObject>().onClick = () => DispatchSystem.Instance?.TryDeploy();
-            b3d1.GetComponent<ClickableObject>().promptText = "Кнопка вылета: отправить робота в бой";
-
-            GameObject b3d2 = CreateCyl(grp.transform, "3D_Btn_Scan", new Vector3(1.0f, 0.88f, -4.8f), new Vector3(0.3f, 0.1f, 0.3f), Color.green);
-            b3d2.AddComponent<ClickableObject>().onClick = () => DispatchSystem.Instance?.SpawnThreat();
-            b3d2.GetComponent<ClickableObject>().promptText = "Радар: сканировать сектор на наличие кайдзю";
+            SetRef(ui, "btnScanThreat", bScan);
+            SetRef(ui, "radarArea", rBox.GetComponent<RectTransform>());
+            SetRef(ui, "radarClick", rClick);
+            SetRef(ui, "markerContainer", mContainer.transform);
+            SetRef(ui, "btnMechSlots", bSlots);
+            SetRef(ui, "txtMechSlots", tSlots);
+            SetRef(ui, "imgMechSlots", iSlots);
         }
 
         private void CreateHUD()
@@ -320,16 +348,20 @@ namespace HangarGame.Prototype
 
             Font font = Font.CreateDynamicFontFromOSFont("Arial", 16) ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-            Button bLeft = CreateBtn(cObj.transform, "Btn_Left", "◀ Диспетчерская\n(180° / A / Q)", new Vector2(0f, 0.5f), new Vector2(20f, 0f), new Vector2(170f, 90f), font, new Color(0.12f, 0.28f, 0.48f, 0.85f));
-            Button bRight = CreateBtn(cObj.transform, "Btn_Right", "Диспетчерская ▶\n(180° / D / E)", new Vector2(1f, 0.5f), new Vector2(-20f, 0f), new Vector2(170f, 90f), font, new Color(0.12f, 0.28f, 0.48f, 0.85f));
+            Button bLeft = CreateBtn(cObj.transform, "Btn_Left", "◀ Рубка (Q)", new Vector2(0f, 0.5f), new Vector2(25f, 0f), new Vector2(150f, 75f), font, new Color(0.12f, 0.28f, 0.48f, 0.85f));
+            Button bRight = CreateBtn(cObj.transform, "Btn_Right", "Рубка ▶ (E)", new Vector2(1f, 0.5f), new Vector2(-25f, 0f), new Vector2(150f, 75f), font, new Color(0.12f, 0.28f, 0.48f, 0.85f));
 
-            GameObject top = CreatePanel(cObj.transform, "TopBar", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -15f), new Vector2(700f, 45f), new Color(0.08f, 0.1f, 0.14f, 0.85f));
-            Text tRes = CreateTxt(top.transform, "Txt_Res", "КРЕДИТЫ: 500 ¢   |   СПЛАВ: 200 т.", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(680f, 40f), 20, font, Color.yellow);
+            GameObject top = CreatePanel(cObj.transform, "TopBar", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -15f), new Vector2(850f, 45f), new Color(0.08f, 0.1f, 0.14f, 0.85f));
+            Text tRes = CreateTxt(top.transform, "Txt_Res", "КРЕДИТЫ: 500 ¢   |   СПЛАВ: 200 т.", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(800f, 40f), 20, font, Color.yellow);
 
-            GameObject pBox = CreatePanel(cObj.transform, "PromptBox", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 25f), new Vector2(800f, 45f), new Color(0.04f, 0.05f, 0.07f, 0.75f));
-            Text tPrompt = CreateTxt(pBox.transform, "Txt_Prompt", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(780f, 40f), 17, font, Color.white);
+            GameObject pnlMech = CreatePanel(cObj.transform, "MechSelectPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 85f), new Vector2(750f, 55f), new Color(0.06f, 0.08f, 0.12f, 0.9f));
+            Button bPrev = CreateBtn(pnlMech.transform, "Btn_PrevMech", "◀ Смена", new Vector2(0f, 0.5f), new Vector2(65f, 0f), new Vector2(110f, 42f), font, new Color(0.18f, 0.35f, 0.55f));
+            Button bNext = CreateBtn(pnlMech.transform, "Btn_NextMech", "Смена ▶", new Vector2(1f, 0.5f), new Vector2(-65f, 0f), new Vector2(110f, 42f), font, new Color(0.18f, 0.35f, 0.55f));
+            Text tCurMech = CreateTxt(pnlMech.transform, "Txt_CurrentMech", "РОБОТ [1/3]: Страж-1 (Лёгкий)", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(460f, 40f), 18, font, Color.cyan);
 
-            // Workbench panel
+            GameObject pBox = CreatePanel(cObj.transform, "PromptBox", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 25f), new Vector2(800f, 40f), new Color(0.04f, 0.05f, 0.07f, 0.75f));
+            Text tPrompt = CreateTxt(pBox.transform, "Txt_Prompt", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(780f, 35f), 16, font, Color.white);
+
             GameObject wb = CreatePanel(cObj.transform, "WorkbenchPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(980f, 180f), new Color(0.08f, 0.11f, 0.16f, 0.96f));
             Text tWbTitle = CreateTxt(wb.transform, "Txt_WbTitle", "🔧 ВЕРСТАК ТО", new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(940f, 30f), 18, font, Color.yellow);
             Text tWbInfo = CreateTxt(wb.transform, "Txt_WbInfo", "Вращение A/D/W/S или ПКМ", new Vector2(0.5f, 1f), new Vector2(0f, -48f), new Vector2(940f, 25f), 15, font, Color.cyan);
@@ -341,11 +373,10 @@ namespace HangarGame.Prototype
             Button bRst = CreateBtn(wb.transform, "bRst", "↺ Сброс", new Vector2(0.5f, 0.5f), new Vector2(150f, 10f), new Vector2(95f, 40f), font, new Color(0.35f, 0.35f, 0.4f));
 
             Button bExit = CreateBtn(wb.transform, "bExit", "❌ ВЫЙТИ В АНГАР (ESC)", new Vector2(0.5f, 0f), new Vector2(-320f, 35f), new Vector2(280f, 48f), font, new Color(0.85f, 0.2f, 0.2f));
-            Button bSwap = CreateBtn(wb.transform, "bSwap", "🔄 СМЕНИТЬ МОДУЛЬ (T)", new Vector2(0.5f, 0f), new Vector2(0f, 35f), new Vector2(280f, 48f), font, new Color(0.2f, 0.55f, 0.85f));
+            Button bSwap = CreateBtn(wb.transform, "bSwap", "🔄 СМЕНИТЬ МОДУЛЬ", new Vector2(0.5f, 0f), new Vector2(0f, 35f), new Vector2(280f, 48f), font, new Color(0.2f, 0.55f, 0.85f));
             Button bFin = CreateBtn(wb.transform, "bFin", "⚡ ЗАВЕРШИТЬ (SPACE)", new Vector2(0.5f, 0f), new Vector2(320f, 35f), new Vector2(280f, 48f), font, new Color(0.15f, 0.7f, 0.3f));
             wb.SetActive(false);
 
-            // Victory panel
             GameObject vic = CreatePanel(cObj.transform, "VictoryPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(700f, 360f), new Color(0.06f, 0.1f, 0.18f, 0.98f));
             CreateTxt(vic.transform, "tWin", "🏆 ТРИУМФ! ЕГЕРЬ ПОСТРОЕН!", new Vector2(0.5f, 1f), new Vector2(0f, -45f), new Vector2(650f, 55f), 30, font, Color.yellow);
             CreateTxt(vic.transform, "tWinD", "Земля спасена от вторжения кайдзю!", new Vector2(0.5f, 0.5f), new Vector2(0f, 20f), new Vector2(620f, 60f), 20, font, Color.white);
@@ -357,6 +388,10 @@ namespace HangarGame.Prototype
             SetRef(hud, "txtResources", tRes);
             SetRef(hud, "btnTurnLeft", bLeft);
             SetRef(hud, "btnTurnRight", bRight);
+            SetRef(hud, "mechSelectPanel", pnlMech);
+            SetRef(hud, "btnPrevMech", bPrev);
+            SetRef(hud, "btnNextMech", bNext);
+            SetRef(hud, "txtCurrentMech", tCurMech);
             SetRef(hud, "txtHoverPrompt", tPrompt);
             SetRef(hud, "wbPanel", wb);
             SetRef(hud, "txtWbTitle", tWbTitle);
@@ -371,8 +406,6 @@ namespace HangarGame.Prototype
             SetRef(hud, "btnExit", bExit);
             SetRef(hud, "victoryPanel", vic);
         }
-
-        #region Helpers
 
         private GameObject CreateBox(Transform parent, string name, Vector3 pos, Vector3 scale, Color c)
         {
@@ -453,7 +486,5 @@ namespace HangarGame.Prototype
             var f = target.GetType().GetField(field, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public);
             if (f != null) f.SetValue(target, val);
         }
-
-        #endregion
     }
 }

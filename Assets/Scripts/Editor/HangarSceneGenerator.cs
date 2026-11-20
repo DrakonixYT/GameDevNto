@@ -9,9 +9,17 @@ namespace HangarGame.EditorTools
 {
     public static class HangarSceneGenerator
     {
-        [MenuItem("Pacific Rim/🚀 1. Сгенерировать сцену прямо сюда (Bake)")]
+        [MenuItem("Tools/Bake Hangar Scene", false, 1)]
+        [MenuItem("Pacific Rim/Bake Hangar Scene", false, 1)]
         public static void BakeIntoCurrentScene()
         {
+            string scenePath = "Assets/Scenes/HangarMainScene.unity";
+            var activeScene = SceneManager.GetActiveScene();
+            if (activeScene.path != scenePath)
+            {
+                activeScene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            }
+
             string[] objectsToClean = {
                 "--- 01_MANAGERS ---", "--- 02_LIGHTING_AND_VFX ---", "--- 03_HANGAR_ROOM ---",
                 "--- 04_MECH_ATLANT ---", "--- 05_JAEGER_FRAME ---", "--- 06_WORKBENCH ---",
@@ -29,8 +37,8 @@ namespace HangarGame.EditorTools
             builder.BuildCompleteHangarPrototype();
             Object.DestroyImmediate(builderObj);
 
-            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-            EditorSceneManager.SaveScene(SceneManager.GetActiveScene());
+            EditorSceneManager.MarkSceneDirty(activeScene);
+            EditorSceneManager.SaveScene(activeScene);
             Debug.Log("<color=green><b>[Pacific Rim]</b> Сцена успешно запечена и сохранена!</color>");
         }
 

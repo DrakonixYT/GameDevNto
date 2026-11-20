@@ -39,6 +39,7 @@ namespace HangarGame.Core
         public void PlayClick() => Play("Click");
         public void PlayBolt() => Play("Bolt");
         public void PlayWeld() => Play("Weld");
+        public void PlayAlarm() => Play("Alarm");
         public void PlaySuccess() => Play("Success");
         public void PlayVictory() => Play("Victory");
 

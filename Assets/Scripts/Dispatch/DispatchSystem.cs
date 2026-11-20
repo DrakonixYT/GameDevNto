@@ -1,119 +1,199 @@
 using System;
-using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using HangarGame.Core;
 using HangarGame.Mechs;
 using HangarGame.Repair;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 namespace HangarGame.Dispatch
 {
-    [Serializable]
-    public class ThreatData
+    public class EnemyDot
     {
-        public string name; public DamageType attackType, weakness; public float power;
-        public int rewardCredits = 250, rewardAlloy = 100;
+        public int id;
+        public string name;
+        public Vector2 position;
+        public float hp = 60f;
+        public float maxHp = 60f;
+        public float speed = 18f;
+        public float attackPower = 10f;
+        public int rewardCredits = 80;
+        public int rewardAlloy = 35;
     }
 
     public class DispatchSystem : MonoBehaviour
     {
         public static DispatchSystem Instance { get; private set; }
-        public ThreatData CurrentThreat { get; private set; }
-        public bool HasActiveThreat => CurrentThreat != null && !IsMissionInProgress;
-        public bool IsMissionInProgress { get; private set; } = false;
-        public bool HasQtePrompt { get; private set; } = false;
-        public float QteTimer { get; private set; } = 0f;
-        public string LastMissionLog { get; private set; } = "База на боевом дежурстве. Держите робота в боеготовности.";
-        public string AdaptationAlert { get; private set; } = "";
 
-        private float waveTimer = 3f, alarmTimer = 0f;
-        private int adaptationStreak = 0;
-        private DamageType counterWeakness = DamageType.Thermal;
+        public List<EnemyDot> Enemies { get; } = new List<EnemyDot>();
+        public string LastBattleLog { get; private set; } = "База на боевом дежурстве. Радар чист.";
+        public int SelectedMechId { get; set; } = -1;
+        public bool IsDeployMode { get; set; } = false;
+
+        private float spawnTimer = 3f;
+        private int enemyCounter = 0;
+        private readonly Vector2 basePos = new Vector2(0f, -240f);
 
         private void Awake() => Instance = this;
 
         private void Update()
         {
-            if (!HasActiveThreat && !IsMissionInProgress)
+            spawnTimer -= Time.deltaTime;
+            if (spawnTimer <= 0f)
             {
-                waveTimer -= Time.deltaTime;
-                if (waveTimer <= 0f) { SpawnThreat(); waveTimer = 22f; }
+                spawnTimer = UnityEngine.Random.Range(10f, 15f);
+                if (Enemies.Count < 6) SpawnEnemy();
             }
-            else if (HasActiveThreat && !IsMissionInProgress)
-            {
-                alarmTimer -= Time.deltaTime;
-                if (alarmTimer <= 0f) { alarmTimer = 4.5f; HangarAudioLight.Instance?.SetAlarm(true); }
-            }
-            if (HasQtePrompt)
-            {
-                QteTimer -= Time.deltaTime;
-                bool space = false;
-#if ENABLE_INPUT_SYSTEM
-                if (Keyboard.current != null) space = Keyboard.current.spaceKey.wasPressedThisFrame;
-#else
-                space = Input.GetKeyDown(KeyCode.Space);
-#endif
-                if (space || QteTimer <= 0f) ExecuteQte();
-            }
+
+            UpdateEnemies();
+            UpdateMechsCombat();
         }
 
-        public void SpawnThreat()
+        public void SpawnEnemy()
         {
-            if (IsMissionInProgress) return;
-            string[] names = { "Кайдзю 'Бритва-5'", "Био-Титан 'Левиафан'", "Осадный Мех 'Цербер'" };
-            DamageType[] types = { DamageType.Physical, DamageType.Thermal, DamageType.Plasma };
-            CurrentThreat = new ThreatData {
-                name = names[UnityEngine.Random.Range(0, names.Length)],
-                attackType = types[UnityEngine.Random.Range(0, types.Length)],
-                weakness = counterWeakness, power = UnityEngine.Random.Range(35f, 55f)
+            enemyCounter++;
+            string[] names = { "Кайдзю-Дрон", "Шипохвост", "Осадный Краб", "Био-Скорпион" };
+            var enemy = new EnemyDot
+            {
+                id = enemyCounter,
+                name = $"{names[UnityEngine.Random.Range(0, names.Length)]} #{enemyCounter}",
+                position = new Vector2(UnityEngine.Random.Range(-450f, 450f), 240f),
+                hp = UnityEngine.Random.Range(50f, 85f),
+                speed = UnityEngine.Random.Range(14f, 22f),
+                attackPower = UnityEngine.Random.Range(8f, 14f),
+                rewardCredits = UnityEngine.Random.Range(70, 120),
+                rewardAlloy = UnityEngine.Random.Range(30, 55)
             };
+            enemy.maxHp = enemy.hp;
+            Enemies.Add(enemy);
             HangarAudioLight.Instance?.SetAlarm(true);
+            LastBattleLog = $"ВНИМАНИЕ! Радар засек {enemy.name}!";
         }
 
-        public bool CanDeploy()
+        private void UpdateEnemies()
         {
-            if (!HasActiveThreat || IsMissionInProgress) return false;
-            if (RepairWorkbench.Instance != null && RepairWorkbench.Instance.HasItem) return false;
-            if (CombatMech.Instance == null || CombatMech.Instance.HasMissingOrDetachedParts()) return false;
-            return true;
-        }
-
-        public bool TryDeploy()
-        {
-            if (!CanDeploy()) return false;
-            StartCoroutine(MissionRoutine());
-            return true;
-        }
-
-        private IEnumerator MissionRoutine()
-        {
-            IsMissionInProgress = true;
-            HangarAudioLight.Instance?.SetAlarm(false);
-            CombatMech.Instance?.SetDeployed(true);
-
-            yield return new WaitForSeconds(1.5f);
-            HasQtePrompt = true; QteTimer = 3.5f;
-            while (HasQtePrompt) yield return null;
-            yield return new WaitForSeconds(1.5f);
-
-            float def = CombatMech.Instance.GetTotalDefense(CurrentThreat.attackType);
-            float dmg = Mathf.Max(10f, CurrentThreat.power * 1.5f - def * 0.3f);
-            CombatMech.Instance.ApplyMissionDamage(dmg);
-            CombatMech.Instance.SetDeployed(false);
-
-            GameManager.Instance?.AddResources(CurrentThreat.rewardCredits, CurrentThreat.rewardAlloy);
-            LastMissionLog = $"Враг [{CurrentThreat.name}] уничтожен! +{CurrentThreat.rewardCredits}¢, +{CurrentThreat.rewardAlloy}т. Урон: {dmg:F0}";
-
-            if (++adaptationStreak >= 2)
+            for (int i = Enemies.Count - 1; i >= 0; i--)
             {
-                adaptationStreak = 0; counterWeakness = (DamageType)(((int)counterWeakness + 1) % 4);
-                AdaptationAlert = $"Кайдзю адаптировались! Новая слабость: {counterWeakness}";
+                var enemy = Enemies[i];
+                if (enemy.hp <= 0f)
+                {
+                    OnEnemyDefeated(enemy);
+                    Enemies.RemoveAt(i);
+                    continue;
+                }
+
+                Vector2 target = basePos;
+                MechUnit closestMech = GetClosestMech(enemy.position, 130f);
+                if (closestMech != null) target = closestMech.battlefieldPos;
+
+                enemy.position = Vector2.MoveTowards(enemy.position, target, enemy.speed * Time.deltaTime);
+
+                if (Vector2.Distance(enemy.position, basePos) < 15f)
+                {
+                    enemy.position = new Vector2(UnityEngine.Random.Range(-400f, 400f), 230f);
+                    HangarAudioLight.Instance?.PlayBolt();
+                    LastBattleLog = $"⚠ {enemy.name} атаковал периметр базы!";
+                }
             }
-            CurrentThreat = null; IsMissionInProgress = false; HangarAudioLight.Instance?.PlaySuccess();
         }
 
-        public void ExecuteQte() { if (HasQtePrompt) { HasQtePrompt = false; HangarAudioLight.Instance?.PlayBolt(); } }
+        private void UpdateMechsCombat()
+        {
+            if (HangarMechManager.Instance == null) return;
+
+            foreach (var mech in HangarMechManager.Instance.Mechs)
+            {
+                if (!mech.isDeployed) continue;
+
+                if (Vector2.Distance(mech.battlefieldPos, mech.targetPos) > 4f)
+                {
+                    mech.battlefieldPos = Vector2.MoveTowards(mech.battlefieldPos, mech.targetPos, mech.moveSpeed * Time.deltaTime);
+                }
+
+                EnemyDot targetEnemy = GetClosestEnemy(mech.battlefieldPos, 120f);
+                if (targetEnemy != null)
+                {
+                    targetEnemy.hp -= mech.attackPower * Time.deltaTime;
+                    mech.ApplyDamage(targetEnemy.attackPower * 0.4f * Time.deltaTime);
+
+                    if (mech.currentHp <= 5f)
+                    {
+                        RecallMech(mech.id);
+                        LastBattleLog = $"🚨 Критический урон {mech.mechName}! Экстренная эвакуация в ангар!";
+                        HangarAudioLight.Instance?.PlayAlarm();
+                    }
+                }
+            }
+        }
+
+        private void OnEnemyDefeated(EnemyDot enemy)
+        {
+            GameManager.Instance?.AddResources(enemy.rewardCredits, enemy.rewardAlloy);
+            LastBattleLog = $"✔ {enemy.name} уничтожен! Получено: +{enemy.rewardCredits}¢, +{enemy.rewardAlloy}т.";
+            HangarAudioLight.Instance?.PlayWeld();
+            if (Enemies.Count == 0) HangarAudioLight.Instance?.SetAlarm(false);
+        }
+
+        public bool DeployMech(int mechId, Vector2 radarPos)
+        {
+            var mech = HangarMechManager.Instance?.GetMechById(mechId);
+            if (mech == null || !mech.CanDeploy()) return false;
+
+            if (RepairWorkbench.Instance != null && RepairWorkbench.Instance.HasItem && RepairWorkbench.Instance.CurrentPart != null)
+            {
+                if (mech.parts.Contains(RepairWorkbench.Instance.CurrentPart)) return false;
+            }
+
+            mech.SetDeployed(true, radarPos);
+            HangarAudioLight.Instance?.PlaySuccess();
+            LastBattleLog = $"🚀 {mech.mechName} высажен в сектор [{radarPos.x:F0}, {radarPos.y:F0}]!";
+            return true;
+        }
+
+        public void RecallMech(int mechId)
+        {
+            var mech = HangarMechManager.Instance?.GetMechById(mechId);
+            if (mech == null || !mech.isDeployed) return;
+
+            mech.SetDeployed(false);
+            HangarMechManager.Instance?.UpdatePodiumDisplay();
+            HangarAudioLight.Instance?.PlayBolt();
+            LastBattleLog = $"🔙 {mech.mechName} отозван в ангар для техобслуживания.";
+        }
+
+        public void OrderMechMove(int mechId, Vector2 radarPos)
+        {
+            var mech = HangarMechManager.Instance?.GetMechById(mechId);
+            if (mech == null || !mech.isDeployed) return;
+
+            mech.targetPos = radarPos;
+            HangarAudioLight.Instance?.PlayClick();
+            LastBattleLog = $"📍 {mech.mechName}: движение к координатам [{radarPos.x:F0}, {radarPos.y:F0}].";
+        }
+
+        public EnemyDot GetClosestEnemy(Vector2 pos, float maxRange)
+        {
+            EnemyDot best = null;
+            float minDst = maxRange;
+            foreach (var e in Enemies)
+            {
+                float d = Vector2.Distance(pos, e.position);
+                if (d < minDst) { minDst = d; best = e; }
+            }
+            return best;
+        }
+
+        public MechUnit GetClosestMech(Vector2 pos, float maxRange)
+        {
+            if (HangarMechManager.Instance == null) return null;
+            MechUnit best = null;
+            float minDst = maxRange;
+            foreach (var m in HangarMechManager.Instance.Mechs)
+            {
+                if (!m.isDeployed) continue;
+                float d = Vector2.Distance(pos, m.battlefieldPos);
+                if (d < minDst) { minDst = d; best = m; }
+            }
+            return best;
+        }
     }
 }
