@@ -581,14 +581,15 @@ namespace HangarGame.Prototype
             GameObject cObj = new GameObject("Terminal_Canvas");
             cObj.transform.SetParent(grp.transform, false);
             cObj.transform.position = screenCenter + new Vector3(0f, 0f, -0.015f);
-            cObj.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
-            cObj.transform.localScale = new Vector3(-0.001f, 0.001f, 0.001f);
+            cObj.transform.rotation = Quaternion.identity;
+            cObj.transform.localScale = new Vector3(0.001f, 0.001f, 0.001f);
 
             Canvas c = cObj.AddComponent<Canvas>();
             c.renderMode = RenderMode.WorldSpace;
             c.worldCamera = cam;
             cObj.GetComponent<RectTransform>().sizeDelta = new Vector2(1280f, 720f);
-            cObj.AddComponent<GraphicRaycaster>();
+            var gr = cObj.AddComponent<GraphicRaycaster>();
+            gr.ignoreReversedGraphics = false;
 
             Font font = Font.CreateDynamicFontFromOSFont("Arial", 16) ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
@@ -780,6 +781,7 @@ namespace HangarGame.Prototype
             t.fontSize = fontSize;
             t.alignment = TextAnchor.MiddleCenter;
             t.color = c;
+            t.raycastTarget = false;
             return t;
         }
 

@@ -21,6 +21,10 @@ namespace HangarGame.CameraControl
         private float wbZoom = 0f;
         private float shakeTime = 0f, shakeMag = 0f;
 
+        [Header("Workbench Camera Setup")]
+        [SerializeField] private Vector3 wbCameraOffset = new Vector3(0f, 1.45f, -1.15f);
+        [SerializeField] private float wbCameraPitch = 30f;
+
         private void Awake() => Instance = this;
 
         public void ConfigureAnchor(Vector3 hPos, Vector3 dPos, float hYaw, float dYaw)
@@ -129,14 +133,14 @@ namespace HangarGame.CameraControl
             curBaseYaw = Mathf.Lerp(curBaseYaw, targetBaseYaw, Time.deltaTime * 8f);
 
             float wbYaw = (RepairWorkbench.Instance != null) ? RepairWorkbench.Instance.transform.eulerAngles.y : 25f;
-            float p = (v == RoomView.WorkbenchFocus) ? (30f - ny * 5f) : (-ny * 7f);
+            float p = (v == RoomView.WorkbenchFocus) ? (wbCameraPitch - ny * 5f) : (-ny * 7f);
             float y = (v == RoomView.WorkbenchFocus) ? (wbYaw + nx * 5f) : (curBaseYaw + nx * 12f);
 
             Vector3 targetPos = hangarPos;
             if (v == RoomView.WorkbenchFocus)
             {
                 Vector3 wbBase = (RepairWorkbench.Instance != null)
-                    ? RepairWorkbench.Instance.transform.TransformPoint(new Vector3(0f, 1.45f, -1.15f))
+                    ? RepairWorkbench.Instance.transform.TransformPoint(wbCameraOffset)
                     : fallbackWbPos;
                 targetPos = wbBase + new Vector3(0f, wbZoom * 0.2f, -wbZoom);
             }

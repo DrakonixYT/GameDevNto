@@ -60,6 +60,7 @@ namespace HangarGame.UI
         private GameObject baseMarkerObj;
         private GameObject orderTargetMarkerObj;
         private Canvas canvas;
+        private float lastRadarClickTime = -1f;
 
         private void Start()
         {
@@ -67,6 +68,12 @@ namespace HangarGame.UI
             if (canvas != null && canvas.worldCamera == null)
             {
                 canvas.worldCamera = UnityEngine.Camera.main;
+            }
+
+            var gr = GetComponent<GraphicRaycaster>();
+            if (gr != null)
+            {
+                gr.ignoreReversedGraphics = false;
             }
 
             if (btnBuildJaeger != null) btnBuildJaeger.onClick.AddListener(() => { HangarAudioLight.Instance?.PlayClick(); JaegerProject.Instance?.StartNextStage(); });
@@ -171,6 +178,7 @@ namespace HangarGame.UI
         private void CheckDirectRadarRaycast(DispatchSystem dispatch)
         {
             if (radarArea == null) return;
+            if (GameManager.Instance != null && GameManager.Instance.CurrentView != RoomView.DispatchConsole) return;
 
             bool clk = false;
 #if ENABLE_INPUT_SYSTEM
@@ -333,6 +341,9 @@ namespace HangarGame.UI
 
         private void OnRadarClicked(Vector2 pos)
         {
+            if (Time.unscaledTime - lastRadarClickTime < 0.05f) return;
+            lastRadarClickTime = Time.unscaledTime;
+
             var dispatch = DispatchSystem.Instance;
             var mechMgr = HangarMechManager.Instance;
             if (dispatch == null || mechMgr == null) return;

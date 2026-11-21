@@ -21,6 +21,53 @@ namespace HangarGame.Repair
         public bool IsJaegerModule => CurrentJaegerModule != null;
         public string RepairStepInfo { get; private set; } = "";
 
+        [Header("Workbench Placement")]
+        [SerializeField] private Vector3 tableRestOffset = new Vector3(0f, 0.85f, 0f);
+        [SerializeField] private Vector3 initialPartEuler = new Vector3(0f, 180f, 0f);
+
+        [Header("Service Hatch")]
+        [SerializeField] private Vector3 hatchLocalOffset = new Vector3(0f, 0f, -0.6f);
+        [SerializeField] private Vector3 hatchSize = new Vector3(1.25f, 0.95f, 0.06f);
+
+        [Header("Bolts Config")]
+        [SerializeField] private Vector3 boltScale = new Vector3(0.24f, 0.07f, 0.24f);
+        [SerializeField] private float boltColliderRadius = 0.55f;
+        [SerializeField] private Vector3[] boltOffsets = new Vector3[]
+        {
+            new Vector3(-0.48f, 0.36f, 0.08f),
+            new Vector3(0.48f, 0.36f, 0.08f),
+            new Vector3(-0.48f, -0.36f, 0.08f),
+            new Vector3(0.48f, -0.36f, 0.08f)
+        };
+
+        [Header("Wires Config")]
+        [SerializeField] private Vector3 pinScale = new Vector3(0.24f, 0.24f, 0.24f);
+        [SerializeField] private float pinColliderRadius = 0.65f;
+        [SerializeField] private Vector3[] leftPinOffsets = new Vector3[]
+        {
+            new Vector3(-0.38f, 0.26f, 0.08f),
+            new Vector3(-0.38f, 0.0f, 0.08f),
+            new Vector3(-0.38f, -0.26f, 0.08f)
+        };
+        [SerializeField] private Vector3[] rightPinOffsets = new Vector3[]
+        {
+            new Vector3(0.38f, -0.26f, 0.08f),
+            new Vector3(0.38f, 0.26f, 0.08f),
+            new Vector3(0.38f, 0.0f, 0.08f)
+        };
+        [SerializeField] private Color[] wireColors = new Color[]
+        {
+            new Color(1f, 0.25f, 0.25f),
+            new Color(0.2f, 0.9f, 1f),
+            new Color(1f, 0.88f, 0.15f)
+        };
+
+        [Header("Controls")]
+        [SerializeField] private float rotationSpeed = 90f;
+        [SerializeField] private float mouseSensitivity = 0.4f;
+        [SerializeField] private float minPitch = -70f;
+        [SerializeField] private float maxPitch = 70f;
+
         private float targetYaw = 180f, targetPitch = 0f, curYaw = 180f, curPitch = 0f;
         private string currentJaegerName;
         private Action onJaegerDone;
@@ -69,7 +116,7 @@ namespace HangarGame.Repair
             if (Mouse.current != null && (Mouse.current.rightButton.isPressed || Mouse.current.middleButton.isPressed))
             {
                 Vector2 d = Mouse.current.delta.ReadValue();
-                targetYaw += d.x * 0.4f; targetPitch = Mathf.Clamp(targetPitch - d.y * 0.4f, -70f, 70f);
+                targetYaw += d.x * mouseSensitivity; targetPitch = Mathf.Clamp(targetPitch - d.y * mouseSensitivity, minPitch, maxPitch);
             }
 #else
             if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.Q)) h -= 1f;
@@ -78,11 +125,11 @@ namespace HangarGame.Repair
             if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) v -= 1f;
             if (Input.GetMouseButton(1) || Input.GetMouseButton(2))
             {
-                targetYaw += Input.GetAxis("Mouse X") * 4f; targetPitch = Mathf.Clamp(targetPitch - Input.GetAxis("Mouse Y") * 4f, -70f, 70f);
+                targetYaw += Input.GetAxis("Mouse X") * (mouseSensitivity * 10f); targetPitch = Mathf.Clamp(targetPitch - Input.GetAxis("Mouse Y") * (mouseSensitivity * 10f), minPitch, maxPitch);
             }
 #endif
-            targetYaw += h * 90f * Time.deltaTime;
-            targetPitch = Mathf.Clamp(targetPitch - v * 90f * Time.deltaTime, -70f, 70f);
+            targetYaw += h * rotationSpeed * Time.deltaTime;
+            targetPitch = Mathf.Clamp(targetPitch - v * rotationSpeed * Time.deltaTime, minPitch, maxPitch);
             curYaw = Mathf.Lerp(curYaw, targetYaw, Time.deltaTime * 12f);
             curPitch = Mathf.Lerp(curPitch, targetPitch, Time.deltaTime * 12f);
 
@@ -91,8 +138,8 @@ namespace HangarGame.Repair
         }
 
         public void RotateYaw(float d) => targetYaw += d;
-        public void RotatePitch(float d) => targetPitch = Mathf.Clamp(targetPitch + d, -70f, 70f);
-        public void ResetRotation() { targetYaw = 180f; targetPitch = 0f; }
+        public void RotatePitch(float d) => targetPitch = Mathf.Clamp(targetPitch + d, minPitch, maxPitch);
+        public void ResetRotation() { targetYaw = initialPartEuler.y; targetPitch = initialPartEuler.x; }
 
         public void CycleModule()
         {
@@ -111,8 +158,8 @@ namespace HangarGame.Repair
 
             ResetRotation();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            Vector3 tablePos = transform.TransformPoint(new Vector3(0f, 0.85f, 0f));
-            StartCoroutine(SlideToWorkbench(p.transform, tablePos, Quaternion.Euler(0f, 180f, 0f), StartBoltsPhase));
+            Vector3 tablePos = transform.TransformPoint(tableRestOffset);
+            StartCoroutine(SlideToWorkbench(p.transform, tablePos, Quaternion.Euler(initialPartEuler), StartBoltsPhase));
         }
 
         public void ReceiveJaegerModule(GameObject mod, string name, Action onDone)
@@ -124,9 +171,9 @@ namespace HangarGame.Repair
 
             ResetRotation();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            Vector3 tablePos = transform.TransformPoint(new Vector3(0f, 0.85f, 0f));
+            Vector3 tablePos = transform.TransformPoint(tableRestOffset);
             mod.transform.position = tablePos + new Vector3(0f, 0.5f, 0f);
-            StartCoroutine(SlideToWorkbench(mod.transform, tablePos, Quaternion.Euler(0f, 180f, 0f), StartBoltsPhase));
+            StartCoroutine(SlideToWorkbench(mod.transform, tablePos, Quaternion.Euler(initialPartEuler), StartBoltsPhase));
         }
 
         private IEnumerator SlideToWorkbench(Transform t, Vector3 targetPos, Quaternion targetRot, Action onDone)
@@ -149,26 +196,26 @@ namespace HangarGame.Repair
             Transform root = CurrentPart != null ? CurrentPart.transform : (CurrentJaegerModule != null ? CurrentJaegerModule.transform : null);
             if (root == null) return;
 
-            boltsRemaining = 4;
-            RepairStepInfo = "Шаг 1/2: Открутите 4 золотых болта на передней панели детали";
-
-            CreateServiceHatchBase(root);
-
-            Vector3[] boltLocalOffsets = {
+            Vector3[] offsets = (boltOffsets != null && boltOffsets.Length > 0) ? boltOffsets : new Vector3[] {
                 new Vector3(-0.48f, 0.36f, 0.08f),
                 new Vector3(0.48f, 0.36f, 0.08f),
                 new Vector3(-0.48f, -0.36f, 0.08f),
                 new Vector3(0.48f, -0.36f, 0.08f)
             };
 
-            for (int i = 0; i < 4; i++)
+            boltsRemaining = offsets.Length;
+            RepairStepInfo = $"Шаг 1/2: Открутите {boltsRemaining} золотых болта на сервисной панели";
+
+            CreateServiceHatchBase(root);
+
+            for (int i = 0; i < offsets.Length; i++)
             {
                 GameObject bolt = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 bolt.name = $"Bolt_{i}";
                 bolt.transform.SetParent(serviceHatchObj.transform, false);
-                bolt.transform.localPosition = boltLocalOffsets[i];
+                bolt.transform.localPosition = offsets[i];
                 bolt.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                bolt.transform.localScale = new Vector3(0.24f, 0.07f, 0.24f);
+                bolt.transform.localScale = boltScale;
 
                 var r = bolt.GetComponent<Renderer>();
                 r.material = CreateMaterial(new Color(1f, 0.85f, 0.1f), true);
@@ -185,7 +232,7 @@ namespace HangarGame.Repair
                 var capCol = bolt.GetComponent<Collider>();
                 if (capCol != null) Destroy(capCol);
                 var sphCol = bolt.AddComponent<SphereCollider>();
-                sphCol.radius = 0.55f;
+                sphCol.radius = boltColliderRadius;
 
                 ClickableObject clk = bolt.AddComponent<ClickableObject>();
                 clk.promptText = "🔧 Крепёжный болт (Клик: открутить)";
@@ -201,14 +248,14 @@ namespace HangarGame.Repair
 
             Vector3 inv = new Vector3(1f / Mathf.Max(0.1f, root.lossyScale.x), 1f / Mathf.Max(0.1f, root.lossyScale.y), 1f / Mathf.Max(0.1f, root.lossyScale.z));
             serviceHatchObj.transform.localScale = inv;
-            serviceHatchObj.transform.localPosition = new Vector3(0f, 0f, -0.6f);
+            serviceHatchObj.transform.localPosition = hatchLocalOffset;
             serviceHatchObj.transform.localRotation = Quaternion.identity;
 
             GameObject plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
             plate.name = "Hatch_Backing";
             plate.transform.SetParent(serviceHatchObj.transform, false);
             plate.transform.localPosition = Vector3.zero;
-            plate.transform.localScale = new Vector3(1.25f, 0.95f, 0.06f);
+            plate.transform.localScale = hatchSize;
             var col = plate.GetComponent<Collider>();
             if (col != null) Destroy(col);
 
@@ -249,41 +296,33 @@ namespace HangarGame.Repair
             Transform root = CurrentPart != null ? CurrentPart.transform : (CurrentJaegerModule != null ? CurrentJaegerModule.transform : null);
             if (root == null || serviceHatchObj == null) return;
 
-            wiresRemaining = 3;
+            Color[] colors = (wireColors != null && wireColors.Length > 0) ? wireColors : new Color[] {
+                new Color(1f, 0.25f, 0.25f),
+                new Color(0.2f, 0.9f, 1f),
+                new Color(1f, 0.88f, 0.15f)
+            };
+
+            int count = colors.Length;
+            wiresRemaining = count;
             selectedPinObj = null;
             selectedColorId = -1;
             selectedSide = -1;
             leftPinPositions.Clear();
             rightPinPositions.Clear();
 
-            RepairStepInfo = "Шаг 2/2: Соедините 3 пары клемм одинакового цвета";
+            RepairStepInfo = $"Шаг 2/2: Соедините {count} пары клемм одинакового цвета";
 
-            Color[] colors = {
-                new Color(1f, 0.25f, 0.25f),
-                new Color(0.2f, 0.9f, 1f),
-                new Color(1f, 0.88f, 0.15f)
-            };
-
-            Vector3[] leftOffsets = {
-                new Vector3(-0.38f, 0.26f, 0.08f),
-                new Vector3(-0.38f, 0.0f, 0.08f),
-                new Vector3(-0.38f, -0.26f, 0.08f)
-            };
-
-            Vector3[] rightOffsets = {
-                new Vector3(0.38f, -0.26f, 0.08f),
-                new Vector3(0.38f, 0.26f, 0.08f),
-                new Vector3(0.38f, 0.0f, 0.08f)
-            };
-
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < count; i++)
             {
                 int colorId = i;
-                leftPinPositions[colorId] = leftOffsets[i];
-                rightPinPositions[colorId] = rightOffsets[i];
+                Vector3 lPos = (leftPinOffsets != null && i < leftPinOffsets.Length) ? leftPinOffsets[i] : new Vector3(-0.38f, 0.26f - i * 0.26f, 0.08f);
+                Vector3 rPos = (rightPinOffsets != null && i < rightPinOffsets.Length) ? rightPinOffsets[i] : new Vector3(0.38f, -0.26f + i * 0.26f, 0.08f);
 
-                CreateWirePin(serviceHatchObj.transform, leftOffsets[i], colors[i], colorId, 0);
-                CreateWirePin(serviceHatchObj.transform, rightOffsets[i], colors[i], colorId, 1);
+                leftPinPositions[colorId] = lPos;
+                rightPinPositions[colorId] = rPos;
+
+                CreateWirePin(serviceHatchObj.transform, lPos, colors[i], colorId, 0);
+                CreateWirePin(serviceHatchObj.transform, rPos, colors[i], colorId, 1);
             }
         }
 
@@ -293,7 +332,7 @@ namespace HangarGame.Repair
             pin.name = $"Pin_{colorId}_{side}";
             pin.transform.SetParent(parent, false);
             pin.transform.localPosition = localPos;
-            pin.transform.localScale = new Vector3(0.24f, 0.24f, 0.24f);
+            pin.transform.localScale = pinScale;
 
             var r = pin.GetComponent<Renderer>();
             r.material = CreateMaterial(c, true);
@@ -301,7 +340,7 @@ namespace HangarGame.Repair
             var col = pin.GetComponent<Collider>();
             if (col != null) Destroy(col);
             var sphCol = pin.AddComponent<SphereCollider>();
-            sphCol.radius = 0.65f;
+            sphCol.radius = pinColliderRadius;
 
             string sideName = side == 0 ? "Входной" : "Выходной";
             ClickableObject clk = pin.AddComponent<ClickableObject>();

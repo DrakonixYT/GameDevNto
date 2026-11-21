@@ -30,14 +30,7 @@ namespace HangarGame.Mechs
             rend = GetComponent<Renderer>() ?? GetComponentInChildren<Renderer>();
             if (rend != null && rend.sharedMaterial != null)
             {
-                if (rend.sharedMaterial.HasProperty("_BaseColor"))
-                    baseColor = rend.sharedMaterial.GetColor("_BaseColor");
-                else
-                    baseColor = rend.sharedMaterial.color;
-                if (baseColor.a < 0.05f && baseColor.r < 0.05f && baseColor.g < 0.05f && baseColor.b < 0.05f)
-                {
-                    baseColor = Color.white;
-                }
+                baseColor = rend.material.color;
             }
             socketPos = transform.localPosition;
             socketRot = transform.localRotation;
@@ -49,18 +42,6 @@ namespace HangarGame.Mechs
         {
             data = d;
             currentHp = maxHp;
-            if (rend == null) rend = GetComponent<Renderer>() ?? GetComponentInChildren<Renderer>();
-            if (rend != null && rend.sharedMaterial != null)
-            {
-                if (rend.sharedMaterial.HasProperty("_BaseColor"))
-                    baseColor = rend.sharedMaterial.GetColor("_BaseColor");
-                else
-                    baseColor = rend.sharedMaterial.color;
-                if (baseColor.a < 0.05f && baseColor.r < 0.05f && baseColor.g < 0.05f && baseColor.b < 0.05f)
-                {
-                    baseColor = Color.white;
-                }
-            }
             UpdateVis();
         }
 
@@ -140,16 +121,8 @@ namespace HangarGame.Mechs
             {
                 if (r != null && r.sharedMaterial != null)
                 {
-                    if (Application.isPlaying)
-                    {
-                        if (r.material.HasProperty("_BaseColor")) r.material.SetColor("_BaseColor", targetCol);
-                        if (r.material.HasProperty("_Color")) r.material.color = targetCol;
-                    }
-                    else
-                    {
-                        if (r.sharedMaterial.HasProperty("_BaseColor")) r.sharedMaterial.SetColor("_BaseColor", targetCol);
-                        if (r.sharedMaterial.HasProperty("_Color")) r.sharedMaterial.color = targetCol;
-                    }
+                    if (Application.isPlaying) r.material.color = targetCol;
+                    else r.sharedMaterial.color = targetCol;
                 }
             }
         }
@@ -165,16 +138,8 @@ namespace HangarGame.Mechs
             {
                 if (r != null && r.sharedMaterial != null)
                 {
-                    if (Application.isPlaying)
-                    {
-                        if (r.material.HasProperty("_BaseColor")) r.material.SetColor("_BaseColor", targetCol);
-                        if (r.material.HasProperty("_Color")) r.material.color = targetCol;
-                    }
-                    else
-                    {
-                        if (r.sharedMaterial.HasProperty("_BaseColor")) r.sharedMaterial.SetColor("_BaseColor", targetCol);
-                        if (r.sharedMaterial.HasProperty("_Color")) r.sharedMaterial.color = targetCol;
-                    }
+                    if (Application.isPlaying) r.material.color = targetCol;
+                    else r.sharedMaterial.color = targetCol;
                 }
             }
         }
