@@ -25,6 +25,7 @@ namespace HangarGame.UI
         [SerializeField] private GameObject mechSelectPanel;
         [SerializeField] private Button btnPrevMech;
         [SerializeField] private Button btnNextMech;
+        [SerializeField] private Button btnRechargeBattery;
         [SerializeField] private Text txtCurrentMech;
 
         [Header("Hover Prompt")]
@@ -47,6 +48,12 @@ namespace HangarGame.UI
 
             if (btnPrevMech != null) btnPrevMech.onClick.AddListener(() => HangarMechManager.Instance?.PrevMech());
             if (btnNextMech != null) btnNextMech.onClick.AddListener(() => HangarMechManager.Instance?.NextMech());
+            if (btnRechargeBattery != null) btnRechargeBattery.onClick.AddListener(() =>
+            {
+                HangarMechManager.Instance?.RechargeCurrentMech();
+                HangarAudioLight.Instance?.PlaySuccess();
+                HangarAudioLight.Instance?.PlayBolt();
+            });
 
             if (btnRotYM != null) btnRotYM.onClick.AddListener(() => RepairWorkbench.Instance?.RotateYaw(-30f));
             if (btnRotYP != null) btnRotYP.onClick.AddListener(() => RepairWorkbench.Instance?.RotateYaw(30f));
@@ -115,10 +122,20 @@ namespace HangarGame.UI
                 if (right) HangarMechManager.Instance.NextMech();
 
                 var cur = HangarMechManager.Instance.CurrentMech;
-                if (txtCurrentMech != null && cur != null)
+                if (cur != null)
                 {
-                    string status = cur.isDeployed ? "В БОЮ В ГОРОДЕ" : $"{cur.currentHp:F0}% HP";
-                    txtCurrentMech.text = $"◀ РОБОТ [{HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}]: {cur.mechName} ({status}) ▶";
+                    if (txtCurrentMech != null)
+                    {
+                        string status = cur.isDeployed ? "В БОЮ" : "В АНГАРЕ";
+                        txtCurrentMech.text = $"◀ [{HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}] {cur.mechName} | {status} | ♥ {cur.currentHp:F0}% | ⚡ {cur.currentEnergy:F0}% ▶";
+                    }
+
+                    if (btnRechargeBattery != null)
+                    {
+                        btnRechargeBattery.interactable = !cur.isDeployed && cur.currentEnergy < 99f;
+                        var bTxt = btnRechargeBattery.GetComponentInChildren<Text>();
+                        if (bTxt != null) bTxt.text = cur.currentEnergy >= 99f ? "⚡ БАТАРЕЯ 100%" : "⚡ ЗАРЯДИТЬ БАТАРЕЮ";
+                    }
                 }
             }
 

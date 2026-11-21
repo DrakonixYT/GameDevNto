@@ -64,6 +64,12 @@ namespace HangarGame.Mechs
             UpdateVis();
         }
 
+        public void SetDurabilityPercent(float pct)
+        {
+            currentHp = maxHp * Mathf.Clamp01(pct);
+            UpdateVis();
+        }
+
         public void ReturnToSocket()
         {
             if (gameObject.activeInHierarchy) StartCoroutine(SlideBack());
@@ -112,7 +118,8 @@ namespace HangarGame.Mechs
             }
             if (rend != null && rend.enabled)
             {
-                rend.material.color = Color.Lerp(Color.red, baseColor, DurabilityPercent);
+                if (Application.isPlaying) rend.material.color = Color.Lerp(Color.red, baseColor, DurabilityPercent);
+                else if (rend.sharedMaterial != null) rend.sharedMaterial.color = Color.Lerp(Color.red, baseColor, DurabilityPercent);
             }
         }
 
@@ -142,6 +149,9 @@ namespace HangarGame.Mechs
         public Color themeColor;
         public List<MechPart> parts = new List<MechPart>();
         public bool isDeployed = false;
+        public bool isReturning = false;
+        public bool isShieldActive = false;
+        public float currentEnergy = 100f, maxEnergy = 100f;
         public float currentHp = 100f, maxHp = 100f;
         public Vector2 battlefieldPos, targetPos;
         public bool hasTarget = false;
@@ -173,7 +183,59 @@ namespace HangarGame.Mechs
             return false;
         }
 
-        public bool CanDeploy() => !isDeployed && !HasMissingOrDetachedParts() && currentHp > 5f;
+        public bool CanDeploy() => !isDeployed && !isReturning && !HasMissingOrDetachedParts() && currentHp > 10f && currentEnergy > 10f;
+
+        public void RechargeBattery()
+        {
+            currentEnergy = maxEnergy;
+        }
+
+        public void ToggleShield()
+        {
+            if (currentEnergy > 5f)
+            {
+                isShieldActive = !isShieldActive;
+            }
+            else
+            {
+                isShieldActive = false;
+            }
+        }
+
+        public void SyncHpFromParts()
+        {
+            EnsurePartsLoaded();
+            if (parts.Count == 0) return;
+            float total = 0f;
+            int valid = 0;
+            for (int i = 0; i < parts.Count; i++)
+            {
+                if (parts[i] != null)
+                {
+                    total += parts[i].DurabilityPercent;
+                    valid++;
+                }
+            }
+            float ratio = valid > 0 ? (total / valid) : 1f;
+            currentHp = maxHp * ratio;
+        }
+
+        public void SyncPartsFromHp(float ratio)
+        {
+            EnsurePartsLoaded();
+            ratio = Mathf.Clamp01(ratio);
+            for (int i = 0; i < parts.Count; i++)
+            {
+                if (parts[i] == null) continue;
+                float partRatio = ratio;
+                if (ratio < 0.98f)
+                {
+                    partRatio = Mathf.Clamp01(ratio + UnityEngine.Random.Range(-0.15f, 0.08f));
+                }
+                parts[i].SetDurabilityPercent(partRatio);
+            }
+            SyncHpFromParts();
+        }
 
         public void SetDeployed(bool dep, Vector2 startPos = default)
         {
@@ -181,13 +243,24 @@ namespace HangarGame.Mechs
             battlefieldPos = startPos;
             targetPos = startPos;
             hasTarget = false;
+            if (!dep)
+            {
+                isReturning = false;
+                isShieldActive = false;
+            }
             gameObject.SetActive(!dep && HangarMechManager.Instance != null && HangarMechManager.Instance.CurrentMech == this);
         }
 
         public void ApplyDamage(float dmg)
         {
+            if (isShieldActive)
+            {
+                dmg *= 0.35f;
+                currentEnergy = Mathf.Max(0f, currentEnergy - dmg * 0.25f);
+                if (currentEnergy <= 0f) isShieldActive = false;
+            }
             currentHp = Mathf.Max(0f, currentHp - dmg);
-            float perPart = (dmg * 0.5f) / Mathf.Max(1, parts.Count);
+            float perPart = (dmg * 0.6f) / Mathf.Max(1, parts.Count);
             foreach (var p in parts)
             {
                 if (p != null) p.Damage(perPart);
@@ -206,9 +279,54 @@ namespace HangarGame.Mechs
         public float GetTotalHpPercent() => maxHp > 0 ? (currentHp / maxHp) : 1f;
     }
 
+    public class BatteryStation : MonoBehaviour, IInteractable
+    {
+        private Renderer rend;
+        private Color origColor;
+
+        private void Awake()
+        {
+            rend = GetComponent<Renderer>();
+            if (rend != null) origColor = rend.material.color;
+        }
+
+        public string GetPrompt()
+        {
+            var mech = HangarMechManager.Instance != null ? HangarMechManager.Instance.CurrentMech : null;
+            if (mech == null) return "[ЗАРЯДНАЯ СТАНЦИЯ] Нет активного робота на подиуме.";
+            if (mech.isDeployed) return $"[ЗАРЯДНАЯ СТАНЦИЯ] {mech.mechName} в бою на выезде.";
+            return $"[ЗАРЯДНАЯ СТАНЦИЯ] Батарея: {mech.currentEnergy:F0}%. Клик: Зарядить до 100% ⚡";
+        }
+
+        public void OnHover(bool isHovered)
+        {
+            if (rend != null) rend.material.color = isHovered ? Color.yellow : origColor;
+        }
+
+        public void OnInteract()
+        {
+            var mech = HangarMechManager.Instance != null ? HangarMechManager.Instance.CurrentMech : null;
+            if (mech != null && !mech.isDeployed)
+            {
+                mech.RechargeBattery();
+                HangarAudioLight.Instance?.PlaySuccess();
+                HangarAudioLight.Instance?.PlayBolt();
+            }
+        }
+    }
+
     public class HangarMechManager : MonoBehaviour
     {
-        public static HangarMechManager Instance { get; private set; }
+        private static HangarMechManager instance;
+        public static HangarMechManager Instance
+        {
+            get
+            {
+                if (instance == null) instance = FindAnyObjectByType<HangarMechManager>();
+                return instance;
+            }
+            private set => instance = value;
+        }
         public List<MechUnit> Mechs = new List<MechUnit>();
         public int CurrentIndex { get; private set; } = 0;
         public MechUnit CurrentMech => (Mechs.Count > 0 && CurrentIndex >= 0 && CurrentIndex < Mechs.Count) ? Mechs[CurrentIndex] : null;
@@ -251,6 +369,14 @@ namespace HangarGame.Mechs
             CurrentIndex = idx;
             UpdatePodiumDisplay();
             OnMechSwitched?.Invoke(CurrentIndex);
+        }
+
+        public void RechargeCurrentMech()
+        {
+            if (CurrentMech != null && !CurrentMech.isDeployed)
+            {
+                CurrentMech.RechargeBattery();
+            }
         }
 
         public void UpdatePodiumDisplay()

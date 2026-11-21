@@ -48,7 +48,7 @@ namespace HangarGame.Prototype
             cam.transform.localPosition = new Vector3(0f, 1.6f, -0.6f);
             cam.transform.localRotation = Quaternion.identity;
             cam.clearFlags = CameraClearFlags.SolidColor;
-            cam.backgroundColor = new Color(0.06f, 0.08f, 0.11f);
+            cam.backgroundColor = new Color(0.04f, 0.06f, 0.09f);
 
             if (cam.GetComponent<RoomCamera>() == null) cam.gameObject.AddComponent<RoomCamera>();
             if (cam.GetComponent<PlayerRaycaster>() == null) cam.gameObject.AddComponent<PlayerRaycaster>();
@@ -65,23 +65,24 @@ namespace HangarGame.Prototype
         private void CreateLighting(HangarAudioLight audioLight)
         {
             GameObject grp = new GameObject("--- 02_LIGHTING_AND_VFX ---");
-            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
+            grp.transform.position = Vector3.zero;
+            grp.transform.rotation = Quaternion.identity;
 
             GameObject dir = new GameObject("Directional Light");
             dir.transform.SetParent(grp.transform, false);
             Light lDir = dir.AddComponent<Light>();
             lDir.type = LightType.Directional;
-            lDir.intensity = 1.15f;
-            lDir.color = new Color(0.96f, 0.98f, 1f);
-            dir.transform.rotation = Quaternion.Euler(50f, -25f, 0f);
+            lDir.intensity = 0.95f;
+            lDir.color = new Color(0.92f, 0.96f, 1.0f);
+            dir.transform.rotation = Quaternion.Euler(52f, -30f, 0f);
 
             GameObject alarm = new GameObject("Emergency_Alarm_Light");
             alarm.transform.SetParent(grp.transform, false);
-            alarm.transform.position = new Vector3(0f, 4.8f, 0f);
+            alarm.transform.position = new Vector3(0f, 6.2f, 0f);
             Light lAlarm = alarm.AddComponent<Light>();
             lAlarm.type = LightType.Point;
             lAlarm.color = Color.red;
-            lAlarm.range = 28f;
+            lAlarm.range = 35f;
             lAlarm.intensity = 0f;
 
             if (audioLight != null)
@@ -90,21 +91,31 @@ namespace HangarGame.Prototype
                 if (f != null) f.SetValue(audioLight, lAlarm);
             }
 
-            CreateSpotlight(grp.transform, "Spotlight_Workbench", new Vector3(0f, 2.8f, 1.0f), Quaternion.Euler(42f, 0f, 0f), 3.5f);
-            CreateSpotlight(grp.transform, "Spotlight_Mech", new Vector3(0f, 4.5f, 3.2f), Quaternion.Euler(35f, 0f, 0f), 2.0f);
-            CreateSpotlight(grp.transform, "Spotlight_Jaeger", new Vector3(3.8f, 4.8f, 2.8f), Quaternion.Euler(35f, 25f, 0f), 2.4f);
+            CreateSpotlight(grp.transform, "Spotlight_Mech_Hero", new Vector3(0f, 6.0f, 2.4f), Quaternion.Euler(46f, 0f, 0f), 3.4f, 70f, new Color(0.95f, 0.98f, 1f));
+            CreateSpotlight(grp.transform, "Spotlight_Workbench", new Vector3(-2.6f, 3.2f, 1.8f), Quaternion.Euler(60f, 0f, 0f), 3.6f, 65f, new Color(1f, 0.92f, 0.78f));
+            CreateSpotlight(grp.transform, "Spotlight_Jaeger", new Vector3(4.5f, 5.5f, 1.8f), Quaternion.Euler(45f, 25f, 0f), 2.8f, 65f, new Color(1f, 0.85f, 0.6f));
+            CreateSpotlight(grp.transform, "Spotlight_Dispatch", new Vector3(0f, 3.4f, -3.4f), Quaternion.Euler(50f, 180f, 0f), 2.5f, 75f, new Color(0.7f, 0.9f, 1f));
 
             GameObject wbFill = new GameObject("PointLight_Workbench");
             wbFill.transform.SetParent(grp.transform, false);
-            wbFill.transform.position = new Vector3(0f, 2.2f, 1.8f);
+            wbFill.transform.position = new Vector3(-2.6f, 1.6f, 1.8f);
             Light lFill = wbFill.AddComponent<Light>();
             lFill.type = LightType.Point;
-            lFill.range = 7f;
-            lFill.intensity = 2.2f;
-            lFill.color = new Color(1f, 0.96f, 0.9f);
+            lFill.range = 5f;
+            lFill.intensity = 2.0f;
+            lFill.color = new Color(1f, 0.95f, 0.85f);
+
+            GameObject batFill = new GameObject("PointLight_BatteryStation");
+            batFill.transform.SetParent(grp.transform, false);
+            batFill.transform.position = new Vector3(2.4f, 1.4f, 3.0f);
+            Light lBat = batFill.AddComponent<Light>();
+            lBat.type = LightType.Point;
+            lBat.range = 5f;
+            lBat.intensity = 2.4f;
+            lBat.color = new Color(0.2f, 0.85f, 1.0f);
         }
 
-        private void CreateSpotlight(Transform parent, string name, Vector3 pos, Quaternion rot, float intensity)
+        private void CreateSpotlight(Transform parent, string name, Vector3 pos, Quaternion rot, float intensity, float angle, Color col)
         {
             GameObject sp = new GameObject(name);
             sp.transform.SetParent(parent, false);
@@ -112,9 +123,10 @@ namespace HangarGame.Prototype
             sp.transform.rotation = rot;
             Light l = sp.AddComponent<Light>();
             l.type = LightType.Spot;
-            l.range = 10f;
-            l.spotAngle = 65f;
+            l.range = 14f;
+            l.spotAngle = angle;
             l.intensity = intensity;
+            l.color = col;
         }
 
         private GameObject LoadAsset(string path)
@@ -141,6 +153,7 @@ namespace HangarGame.Prototype
 #if UNITY_EDITOR
             GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
             if (instance == null) instance = Instantiate(prefab, parent);
+            else PrefabUtility.UnpackPrefabInstance(instance, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
             return instance;
 #else
             return Instantiate(prefab, parent);
@@ -150,7 +163,42 @@ namespace HangarGame.Prototype
         private void CreateHangarRoom()
         {
             GameObject grp = new GameObject("--- 03_HANGAR_ROOM ---");
-            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
+            grp.transform.position = Vector3.zero;
+            grp.transform.rotation = Quaternion.identity;
+
+            Color cFloor = new Color(0.12f, 0.14f, 0.17f);
+            Color cCeiling = new Color(0.08f, 0.09f, 0.12f);
+            Color cWall = new Color(0.14f, 0.16f, 0.20f);
+            Color cDoorFrame = new Color(0.18f, 0.21f, 0.26f);
+            Color cHazard = new Color(0.9f, 0.72f, 0.12f);
+            Color cBeam = new Color(0.22f, 0.25f, 0.30f);
+
+            CreateBox(grp.transform, "Hangar_Floor", new Vector3(0f, -0.2f, 0f), new Vector3(26f, 0.4f, 26f), cFloor);
+            CreateBox(grp.transform, "Hangar_Ceiling", new Vector3(0f, 7.2f, 0f), new Vector3(26f, 0.4f, 26f), cCeiling);
+
+            for (float x = -10f; x <= 10f; x += 5f)
+            {
+                CreateBox(grp.transform, $"Truss_X_{x:F0}", new Vector3(x, 6.85f, 0f), new Vector3(0.35f, 0.5f, 25f), cBeam);
+            }
+            CreateBox(grp.transform, "Gantry_Rail_L", new Vector3(-3.5f, 6.6f, 0f), new Vector3(0.5f, 0.4f, 25f), cHazard);
+            CreateBox(grp.transform, "Gantry_Rail_R", new Vector3(3.5f, 6.6f, 0f), new Vector3(0.5f, 0.4f, 25f), cHazard);
+
+            CreateBox(grp.transform, "Wall_Back", new Vector3(0f, 3.5f, 10.5f), new Vector3(26f, 7f, 0.8f), cWall);
+            CreateBox(grp.transform, "Blast_Door_Frame", new Vector3(0f, 3.5f, 10.0f), new Vector3(11f, 6.6f, 0.4f), cDoorFrame);
+            CreateBox(grp.transform, "Blast_Door_Left", new Vector3(-2.6f, 3.4f, 9.9f), new Vector3(5.0f, 6.2f, 0.2f), new Color(0.20f, 0.23f, 0.28f));
+            CreateBox(grp.transform, "Blast_Door_Right", new Vector3(2.6f, 3.4f, 9.9f), new Vector3(5.0f, 6.2f, 0.2f), new Color(0.20f, 0.23f, 0.28f));
+            CreateBox(grp.transform, "Door_Hazard_Stripe_L", new Vector3(-2.6f, 0.6f, 9.78f), new Vector3(4.8f, 0.25f, 0.05f), cHazard);
+            CreateBox(grp.transform, "Door_Hazard_Stripe_R", new Vector3(2.6f, 0.6f, 9.78f), new Vector3(4.8f, 0.25f, 0.05f), cHazard);
+
+            CreateBox(grp.transform, "Wall_Front", new Vector3(0f, 3.5f, -10.5f), new Vector3(26f, 7f, 0.8f), cWall);
+            CreateBox(grp.transform, "Wall_Left", new Vector3(-12.5f, 3.5f, 0f), new Vector3(0.8f, 7f, 26f), cWall);
+            CreateBox(grp.transform, "Wall_Right", new Vector3(12.5f, 3.5f, 0f), new Vector3(0.8f, 7f, 26f), cWall);
+
+            for (float z = -8f; z <= 8f; z += 4f)
+            {
+                CreateBox(grp.transform, $"Pillar_L_{z:F0}", new Vector3(-12.0f, 3.5f, z), new Vector3(0.6f, 7f, 0.6f), cBeam);
+                CreateBox(grp.transform, $"Pillar_R_{z:F0}", new Vector3(12.0f, 3.5f, z), new Vector3(0.6f, 7f, 0.6f), cBeam);
+            }
 
             GameObject fullPrefab = LoadAsset("Assets/Prefabs/Base/HANGARFULL.prefab");
             GameObject hangarPrefab = LoadAsset("Assets/Prefabs/Hangar/Hangar.prefab");
@@ -159,7 +207,7 @@ namespace HangarGame.Prototype
             {
                 GameObject fullObj = InstantiateModel(fullPrefab, grp.transform);
                 fullObj.name = "Hangar_Full_Base";
-                fullObj.transform.localPosition = new Vector3(13.87f, 0f, 0f);
+                fullObj.transform.localPosition = new Vector3(0f, 0f, 0f);
                 fullObj.transform.localRotation = Quaternion.identity;
             }
 
@@ -167,43 +215,37 @@ namespace HangarGame.Prototype
             {
                 GameObject hObj = InstantiateModel(hangarPrefab, grp.transform);
                 hObj.name = "Hangar_Gantry_Rig";
-                hObj.transform.localPosition = new Vector3(23.14f, 0f, 0f);
+                hObj.transform.localPosition = new Vector3(0f, 4.6f, 3.5f);
                 hObj.transform.localRotation = Quaternion.identity;
-            }
-
-            if (fullPrefab == null && hangarPrefab == null)
-            {
-                CreateBox(grp.transform, "Floor", new Vector3(0f, -0.5f, 0f), new Vector3(18f, 1f, 18f), new Color(0.18f, 0.2f, 0.23f));
-                CreateBox(grp.transform, "Ceiling", new Vector3(0f, 5.5f, 0f), new Vector3(18f, 0.5f, 18f), new Color(0.12f, 0.14f, 0.16f));
-                CreateBox(grp.transform, "Crane_Beam", new Vector3(0f, 4.8f, 2.5f), new Vector3(17f, 0.4f, 0.8f), new Color(0.85f, 0.65f, 0.1f));
-                CreateBox(grp.transform, "Wall_Back", new Vector3(0f, 2.5f, 8.5f), new Vector3(18f, 6f, 0.6f), new Color(0.14f, 0.16f, 0.19f));
-                CreateBox(grp.transform, "Blast_Doors", new Vector3(0f, 2.4f, 8.25f), new Vector3(7.5f, 4.8f, 0.1f), new Color(0.22f, 0.25f, 0.28f));
-                CreateBox(grp.transform, "Wall_Front", new Vector3(0f, 2.5f, -8.5f), new Vector3(18f, 6f, 0.6f), new Color(0.12f, 0.14f, 0.17f));
-                CreateBox(grp.transform, "Wall_Left", new Vector3(-8.8f, 2.5f, 0f), new Vector3(0.6f, 6f, 18f), new Color(0.15f, 0.17f, 0.2f));
-                CreateBox(grp.transform, "Wall_Right", new Vector3(8.8f, 2.5f, 0f), new Vector3(0.6f, 6f, 18f), new Color(0.15f, 0.17f, 0.2f));
             }
 
             GameObject fl = new GameObject("Hangar_Floor_Collider");
             fl.transform.SetParent(grp.transform, false);
             fl.transform.localPosition = new Vector3(0f, -0.2f, 0f);
             var col = fl.AddComponent<BoxCollider>();
-            col.size = new Vector3(50f, 0.4f, 50f);
+            col.size = new Vector3(60f, 0.4f, 60f);
         }
 
         private void CreateMechsHangar()
         {
             GameObject grp = new GameObject("--- 04_MECH_ATLANT ---");
-            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
+            grp.transform.position = Vector3.zero;
+            grp.transform.rotation = Quaternion.identity;
 
             var mgr = grp.AddComponent<HangarMechManager>();
 
-            CreateCyl(grp.transform, "Podium_Pedestal", new Vector3(0f, 0.1f, 5.5f), new Vector3(4f, 0.18f, 4f), new Color(0.22f, 0.25f, 0.28f));
-            CreateBox(grp.transform, "Scaffold_L", new Vector3(-2.2f, 2.2f, 5.5f), new Vector3(0.2f, 4.4f, 2.4f), new Color(0.85f, 0.65f, 0.1f));
-            CreateBox(grp.transform, "Scaffold_R", new Vector3(2.2f, 2.2f, 5.5f), new Vector3(0.2f, 4.4f, 2.4f), new Color(0.85f, 0.65f, 0.1f));
+            Vector3 podiumPos = new Vector3(0f, 0f, 4.2f);
+            CreateCyl(grp.transform, "Podium_Pedestal", podiumPos + new Vector3(0f, 0.12f, 0f), new Vector3(6.5f, 0.24f, 6.5f), new Color(0.18f, 0.21f, 0.25f));
+            CreateCyl(grp.transform, "Podium_Inner_Glow", podiumPos + new Vector3(0f, 0.16f, 0f), new Vector3(5.5f, 0.04f, 5.5f), new Color(0.15f, 0.75f, 0.95f));
 
-            var m0 = BuildMechUnit(grp.transform, 0, "Страж-1 (Лёгкий)", new Color(0.15f, 0.75f, 0.85f), 80f, 32f, 85f, 0.88f);
-            var m1 = BuildMechUnit(grp.transform, 1, "Атлант-2 (Штурм)", new Color(0.2f, 0.45f, 0.85f), 110f, 45f, 60f, 1.0f);
-            var m2 = BuildMechUnit(grp.transform, 2, "Голиаф-3 (Тяжёлый)", new Color(0.85f, 0.5f, 0.15f), 160f, 62f, 42f, 1.18f);
+            CreateBox(grp.transform, "Scaffold_L", podiumPos + new Vector3(-3.5f, 2.8f, 0f), new Vector3(0.3f, 5.6f, 1.8f), new Color(0.9f, 0.72f, 0.12f));
+            CreateBox(grp.transform, "Scaffold_R", podiumPos + new Vector3(3.5f, 2.8f, 0f), new Vector3(0.3f, 5.6f, 1.8f), new Color(0.9f, 0.72f, 0.12f));
+
+            CreateBatteryStation(grp.transform, new Vector3(2.8f, 0f, 2.8f));
+
+            var m0 = BuildMechUnit(grp.transform, 0, "Страж-1 (Лёгкий)", new Color(0.15f, 0.75f, 0.85f), 80f, 32f, 85f, 0.92f, podiumPos);
+            var m1 = BuildMechUnit(grp.transform, 1, "Атлант-2 (Штурм)", new Color(0.2f, 0.45f, 0.85f), 110f, 45f, 60f, 1.0f, podiumPos);
+            var m2 = BuildMechUnit(grp.transform, 2, "Голиаф-3 (Тяжёлый)", new Color(0.85f, 0.5f, 0.15f), 160f, 62f, 42f, 1.12f, podiumPos);
 
             mgr.Mechs.Add(m0);
             mgr.Mechs.Add(m1);
@@ -214,7 +256,23 @@ namespace HangarGame.Prototype
             m2.gameObject.SetActive(false);
         }
 
-        private MechUnit BuildMechUnit(Transform parent, int id, string name, Color theme, float hp, float atk, float spd, float scaleMult)
+        private void CreateBatteryStation(Transform parent, Vector3 pos)
+        {
+            GameObject bRoot = new GameObject("Battery_Charging_Station");
+            bRoot.transform.SetParent(parent, false);
+            bRoot.transform.position = pos;
+
+            CreateBox(bRoot.transform, "Battery_Base", new Vector3(0f, 0.45f, 0f), new Vector3(0.85f, 0.9f, 0.85f), new Color(0.16f, 0.19f, 0.24f));
+            GameObject core = CreateCyl(bRoot.transform, "Battery_Energy_Core", new Vector3(0f, 1.25f, 0f), new Vector3(0.45f, 0.7f, 0.45f), new Color(0.15f, 0.85f, 1.0f));
+            CreateBox(bRoot.transform, "Battery_Top_Cap", new Vector3(0f, 1.7f, 0f), new Vector3(0.75f, 0.25f, 0.75f), new Color(0.85f, 0.65f, 0.15f));
+
+            var col = core.GetComponent<Collider>();
+            if (col == null) col = core.AddComponent<CapsuleCollider>();
+
+            var stationComp = core.AddComponent<BatteryStation>();
+        }
+
+        private MechUnit BuildMechUnit(Transform parent, int id, string name, Color theme, float hp, float atk, float spd, float scaleMult, Vector3 podiumPos)
         {
             GameObject mechPrefab = LoadAsset("Assets/Prefabs/Mech01/Mech01.prefab");
             GameObject obj;
@@ -228,9 +286,9 @@ namespace HangarGame.Prototype
                 obj.transform.SetParent(parent, false);
             }
             obj.name = $"Mech_{id}_{name}";
-            obj.transform.position = new Vector3(0f, 2.5f * scaleMult, 5.5f);
-            obj.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
-            obj.transform.localScale = Vector3.one * scaleMult;
+            obj.transform.position = podiumPos + new Vector3(-0.55f, 1.8f * scaleMult, 0f);
+            obj.transform.rotation = Quaternion.Euler(270f, 0f, 180f);
+            obj.transform.localScale = Vector3.one * 15f * scaleMult;
 
             MechUnit unit = obj.GetComponent<MechUnit>();
             if (unit == null) unit = obj.AddComponent<MechUnit>();
@@ -239,6 +297,8 @@ namespace HangarGame.Prototype
             unit.themeColor = theme;
             unit.maxHp = hp;
             unit.currentHp = hp;
+            unit.maxEnergy = 100f;
+            unit.currentEnergy = 100f;
             unit.attackPower = atk;
             unit.moveSpeed = spd;
             unit.parts.Clear();
@@ -250,7 +310,7 @@ namespace HangarGame.Prototype
                 tintedMat.color = theme;
                 foreach (var r in obj.GetComponentsInChildren<Renderer>(true))
                 {
-                    r.material = tintedMat;
+                    r.sharedMaterial = tintedMat;
                 }
             }
 
@@ -259,14 +319,6 @@ namespace HangarGame.Prototype
             Transform tArmL = obj.transform.Find("LeftArmLow02");
             Transform tArmR = obj.transform.Find("RightArmLow02");
             Transform tLegs = obj.transform.Find("LowerBody02");
-            Transform tLegL = obj.transform.Find("LeftLegLow02");
-            Transform tLegR = obj.transform.Find("RightLegLow02");
-
-            if (tLegs != null)
-            {
-                if (tLegL != null) tLegL.SetParent(tLegs, true);
-                if (tLegR != null) tLegR.SetParent(tLegs, true);
-            }
 
             GameObject brokenHeadPrefab = LoadAsset("Assets/Prefabs/Mech01/BrokenParts/HeadBroken.fbx");
             GameObject brokenLeftArmPrefab = LoadAsset("Assets/Prefabs/Mech01/BrokenParts/LeftArmBroken.fbx");
@@ -328,6 +380,7 @@ namespace HangarGame.Prototype
             if (pArmR != null) unit.parts.Add(pArmR);
             if (pLegs != null) unit.parts.Add(pLegs);
 
+            unit.SyncHpFromParts();
             return unit;
         }
 
@@ -405,10 +458,14 @@ namespace HangarGame.Prototype
         private void CreateJaegerFrame()
         {
             GameObject grp = new GameObject("--- 05_JAEGER_FRAME ---");
-            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
+            grp.transform.position = Vector3.zero;
+            grp.transform.rotation = Quaternion.identity;
 
-            CreateBox(grp.transform, "Tower_L", new Vector3(3.2f, 3.5f, 4.8f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
-            CreateBox(grp.transform, "Tower_R", new Vector3(6.4f, 3.5f, 4.8f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
+            Vector3 bayPos = new Vector3(4.5f, 0f, 3.2f);
+            Quaternion bayRot = Quaternion.Euler(0f, -30f, 0f);
+
+            CreateBox(grp.transform, "Tower_L", bayPos + new Vector3(-1.6f, 3.5f, 0f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
+            CreateBox(grp.transform, "Tower_R", bayPos + new Vector3(1.6f, 3.5f, 0f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
 
             GameObject egerPrefab = LoadAsset("Assets/Prefabs/Eger/Eger.fbx");
             GameObject platePrefab = LoadAsset("Assets/Prefabs/Eger/Plate.fbx");
@@ -418,15 +475,15 @@ namespace HangarGame.Prototype
             {
                 egerObj = InstantiateModel(egerPrefab, grp.transform);
                 egerObj.name = "Jaeger_Titan_Chassis";
-                egerObj.transform.position = new Vector3(4.8f, 0.1f, 4.8f);
-                egerObj.transform.rotation = Quaternion.Euler(0f, -40f, 0f);
+                egerObj.transform.position = bayPos + new Vector3(0f, 0.1f, 0f);
+                egerObj.transform.rotation = bayRot;
                 egerObj.transform.localScale = Vector3.one * 1.5f;
             }
             else
             {
                 egerObj = new GameObject("Jaeger_Titan_Chassis");
                 egerObj.transform.SetParent(grp.transform, false);
-                egerObj.transform.position = new Vector3(4.8f, 0.1f, 4.8f);
+                egerObj.transform.position = bayPos + new Vector3(0f, 0.1f, 0f);
             }
 
             Transform[] markers = new Transform[4];
@@ -463,9 +520,11 @@ namespace HangarGame.Prototype
                     pObj.transform.localPosition = new Vector3(5.19f, -1.46f, 0.40f);
                     pObj.transform.localRotation = Quaternion.identity;
                     pObj.transform.localScale = Vector3.one * 0.85f;
+                    Material stageMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+                    stageMat.color = stageColors[i];
                     foreach (var r in pObj.GetComponentsInChildren<Renderer>(true))
                     {
-                        r.material.color = stageColors[i];
+                        r.sharedMaterial = stageMat;
                     }
                 }
                 else
@@ -486,33 +545,35 @@ namespace HangarGame.Prototype
         private void CreateWorkbench()
         {
             GameObject grp = new GameObject("--- 06_WORKBENCH ---");
-            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
+            grp.transform.position = new Vector3(-2.6f, 0f, 1.8f);
+            grp.transform.rotation = Quaternion.Euler(0f, 25f, 0f);
             grp.AddComponent<RepairWorkbench>();
 
-            CreateBox(grp.transform, "Tabletop", new Vector3(0f, 0.75f, 2.3f), new Vector3(2.4f, 0.12f, 1.1f), new Color(0.22f, 0.24f, 0.27f));
-            CreateBox(grp.transform, "Vice", new Vector3(-0.95f, 0.88f, 2.3f), new Vector3(0.25f, 0.2f, 0.3f), new Color(0.7f, 0.2f, 0.2f));
-            CreateCyl(grp.transform, "Lamp", new Vector3(0.95f, 1.15f, 2.5f), new Vector3(0.08f, 0.6f, 0.08f), new Color(0.8f, 0.8f, 0.2f));
+            CreateBox(grp.transform, "Tabletop", new Vector3(0f, 0.75f, 0f), new Vector3(2.4f, 0.12f, 1.1f), new Color(0.22f, 0.24f, 0.27f));
+            CreateBox(grp.transform, "Vice", new Vector3(-0.95f, 0.88f, 0f), new Vector3(0.25f, 0.2f, 0.3f), new Color(0.7f, 0.2f, 0.2f));
+            CreateCyl(grp.transform, "Lamp", new Vector3(0.95f, 1.15f, 0.2f), new Vector3(0.08f, 0.6f, 0.08f), new Color(0.8f, 0.8f, 0.2f));
 
             for (int x = -1; x <= 1; x += 2)
                 for (int z = -1; z <= 1; z += 2)
-                    CreateBox(grp.transform, $"Leg_{x}_{z}", new Vector3(x * 1.05f, 0.35f, 2.3f + z * 0.45f), new Vector3(0.12f, 0.7f, 0.12f), Color.black);
+                    CreateBox(grp.transform, $"Leg_{x}_{z}", new Vector3(x * 1.05f, 0.35f, z * 0.45f), new Vector3(0.12f, 0.7f, 0.12f), Color.black);
         }
 
         private void CreateDispatchConsole(UnityEngine.Camera cam)
         {
             GameObject grp = new GameObject("--- 07_DISPATCH_CONSOLE ---");
-            grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
+            grp.transform.position = Vector3.zero;
+            grp.transform.rotation = Quaternion.identity;
 
-            CreateBox(grp.transform, "Desk", new Vector3(0f, 0.75f, -5.2f), new Vector3(3.6f, 0.15f, 1.5f), new Color(0.18f, 0.2f, 0.24f));
-            CreateBox(grp.transform, "Chair", new Vector3(0f, 0.55f, -4.0f), new Vector3(0.7f, 0.8f, 0.7f), new Color(0.1f, 0.1f, 0.12f));
-            CreateBox(grp.transform, "Rack_L", new Vector3(-2.2f, 1.4f, -5.3f), new Vector3(0.8f, 2.8f, 0.9f), new Color(0.12f, 0.14f, 0.18f));
-            CreateBox(grp.transform, "Rack_R", new Vector3(2.2f, 1.4f, -5.3f), new Vector3(0.8f, 2.8f, 0.9f), new Color(0.12f, 0.14f, 0.18f));
+            CreateBox(grp.transform, "Desk", new Vector3(0f, 0.75f, -4.8f), new Vector3(3.6f, 0.15f, 1.5f), new Color(0.18f, 0.2f, 0.24f));
+            CreateBox(grp.transform, "Chair", new Vector3(0f, 0.55f, -3.6f), new Vector3(0.7f, 0.8f, 0.7f), new Color(0.1f, 0.1f, 0.12f));
+            CreateBox(grp.transform, "Rack_L", new Vector3(-2.2f, 1.4f, -4.9f), new Vector3(0.8f, 2.8f, 0.9f), new Color(0.12f, 0.14f, 0.18f));
+            CreateBox(grp.transform, "Rack_R", new Vector3(2.2f, 1.4f, -4.9f), new Vector3(0.8f, 2.8f, 0.9f), new Color(0.12f, 0.14f, 0.18f));
 
-            CreateBox(grp.transform, "Monitor_Bezel", new Vector3(0f, 1.85f, -5.45f), new Vector3(2.8f, 1.55f, 0.15f), new Color(0.04f, 0.08f, 0.12f));
+            CreateBox(grp.transform, "Monitor_Bezel", new Vector3(0f, 1.85f, -5.05f), new Vector3(3.0f, 1.65f, 0.15f), new Color(0.04f, 0.08f, 0.12f));
 
             GameObject cObj = new GameObject("Terminal_Canvas");
             cObj.transform.SetParent(grp.transform, false);
-            cObj.transform.position = new Vector3(0f, 1.85f, -5.36f);
+            cObj.transform.position = new Vector3(0f, 1.85f, -4.96f);
             cObj.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
             cObj.transform.localScale = new Vector3(0.00135f, 0.00135f, 1f);
 
@@ -538,19 +599,31 @@ namespace HangarGame.Prototype
             GameObject mContainer = new GameObject("Marker_Container");
             mContainer.transform.SetParent(rBox.transform, false);
             var mRect = mContainer.AddComponent<RectTransform>();
-            mRect.anchorMin = Vector2.zero; mRect.anchorMax = Vector2.one; mRect.sizeDelta = Vector2.zero;
+            mRect.anchorMin = Vector2.zero;
+            mRect.anchorMax = Vector2.one;
+            mRect.sizeDelta = Vector2.zero;
 
             Button[] bSlots = new Button[3];
+            Button[] bShields = new Button[3];
+            Button[] bRecalls = new Button[3];
             Text[] tSlots = new Text[3];
             Image[] iSlots = new Image[3];
 
             float[] xOffsets = { -560f, 0f, 560f };
             for (int i = 0; i < 3; i++)
             {
-                Button b = CreateBtn(bg.transform, $"Btn_MechSlot_{i}", "", new Vector2(0.5f, 0f), new Vector2(xOffsets[i], 125f), new Vector2(530f, 115f), font, new Color(0.12f, 0.45f, 0.35f));
-                bSlots[i] = b;
-                iSlots[i] = b.GetComponent<Image>();
-                tSlots[i] = b.GetComponentInChildren<Text>();
+                GameObject slotRoot = CreatePanel(bg.transform, $"SlotRoot_{i}", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(xOffsets[i], 125f), new Vector2(530f, 115f), new Color(0.08f, 0.12f, 0.16f, 0.95f));
+
+                Button bMain = CreateBtn(slotRoot.transform, $"Btn_MechSlot_{i}", "", new Vector2(0.5f, 1f), new Vector2(0f, -38f), new Vector2(520f, 70f), font, new Color(0.12f, 0.45f, 0.35f));
+                bSlots[i] = bMain;
+                iSlots[i] = bMain.GetComponent<Image>();
+                tSlots[i] = bMain.GetComponentInChildren<Text>();
+
+                Button bShield = CreateBtn(slotRoot.transform, $"Btn_Shield_{i}", "🛡 ЩИТ", new Vector2(0f, 0f), new Vector2(130f, 20f), new Vector2(250f, 35f), font, new Color(0.2f, 0.5f, 0.75f));
+                Button bRecall = CreateBtn(slotRoot.transform, $"Btn_Recall_{i}", "🔙 НА БАЗУ", new Vector2(1f, 0f), new Vector2(-130f, 20f), new Vector2(250f, 35f), font, new Color(0.75f, 0.25f, 0.2f));
+
+                bShields[i] = bShield;
+                bRecalls[i] = bRecall;
             }
 
             Text tLog = CreateTxt(bg.transform, "Txt_BattleLog", "База готова к дежурству. Радар чист.", new Vector2(0.5f, 0f), new Vector2(0f, 35f), new Vector2(1800f, 40f), 19, font, new Color(0.85f, 0.9f, 0.95f));
@@ -565,6 +638,8 @@ namespace HangarGame.Prototype
             SetRef(ui, "radarClick", rClick);
             SetRef(ui, "markerContainer", mContainer.transform);
             SetRef(ui, "btnMechSlots", bSlots);
+            SetRef(ui, "btnShieldSlots", bShields);
+            SetRef(ui, "btnRecallSlots", bRecalls);
             SetRef(ui, "txtMechSlots", tSlots);
             SetRef(ui, "imgMechSlots", iSlots);
         }
@@ -590,10 +665,11 @@ namespace HangarGame.Prototype
             GameObject top = CreatePanel(cObj.transform, "TopBar", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -15f), new Vector2(850f, 45f), new Color(0.08f, 0.1f, 0.14f, 0.85f));
             Text tRes = CreateTxt(top.transform, "Txt_Res", "КРЕДИТЫ: 500 ¢   |   СПЛАВ: 200 т.", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(800f, 40f), 20, font, Color.yellow);
 
-            GameObject pnlMech = CreatePanel(cObj.transform, "MechSelectPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 85f), new Vector2(750f, 55f), new Color(0.06f, 0.08f, 0.12f, 0.9f));
+            GameObject pnlMech = CreatePanel(cObj.transform, "MechSelectPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 85f), new Vector2(920f, 55f), new Color(0.06f, 0.08f, 0.12f, 0.9f));
             Button bPrev = CreateBtn(pnlMech.transform, "Btn_PrevMech", "◀ Смена", new Vector2(0f, 0.5f), new Vector2(65f, 0f), new Vector2(110f, 42f), font, new Color(0.18f, 0.35f, 0.55f));
             Button bNext = CreateBtn(pnlMech.transform, "Btn_NextMech", "Смена ▶", new Vector2(1f, 0.5f), new Vector2(-65f, 0f), new Vector2(110f, 42f), font, new Color(0.18f, 0.35f, 0.55f));
-            Text tCurMech = CreateTxt(pnlMech.transform, "Txt_CurrentMech", "РОБОТ [1/3]: Страж-1 (Лёгкий)", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(460f, 40f), 18, font, Color.cyan);
+            Button bCharge = CreateBtn(pnlMech.transform, "Btn_RechargeBattery", "⚡ ЗАРЯДИТЬ БАТАРЕЮ", new Vector2(0.5f, 0.5f), new Vector2(250f, 0f), new Vector2(200f, 42f), font, new Color(0.15f, 0.65f, 0.85f));
+            Text tCurMech = CreateTxt(pnlMech.transform, "Txt_CurrentMech", "РОБОТ [1/3]: Страж-1 (Лёгкий)", new Vector2(0.5f, 0.5f), new Vector2(-100f, 0f), new Vector2(480f, 40f), 17, font, Color.cyan);
 
             GameObject pBox = CreatePanel(cObj.transform, "PromptBox", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 25f), new Vector2(800f, 40f), new Color(0.04f, 0.05f, 0.07f, 0.75f));
             Text tPrompt = CreateTxt(pBox.transform, "Txt_Prompt", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(780f, 35f), 16, font, Color.white);
@@ -627,6 +703,7 @@ namespace HangarGame.Prototype
             SetRef(hud, "mechSelectPanel", pnlMech);
             SetRef(hud, "btnPrevMech", bPrev);
             SetRef(hud, "btnNextMech", bNext);
+            SetRef(hud, "btnRechargeBattery", bCharge);
             SetRef(hud, "txtCurrentMech", tCurMech);
             SetRef(hud, "txtHoverPrompt", tPrompt);
             SetRef(hud, "wbPanel", wb);

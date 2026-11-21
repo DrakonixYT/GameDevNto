@@ -12,7 +12,7 @@ namespace HangarGame.CameraControl
         public static RoomCamera Instance { get; private set; }
         private readonly Vector3 hangarPos = new Vector3(0f, 1.6f, -0.6f);
         private readonly Vector3 dispatchPos = new Vector3(0f, 1.55f, -3.2f);
-        private readonly Vector3 wbPos = new Vector3(0f, 1.45f, 0.7f);
+        private readonly Vector3 fallbackWbPos = new Vector3(-2.6f, 1.35f, 0.9f);
 
         private float targetBaseYaw = 0f;
         private float curBaseYaw = 0f;
@@ -73,17 +73,30 @@ namespace HangarGame.CameraControl
 
             curBaseYaw = Mathf.Lerp(curBaseYaw, targetBaseYaw, Time.deltaTime * 8f);
 
-            float p = (v == RoomView.WorkbenchFocus) ? (14f - ny * 5f) : (-ny * 7f);
-            float y = curBaseYaw + nx * (v == RoomView.WorkbenchFocus ? 5f : 12f);
+            float p = (v == RoomView.WorkbenchFocus) ? (32f - ny * 5f) : (-ny * 7f);
+            float y = (v == RoomView.WorkbenchFocus) ? (25f + nx * 5f) : (curBaseYaw + nx * 12f);
 
             Vector3 targetPos = hangarPos;
-            if (v == RoomView.WorkbenchFocus) targetPos = wbPos + new Vector3(0f, wbZoom * 0.2f, -wbZoom);
-            else if (v == RoomView.DispatchConsole) targetPos = dispatchPos;
+            if (v == RoomView.WorkbenchFocus)
+            {
+                Vector3 wbBase = (RepairWorkbench.Instance != null)
+                    ? RepairWorkbench.Instance.transform.position + new Vector3(0f, 0.65f, -1.05f)
+                    : fallbackWbPos;
+                targetPos = wbBase + new Vector3(0f, wbZoom * 0.2f, -wbZoom);
+            }
+            else if (v == RoomView.DispatchConsole)
+            {
+                targetPos = dispatchPos;
+            }
 
             transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 6f);
             transform.rotation = Quaternion.Euler(p, y, 0f);
 
-            if (shakeTime > 0f) { transform.position += Random.insideUnitSphere * shakeMag; shakeTime -= Time.deltaTime; }
+            if (shakeTime > 0f)
+            {
+                transform.position += Random.insideUnitSphere * shakeMag;
+                shakeTime -= Time.deltaTime;
+            }
         }
 
         public void TurnLeft()
@@ -112,11 +125,10 @@ namespace HangarGame.CameraControl
             GameManager.Instance.SwitchView(nextView);
         }
 
-        public void Toggle180()
+        public void Shake(float dur, float mag)
         {
-            TurnRight();
+            shakeTime = dur;
+            shakeMag = mag;
         }
-
-        public void Shake(float d, float m) { shakeTime = d; shakeMag = m; }
     }
 }
