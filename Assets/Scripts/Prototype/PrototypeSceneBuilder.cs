@@ -287,6 +287,9 @@ namespace HangarGame.Prototype
             if (mechPrefab != null)
             {
                 obj = InstantiateModel(mechPrefab, parent);
+#if UNITY_EDITOR
+                UnityEditor.PrefabUtility.UnpackPrefabInstance(obj, UnityEditor.PrefabUnpackMode.Completely, UnityEditor.InteractionMode.AutomatedAction);
+#endif
             }
             else
             {
@@ -311,15 +314,18 @@ namespace HangarGame.Prototype
             unit.moveSpeed = spd;
             unit.parts.Clear();
 
-            Material mechMat = LoadMaterial("Assets/Prefabs/Mech01/Mech01.mat");
-            Material tintedMat = mechMat != null ? new Material(mechMat) : null;
-            if (tintedMat != null)
+            string[] matPaths = {
+                "Assets/Prefabs/Mech01/Mech01_Guard_Cyan.mat",
+                "Assets/Prefabs/Mech01/Mech01_Atlant_Blue.mat",
+                "Assets/Prefabs/Mech01/Mech01_Goliath_Orange.mat"
+            };
+            string chosenPath = (id >= 0 && id < matPaths.Length) ? matPaths[id] : "Assets/Prefabs/Mech01/Mech01.mat";
+            Material mechMat = LoadMaterial(chosenPath);
+            if (mechMat != null)
             {
-                if (tintedMat.HasProperty("_BaseColor")) tintedMat.SetColor("_BaseColor", theme);
-                if (tintedMat.HasProperty("_Color")) tintedMat.color = theme;
                 foreach (var r in obj.GetComponentsInChildren<Renderer>(true))
                 {
-                    r.sharedMaterial = tintedMat;
+                    r.sharedMaterial = mechMat;
                 }
             }
 
@@ -328,6 +334,14 @@ namespace HangarGame.Prototype
             Transform tArmL = obj.transform.Find("LeftArmLow02");
             Transform tArmR = obj.transform.Find("RightArmLow02");
             Transform tLegs = obj.transform.Find("LowerBody02");
+            Transform tLegL = obj.transform.Find("LeftLegLow02");
+            Transform tLegR = obj.transform.Find("RightLegLow02");
+
+            if (tLegs != null)
+            {
+                if (tLegL != null) tLegL.SetParent(tLegs, true);
+                if (tLegR != null) tLegR.SetParent(tLegs, true);
+            }
 
             var pTorso = SetupPartComponent(tTorso.gameObject, new MechPartData
             {
@@ -393,6 +407,8 @@ namespace HangarGame.Prototype
                 obj.transform.position += shift;
             }
 
+            unit.EnsurePartsLoaded();
+            unit.ApplyThemeColor();
             unit.SyncHpFromParts();
             return unit;
         }

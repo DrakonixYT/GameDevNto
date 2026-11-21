@@ -153,7 +153,9 @@ namespace HangarGame.Repair
         public void ReceivePart(MechPart p)
         {
             if (HasItem) return;
-            CurrentPart = p; p.IsOnWorkbench = true;
+            p.OnHover(false);
+            CurrentPart = p;
+            p.IsOnWorkbench = true;
 
             foreach (var col in p.GetComponentsInChildren<Collider>(true)) col.enabled = false;
 
@@ -466,6 +468,7 @@ namespace HangarGame.Repair
 
                 if (CurrentPart.Data != null)
                     GameManager.Instance?.TrySpend(CurrentPart.Data.repairCredits, CurrentPart.Data.repairAlloy);
+                CurrentPart.IsOnWorkbench = false;
                 CurrentPart.RepairFull();
                 CurrentPart.ReturnToSocket();
                 CurrentPart = null;
@@ -486,6 +489,7 @@ namespace HangarGame.Repair
             if (CurrentPart != null)
             {
                 foreach (var col in CurrentPart.GetComponentsInChildren<Collider>()) col.enabled = true;
+                CurrentPart.IsOnWorkbench = false;
                 CurrentPart.ReturnToSocket(); CurrentPart = null;
             }
             HangarMechManager.Instance?.UpdatePodiumDisplay();

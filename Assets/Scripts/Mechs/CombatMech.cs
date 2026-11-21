@@ -28,16 +28,34 @@ namespace HangarGame.Mechs
 
         private void Awake()
         {
-            rend = GetComponent<Renderer>() ?? GetComponentInChildren<Renderer>();
-            if (rend != null && rend.sharedMaterial != null)
-            {
-                baseColor = rend.material.color;
-            }
+            rend = GetComponent<Renderer>();
+            if (rend == null) rend = GetComponentInChildren<Renderer>();
+            var unit = GetComponentInParent<MechUnit>();
+            if (unit != null) baseColor = unit.themeColor;
+            else if (rend != null && rend.sharedMaterial != null && rend.sharedMaterial.HasProperty("_BaseColor"))
+                baseColor = rend.sharedMaterial.GetColor("_BaseColor");
+            else
+                baseColor = Color.white;
             socketPos = transform.localPosition;
             socketRot = transform.localRotation;
             socketScale = transform.localScale;
             socketParent = transform.parent;
             if (data == null) data = new MechPartData { partName = gameObject.name };
+        }
+
+        public Color BaseColor
+        {
+            get
+            {
+                if (baseColor.a <= 0.01f && baseColor.r == 0f && baseColor.g == 0f && baseColor.b == 0f)
+                {
+                    var unit = GetComponentInParent<MechUnit>();
+                    if (unit != null) baseColor = unit.themeColor;
+                    else baseColor = Color.white;
+                }
+                return baseColor;
+            }
+            set => baseColor = value;
         }
 
         public void Setup(MechPartData d)
@@ -127,16 +145,32 @@ namespace HangarGame.Mechs
                     pristineRenderer.enabled = true;
                 }
             }
-            Color targetCol = Color.Lerp(Color.red, baseColor, DurabilityPercent);
+            Color targetCol = Color.Lerp(new Color(0.75f, 0.15f, 0.1f), BaseColor, DurabilityPercent);
+            ApplyColor(targetCol);
+        }
+
+        private void ApplyColor(Color col)
+        {
             var rends = GetComponentsInChildren<Renderer>(false);
             foreach (var r in rends)
             {
-                if (r != null && r.sharedMaterial != null)
-                {
-                    var owner = r.GetComponentInParent<MechPart>();
-                    if (owner != this) continue;
+                if (r == null || r.sharedMaterial == null) continue;
+                var owner = r.GetComponentInParent<MechPart>();
+                if (owner != this) continue;
 
-                    if (Application.isPlaying) r.material.color = targetCol;
+                if (Application.isPlaying)
+                {
+                    if (r.material.HasProperty("_BaseColor")) r.material.SetColor("_BaseColor", col);
+                    if (r.material.HasProperty("_Color")) r.material.SetColor("_Color", col);
+                    r.material.color = col;
+                }
+                else
+                {
+                    var block = new MaterialPropertyBlock();
+                    r.GetPropertyBlock(block);
+                    block.SetColor("_BaseColor", col);
+                    block.SetColor("_Color", col);
+                    r.SetPropertyBlock(block);
                 }
             }
         }
@@ -146,18 +180,8 @@ namespace HangarGame.Mechs
         public void OnHover(bool h)
         {
             if (IsOnWorkbench) return;
-            Color targetCol = h ? Color.cyan : Color.Lerp(Color.red, baseColor, DurabilityPercent);
-            var rends = GetComponentsInChildren<Renderer>(false);
-            foreach (var r in rends)
-            {
-                if (r != null && r.sharedMaterial != null)
-                {
-                    var owner = r.GetComponentInParent<MechPart>();
-                    if (owner != this) continue;
-
-                    if (Application.isPlaying) r.material.color = targetCol;
-                }
-            }
+            Color targetCol = h ? Color.cyan : Color.Lerp(new Color(0.75f, 0.15f, 0.1f), BaseColor, DurabilityPercent);
+            ApplyColor(targetCol);
         }
 
         public void OnInteract()
@@ -188,6 +212,20 @@ namespace HangarGame.Mechs
         private void Awake()
         {
             EnsurePartsLoaded();
+            ApplyThemeColor();
+        }
+
+        public void ApplyThemeColor()
+        {
+            EnsurePartsLoaded();
+            foreach (var p in parts)
+            {
+                if (p != null)
+                {
+                    p.BaseColor = themeColor;
+                    p.UpdateVis();
+                }
+            }
         }
 
         public void EnsurePartsLoaded()
