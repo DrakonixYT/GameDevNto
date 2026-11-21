@@ -87,8 +87,8 @@ namespace HangarGame.Dispatch
                 var enemy = Enemies[i];
                 if (enemy.hp <= 0f)
                 {
-                    OnEnemyDefeated(enemy);
                     Enemies.RemoveAt(i);
+                    OnEnemyDefeated(enemy);
                     continue;
                 }
 

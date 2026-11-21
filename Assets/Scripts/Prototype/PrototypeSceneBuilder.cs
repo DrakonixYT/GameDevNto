@@ -170,12 +170,13 @@ namespace HangarGame.Prototype
             HangarAudioLight audioLight = FindAnyObjectByType<HangarAudioLight>();
 
             GameObject spMech = CreateSpotlight(grp.transform, "Spotlight_Mech_Hero", podiumPos + new Vector3(0f, 2.5f, 1.5f), Quaternion.Euler(40f, 180f, 0f), new Color(0.9f, 0.95f, 1.0f), 5.5f, 15f, 60f);
-            if (audioLight != null) SetRef(audioLight, "mechSpotlight", spMech.GetComponent<Light>());
 
             GameObject spScreen = CreateSpotlight(grp.transform, "Spotlight_Screen", screenCenter + new Vector3(0f, 2.0f, -1.2f), Quaternion.Euler(45f, 0f, 0f), new Color(0.6f, 0.8f, 1.0f), 2.5f, 8f, 70f);
 
             GameObject spJ = CreateSpotlight(grp.transform, "Spotlight_Jaeger", podiumPos + new Vector3(-2.5f, 2.8f, 2.5f), Quaternion.Euler(55f, 70f, 0f), new Color(1.0f, 0.7f, 0.3f), 3.0f, 10f, 55f);
-            if (audioLight != null) SetRef(audioLight, "jaegerSpotlight", spJ.GetComponent<Light>());
+
+            GameObject spAlarm = CreateSpotlight(grp.transform, "Spotlight_Alarm_Red", podiumPos + new Vector3(0f, 3.8f, 0f), Quaternion.Euler(90f, 0f, 0f), new Color(1.0f, 0.15f, 0.15f), 0f, 30f, 120f);
+            if (audioLight != null) SetRef(audioLight, "redAlarmLight", spAlarm.GetComponent<Light>());
         }
 
         private GameObject CreateSpotlight(Transform parent, string name, Vector3 pos, Quaternion rot, Color c, float intensity, float range, float spotAngle)

@@ -18,12 +18,17 @@ namespace HangarGame.Interaction
     {
         public string promptText = "";
         public Action onClick;
+        public bool disableHover = false;
         private Renderer rend;
         private Color origColor;
 
         private void Awake() { rend = GetComponent<Renderer>(); if (rend != null) origColor = rend.material.color; }
         public string GetPrompt() => promptText;
-        public void OnHover(bool h) { if (rend != null) rend.material.color = h ? Color.cyan : origColor; }
+        public void OnHover(bool h)
+        {
+            if (disableHover) return;
+            if (rend != null) rend.material.color = h ? Color.cyan : origColor;
+        }
         public void OnInteract() => onClick?.Invoke();
     }
 
