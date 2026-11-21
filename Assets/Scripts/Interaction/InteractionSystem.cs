@@ -38,7 +38,6 @@ namespace HangarGame.Interaction
 
         private void Update()
         {
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) { Clear(); return; }
             Vector2 m = Vector2.zero;
 #if ENABLE_INPUT_SYSTEM
             if (Mouse.current != null) m = Mouse.current.position.ReadValue();
@@ -46,23 +45,85 @@ namespace HangarGame.Interaction
             m = Input.mousePosition;
 #endif
             if (cam == null) return;
-            if (Physics.Raycast(cam.ScreenPointToRay(m), out var hit, 40f))
+
+            bool isOverInteractiveUI = false;
+            if (EventSystem.current != null)
             {
-                var obj = hit.collider.GetComponentInParent<IInteractable>();
-                if (obj != null)
+                var ped = new PointerEventData(EventSystem.current) { position = m };
+                var uiHits = new System.Collections.Generic.List<RaycastResult>();
+                EventSystem.current.RaycastAll(ped, uiHits);
+                foreach (var h in uiHits)
                 {
-                    if (current != obj) { Clear(); current = obj; current.OnHover(true); }
-                    CurrentPrompt = current.GetPrompt();
-                    bool clk = false;
-#if ENABLE_INPUT_SYSTEM
-                    if (Mouse.current != null) clk = Mouse.current.leftButton.wasPressedThisFrame;
-#else
-                    clk = Input.GetMouseButtonDown(0);
-#endif
-                    if (clk) current.OnInteract();
-                    return;
+                    if (h.gameObject.GetComponentInParent<UnityEngine.UI.Selectable>() != null)
+                    {
+                        isOverInteractiveUI = true;
+                        break;
+                    }
                 }
             }
+
+            if (isOverInteractiveUI)
+            {
+                Clear();
+                return;
+            }
+
+            Ray ray = cam.ScreenPointToRay(m);
+            IInteractable best = null;
+
+            var hits = Physics.RaycastAll(ray, 40f);
+            if (hits != null && hits.Length > 0)
+            {
+                Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+                foreach (var h in hits)
+                {
+                    var interactable = h.collider.GetComponentInParent<IInteractable>();
+                    if (interactable != null)
+                    {
+                        best = interactable;
+                        break;
+                    }
+                }
+            }
+
+            if (best == null)
+            {
+                var sphereHits = Physics.SphereCastAll(ray, 0.08f, 40f);
+                if (sphereHits != null && sphereHits.Length > 0)
+                {
+                    Array.Sort(sphereHits, (a, b) => a.distance.CompareTo(b.distance));
+                    foreach (var sh in sphereHits)
+                    {
+                        var interactable = sh.collider.GetComponentInParent<IInteractable>();
+                        if (interactable != null)
+                        {
+                            best = interactable;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (best != null)
+            {
+                if (current != best)
+                {
+                    Clear();
+                    current = best;
+                    current.OnHover(true);
+                }
+                CurrentPrompt = current.GetPrompt();
+
+                bool clk = false;
+#if ENABLE_INPUT_SYSTEM
+                if (Mouse.current != null) clk = Mouse.current.leftButton.wasPressedThisFrame;
+#else
+                clk = Input.GetMouseButtonDown(0);
+#endif
+                if (clk) current.OnInteract();
+                return;
+            }
+
             Clear();
         }
 

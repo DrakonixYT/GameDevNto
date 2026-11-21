@@ -339,7 +339,7 @@ namespace HangarGame.UI
             }
         }
 
-        private void OnRadarClicked(Vector2 pos)
+        public void OnRadarClicked(Vector2 pos)
         {
             if (Time.unscaledTime - lastRadarClickTime < 0.05f) return;
             lastRadarClickTime = Time.unscaledTime;
@@ -347,6 +347,45 @@ namespace HangarGame.UI
             var dispatch = DispatchSystem.Instance;
             var mechMgr = HangarMechManager.Instance;
             if (dispatch == null || mechMgr == null) return;
+
+            MechUnit clickedMech = null;
+            float bestDist = 120f;
+            foreach (var m in mechMgr.Mechs)
+            {
+                if (!m.isDeployed) continue;
+                Vector2 diff = pos - m.battlefieldPos;
+                if (Mathf.Abs(diff.x) <= 90f && Mathf.Abs(diff.y) <= 32f)
+                {
+                    float d = diff.sqrMagnitude;
+                    if (d < bestDist * bestDist)
+                    {
+                        bestDist = Mathf.Sqrt(d);
+                        clickedMech = m;
+                    }
+                }
+            }
+
+            if (clickedMech != null)
+            {
+                dispatch.SelectedMechId = clickedMech.id;
+                dispatch.IsDeployMode = false;
+                HangarAudioLight.Instance?.PlayClick();
+                return;
+            }
+
+            if (Mathf.Abs(pos.x) <= 110f && Mathf.Abs(pos.y - (-240f)) <= 28f)
+            {
+                foreach (var m in mechMgr.Mechs)
+                {
+                    if (!m.isDeployed && m.CanDeploy())
+                    {
+                        dispatch.SelectedMechId = m.id;
+                        dispatch.IsDeployMode = true;
+                        HangarAudioLight.Instance?.PlayBolt();
+                        return;
+                    }
+                }
+            }
 
             if (dispatch.SelectedMechId >= 0)
             {
@@ -414,8 +453,10 @@ namespace HangarGame.UI
                 var img = m.GetComponent<Image>();
                 if (img != null) img.color = (dispatch.SelectedMechId == mech.id) ? Color.yellow : mech.themeColor;
                 var txt = m.GetComponentInChildren<Text>();
+                bool isSel = dispatch.SelectedMechId == mech.id;
                 string status = mech.isReturning ? "ОТХОД" : (mech.isShieldActive ? "ЩИТ" : "БОЙ");
-                if (txt != null) txt.text = $"▲ {mech.mechName} [{status}]\n♥ {mech.currentHp:F0}%  ⚡ {mech.currentEnergy:F0}%";
+                string selMarker = isSel ? "▶ [ВЫБРАН] " : "";
+                if (txt != null) txt.text = $"{selMarker}▲ {mech.mechName} [{status}]\n♥ {mech.currentHp:F0}%  ⚡ {mech.currentEnergy:F0}%";
 
                 int mechId = mech.id;
                 var btn = m.GetComponent<Button>();

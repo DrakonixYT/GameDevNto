@@ -32,7 +32,7 @@ namespace HangarGame.Repair
 
         [Header("Bolts Config")]
         [SerializeField] private Vector3 boltScale = new Vector3(0.08f, 0.025f, 0.08f);
-        [SerializeField] private float boltColliderRadius = 0.35f;
+        [SerializeField] private float boltColliderRadius = 2.5f;
         [SerializeField] private Vector3[] boltOffsets = new Vector3[]
         {
             new Vector3(-0.16f, 0.12f, 0.035f),
@@ -43,7 +43,7 @@ namespace HangarGame.Repair
 
         [Header("Wires Config")]
         [SerializeField] private Vector3 pinScale = new Vector3(0.08f, 0.08f, 0.08f);
-        [SerializeField] private float pinColliderRadius = 0.35f;
+        [SerializeField] private float pinColliderRadius = 2.5f;
         [SerializeField] private Vector3[] leftPinOffsets = new Vector3[]
         {
             new Vector3(-0.13f, 0.09f, 0.035f),
@@ -231,9 +231,10 @@ namespace HangarGame.Repair
                 if (wCol != null) Destroy(wCol);
 
                 var capCol = bolt.GetComponent<Collider>();
-                if (capCol != null) Destroy(capCol);
+                if (capCol != null) DestroyImmediate(capCol);
                 var sphCol = bolt.AddComponent<SphereCollider>();
                 sphCol.radius = boltColliderRadius;
+                sphCol.center = new Vector3(0f, 0.5f, 0f);
 
                 ClickableObject clk = bolt.AddComponent<ClickableObject>();
                 clk.promptText = "🔧 Крепёжный болт (Клик: открутить)";
@@ -339,7 +340,7 @@ namespace HangarGame.Repair
             r.material = CreateMaterial(c, true);
 
             var col = pin.GetComponent<Collider>();
-            if (col != null) Destroy(col);
+            if (col != null) DestroyImmediate(col);
             var sphCol = pin.AddComponent<SphereCollider>();
             sphCol.radius = pinColliderRadius;
 

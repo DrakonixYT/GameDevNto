@@ -682,6 +682,8 @@ namespace HangarGame.Prototype
             Text tCurMech = CreateTxt(pnlMech.transform, "Txt_CurrentMech", "РОБОТ [1/3]: Страж-1 (Лёгкий)", new Vector2(0.5f, 0.5f), new Vector2(-100f, 0f), new Vector2(480f, 40f), 17, font, Color.cyan);
 
             GameObject pBox = CreatePanel(cObj.transform, "PromptBox", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 25f), new Vector2(800f, 40f), new Color(0.04f, 0.05f, 0.07f, 0.75f));
+            var pImg = pBox.GetComponent<Image>();
+            if (pImg != null) pImg.raycastTarget = false;
             Text tPrompt = CreateTxt(pBox.transform, "Txt_Prompt", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(780f, 35f), 16, font, Color.white);
 
             GameObject wb = CreatePanel(cObj.transform, "WorkbenchPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(980f, 180f), new Color(0.08f, 0.11f, 0.16f, 0.96f));
