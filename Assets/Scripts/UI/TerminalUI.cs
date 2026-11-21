@@ -98,6 +98,7 @@ namespace HangarGame.UI
             bRect.anchoredPosition = new Vector2(0f, -240f);
             var bImg = baseMarkerObj.AddComponent<Image>();
             bImg.color = new Color(0.1f, 0.45f, 0.2f, 0.85f);
+            bImg.raycastTarget = false;
 
             GameObject bTxtObj = new GameObject("Txt");
             bTxtObj.transform.SetParent(baseMarkerObj.transform, false);
@@ -109,6 +110,7 @@ namespace HangarGame.UI
             bTxt.alignment = TextAnchor.MiddleCenter;
             bTxt.color = Color.white;
             bTxt.text = "🏢 БАЗА АНГАР (ВЫХОД)";
+            bTxt.raycastTarget = false;
 
             orderTargetMarkerObj = new GameObject("Radar_TargetMarker");
             orderTargetMarkerObj.transform.SetParent(markerContainer, false);
@@ -116,6 +118,7 @@ namespace HangarGame.UI
             tRect.sizeDelta = new Vector2(130f, 26f);
             var tImg = orderTargetMarkerObj.AddComponent<Image>();
             tImg.color = new Color(1f, 0.85f, 0.1f, 0.85f);
+            tImg.raycastTarget = false;
 
             GameObject tTxtObj = new GameObject("Txt");
             tTxtObj.transform.SetParent(orderTargetMarkerObj.transform, false);
@@ -127,6 +130,7 @@ namespace HangarGame.UI
             tTxt.alignment = TextAnchor.MiddleCenter;
             tTxt.color = Color.black;
             tTxt.text = "◎ ЦЕЛЬ ПРИКАЗА";
+            tTxt.raycastTarget = false;
             orderTargetMarkerObj.SetActive(false);
         }
 
@@ -167,8 +171,6 @@ namespace HangarGame.UI
         private void CheckDirectRadarRaycast(DispatchSystem dispatch)
         {
             if (radarArea == null) return;
-
-            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
 
             bool clk = false;
 #if ENABLE_INPUT_SYSTEM
@@ -332,15 +334,23 @@ namespace HangarGame.UI
         private void OnRadarClicked(Vector2 pos)
         {
             var dispatch = DispatchSystem.Instance;
-            if (dispatch == null) return;
+            var mechMgr = HangarMechManager.Instance;
+            if (dispatch == null || mechMgr == null) return;
 
-            if (dispatch.IsDeployMode && dispatch.SelectedMechId >= 0)
+            if (dispatch.SelectedMechId >= 0)
             {
-                dispatch.DeployMech(dispatch.SelectedMechId, pos);
-            }
-            else if (dispatch.SelectedMechId >= 0)
-            {
-                dispatch.OrderMechMove(dispatch.SelectedMechId, pos);
+                var mech = mechMgr.GetMechById(dispatch.SelectedMechId);
+                if (mech != null)
+                {
+                    if (dispatch.IsDeployMode || (!mech.isDeployed && mech.CanDeploy()))
+                    {
+                        dispatch.DeployMech(mech.id, pos);
+                    }
+                    else if (mech.isDeployed)
+                    {
+                        dispatch.OrderMechMove(mech.id, pos);
+                    }
+                }
             }
         }
 
@@ -424,7 +434,7 @@ namespace HangarGame.UI
             r.sizeDelta = new Vector2(170f, 48f);
             var img = m.AddComponent<Image>();
             img.color = Color.red;
-            m.AddComponent<Button>();
+            img.raycastTarget = false;
 
             Font font = Font.CreateDynamicFontFromOSFont("Arial", 12) ?? Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             GameObject tObj = new GameObject("Txt");
@@ -436,6 +446,7 @@ namespace HangarGame.UI
             txt.fontSize = 12;
             txt.alignment = TextAnchor.MiddleCenter;
             txt.color = Color.white;
+            txt.raycastTarget = false;
             return m;
         }
     }

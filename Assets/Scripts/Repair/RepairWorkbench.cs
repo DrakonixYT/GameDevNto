@@ -111,7 +111,8 @@ namespace HangarGame.Repair
 
             ResetRotation();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            StartCoroutine(SlideToWorkbench(p.transform, new Vector3(0f, 1.25f, 2.3f), Quaternion.Euler(0f, 180f, 0f), StartBoltsPhase));
+            Vector3 tablePos = transform.position + new Vector3(0f, 1.05f, 0f);
+            StartCoroutine(SlideToWorkbench(p.transform, tablePos, Quaternion.Euler(0f, 180f, 0f), StartBoltsPhase));
         }
 
         public void ReceiveJaegerModule(GameObject mod, string name, Action onDone)
@@ -123,8 +124,9 @@ namespace HangarGame.Repair
 
             ResetRotation();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            mod.transform.position = new Vector3(0f, 2.2f, 2.3f);
-            StartCoroutine(SlideToWorkbench(mod.transform, new Vector3(0f, 1.25f, 2.3f), Quaternion.Euler(0f, 180f, 0f), StartBoltsPhase));
+            Vector3 tablePos = transform.position + new Vector3(0f, 1.05f, 0f);
+            mod.transform.position = tablePos + new Vector3(0f, 0.9f, 0f);
+            StartCoroutine(SlideToWorkbench(mod.transform, tablePos, Quaternion.Euler(0f, 180f, 0f), StartBoltsPhase));
         }
 
         private IEnumerator SlideToWorkbench(Transform t, Vector3 targetPos, Quaternion targetRot, Action onDone)
@@ -199,42 +201,37 @@ namespace HangarGame.Repair
 
             Vector3 inv = new Vector3(1f / Mathf.Max(0.1f, root.lossyScale.x), 1f / Mathf.Max(0.1f, root.lossyScale.y), 1f / Mathf.Max(0.1f, root.lossyScale.z));
             serviceHatchObj.transform.localScale = inv;
-
-            float forwardZ = 0.65f * Mathf.Max(root.lossyScale.z, 1.0f);
-            serviceHatchObj.transform.localPosition = new Vector3(0f, 0f, -forwardZ * inv.z);
+            serviceHatchObj.transform.localPosition = new Vector3(0f, 0f, -0.6f);
+            serviceHatchObj.transform.localRotation = Quaternion.identity;
 
             GameObject plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            plate.name = "Hatch_Backplate";
+            plate.name = "Hatch_Backing";
             plate.transform.SetParent(serviceHatchObj.transform, false);
             plate.transform.localPosition = Vector3.zero;
             plate.transform.localScale = new Vector3(1.25f, 0.95f, 0.06f);
-            plate.GetComponent<Renderer>().material = CreateMaterial(new Color(0.12f, 0.15f, 0.2f), false);
+            var col = plate.GetComponent<Collider>();
+            if (col != null) Destroy(col);
 
-            var pCol = plate.GetComponent<Collider>();
-            if (pCol != null) Destroy(pCol);
-
-            GameObject frame = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            frame.name = "Hatch_Border";
-            frame.transform.SetParent(serviceHatchObj.transform, false);
-            frame.transform.localPosition = new Vector3(0f, 0f, 0.02f);
-            frame.transform.localScale = new Vector3(1.3f, 1.0f, 0.03f);
-            frame.GetComponent<Renderer>().material = CreateMaterial(new Color(0.15f, 0.65f, 0.85f), true);
-            var fCol = frame.GetComponent<Collider>();
-            if (fCol != null) Destroy(fCol);
-
+            plate.GetComponent<Renderer>().material = CreateMaterial(new Color(0.15f, 0.17f, 0.20f), false);
+            activeSubObjects.Add(plate);
             activeSubObjects.Add(serviceHatchObj);
         }
 
-        private void OnBoltUnscrewed(GameObject b)
+        private void OnBoltUnscrewed(GameObject bolt)
         {
-            HangarAudioLight.Instance?.PlayBolt();
-            activeSubObjects.Remove(b);
-            Destroy(b);
             boltsRemaining--;
+            HangarAudioLight.Instance?.PlayBolt();
+            activeSubObjects.Remove(bolt);
+            Destroy(bolt);
+
             if (boltsRemaining <= 0)
             {
                 HangarAudioLight.Instance?.PlaySuccess();
                 StartWiresPhase();
+            }
+            else
+            {
+                RepairStepInfo = $"Шаг 1/2: Осталось открутить {boltsRemaining} болта";
             }
         }
 
@@ -301,28 +298,20 @@ namespace HangarGame.Repair
             var r = pin.GetComponent<Renderer>();
             r.material = CreateMaterial(c, true);
 
-            GameObject socket = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            socket.name = "Socket";
-            socket.transform.SetParent(pin.transform, false);
-            socket.transform.localPosition = new Vector3(0f, 0f, -0.3f);
-            socket.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            socket.transform.localScale = new Vector3(1.3f, 0.3f, 1.3f);
-            socket.GetComponent<Renderer>().material = CreateMaterial(new Color(0.2f, 0.22f, 0.25f), false);
-            var sCol = socket.GetComponent<Collider>();
-            if (sCol != null) Destroy(sCol);
-
-            var capCol = pin.GetComponent<Collider>();
-            if (capCol != null) Destroy(capCol);
+            var col = pin.GetComponent<Collider>();
+            if (col != null) Destroy(col);
             var sphCol = pin.AddComponent<SphereCollider>();
-            sphCol.radius = 0.6f;
+            sphCol.radius = 0.65f;
 
+            string sideName = side == 0 ? "Входной" : "Выходной";
             ClickableObject clk = pin.AddComponent<ClickableObject>();
-            clk.promptText = $"⚡ Контакт #{colorId + 1} (Клик: соединить)";
-            clk.onClick = () => OnWirePinClicked(pin, colorId, side, c);
+            clk.promptText = $"⚡ {sideName} контакт #{colorId + 1} (Клик: подключить)";
+            clk.onClick = () => OnPinClicked(pin, colorId, side, c);
+
             activeSubObjects.Add(pin);
         }
 
-        private void OnWirePinClicked(GameObject pin, int colorId, int side, Color origColor)
+        private void OnPinClicked(GameObject pin, int colorId, int side, Color origColor)
         {
             if (selectedPinObj == null)
             {
@@ -334,49 +323,48 @@ namespace HangarGame.Repair
                 pin.GetComponent<Renderer>().material = CreateMaterial(Color.white, true);
                 pin.transform.localScale = new Vector3(0.32f, 0.32f, 0.32f);
                 HangarAudioLight.Instance?.PlayClick();
-                RepairStepInfo = "Выбран контакт цепи! Теперь кликните парный контакт того же цвета";
+                RepairStepInfo = $"Выбран контакт #{colorId + 1}. Теперь кликните парный контакт того же цвета!";
             }
             else
             {
-                if (selectedPinObj == pin)
+                if (selectedPinObj == pin) return;
+
+                if (selectedSide != side)
                 {
-                    selectedPinObj.GetComponent<Renderer>().material = CreateMaterial(selectedOriginalColor, true);
-                    selectedPinObj.transform.localScale = new Vector3(0.24f, 0.24f, 0.24f);
-                    selectedPinObj = null;
-                    selectedColorId = -1;
-                    selectedSide = -1;
-                    HangarAudioLight.Instance?.PlayClick();
-                    RepairStepInfo = "Выбор отменен. Кликните контакт для соединения.";
-                    return;
-                }
-
-                if (selectedColorId == colorId && selectedSide != side)
-                {
-                    selectedPinObj.GetComponent<Renderer>().material = CreateMaterial(selectedOriginalColor, true);
-                    selectedPinObj.transform.localScale = new Vector3(0.24f, 0.24f, 0.24f);
-
-                    var clk1 = selectedPinObj.GetComponent<ClickableObject>();
-                    if (clk1 != null) Destroy(clk1);
-                    var clk2 = pin.GetComponent<ClickableObject>();
-                    if (clk2 != null) Destroy(clk2);
-
-                    CreateWireBridge(colorId, origColor);
-
-                    selectedPinObj = null;
-                    selectedColorId = -1;
-                    selectedSide = -1;
-                    wiresRemaining--;
-
-                    HangarAudioLight.Instance?.PlayWeld();
-
-                    if (wiresRemaining <= 0)
+                    if (selectedColorId == colorId)
                     {
-                        RepairStepInfo = "✔ Все цепи замкнуты! Деталь восстановлена на 100%! Нажмите [ПРОБЕЛ] для установки.";
-                        HangarAudioLight.Instance?.PlaySuccess();
+                        CreateWireBridge(colorId, origColor);
+
+                        var clk1 = selectedPinObj.GetComponent<ClickableObject>();
+                        if (clk1 != null) Destroy(clk1);
+                        var clk2 = pin.GetComponent<ClickableObject>();
+                        if (clk2 != null) Destroy(clk2);
+
+                        selectedPinObj.transform.localScale = new Vector3(0.24f, 0.24f, 0.24f);
+                        selectedPinObj.GetComponent<Renderer>().material = CreateMaterial(origColor, false);
+                        pin.GetComponent<Renderer>().material = CreateMaterial(origColor, false);
+
+                        selectedPinObj = null;
+                        selectedColorId = -1;
+                        selectedSide = -1;
+
+                        wiresRemaining--;
+                        HangarAudioLight.Instance?.PlayBolt();
+
+                        if (wiresRemaining <= 0)
+                        {
+                            HangarAudioLight.Instance?.PlaySuccess();
+                            RepairStepInfo = "✔ Все цепи восстановлены! Нажмите [SPACE] для завершения.";
+                        }
+                        else
+                        {
+                            RepairStepInfo = $"✔ Цепь замкнута! Осталось соединить: {wiresRemaining}";
+                        }
                     }
                     else
                     {
-                        RepairStepInfo = $"✔ Цепь замкнута! Осталось соединить: {wiresRemaining}";
+                        HangarAudioLight.Instance?.PlayClick();
+                        RepairStepInfo = "❌ Короткое замыкание! Цвета не совпадают. Попробуйте снова.";
                     }
                 }
                 else

@@ -39,13 +39,33 @@ namespace HangarGame.EditorTools
 
             EditorSceneManager.MarkSceneDirty(activeScene);
             EditorSceneManager.SaveScene(activeScene);
+            CaptureGameView("C:/Users/skori/.gemini/antigravity/brain/9c28db05-5532-4b25-87af-9906cc3f22c9/game_view_hangar.png");
             Debug.Log("<color=green><b>[Pacific Rim]</b> Сцена успешно запечена и сохранена!</color>");
         }
 
-        [MenuItem("Pacific Rim/💾 2. Пересоздать файл сцены 'HangarMainScene'")]
-        public static void GenerateSceneMenu()
+        private static void CaptureGameView(string path)
         {
-            BakeIntoCurrentScene();
+            var camObj = GameObject.Find("Main Camera");
+            if (camObj == null) return;
+            var cam = camObj.GetComponent<Camera>();
+            if (cam == null) return;
+
+            RenderTexture rt = new RenderTexture(1920, 1080, 24);
+            cam.targetTexture = rt;
+            cam.Render();
+            RenderTexture.active = rt;
+
+            Texture2D tex = new Texture2D(1920, 1080, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, 1920, 1080), 0, 0);
+            tex.Apply();
+
+            cam.targetTexture = null;
+            RenderTexture.active = null;
+            Object.DestroyImmediate(rt);
+
+            byte[] bytes = tex.EncodeToPNG();
+            Object.DestroyImmediate(tex);
+            System.IO.File.WriteAllBytes(path, bytes);
         }
     }
 }

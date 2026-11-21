@@ -25,6 +25,33 @@ namespace HangarGame.CameraControl
         {
             transform.position = hangarPos;
             transform.rotation = Quaternion.identity;
+            targetBaseYaw = 0f;
+            curBaseYaw = 0f;
+
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnViewChanged += HandleViewChanged;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnViewChanged -= HandleViewChanged;
+            }
+        }
+
+        private void HandleViewChanged(RoomView view)
+        {
+            if (view == RoomView.Hangar)
+            {
+                targetBaseYaw = 0f;
+            }
+            else if (view == RoomView.DispatchConsole)
+            {
+                targetBaseYaw = 180f;
+            }
         }
 
         private void Update()
@@ -107,7 +134,6 @@ namespace HangarGame.CameraControl
                 RepairWorkbench.Instance?.CancelWork();
                 return;
             }
-            targetBaseYaw -= 180f;
             var nextView = (GameManager.Instance.CurrentView == RoomView.Hangar) ? RoomView.DispatchConsole : RoomView.Hangar;
             GameManager.Instance.SwitchView(nextView);
         }
@@ -120,7 +146,6 @@ namespace HangarGame.CameraControl
                 RepairWorkbench.Instance?.CancelWork();
                 return;
             }
-            targetBaseYaw += 180f;
             var nextView = (GameManager.Instance.CurrentView == RoomView.Hangar) ? RoomView.DispatchConsole : RoomView.Hangar;
             GameManager.Instance.SwitchView(nextView);
         }
