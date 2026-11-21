@@ -11,25 +11,58 @@ namespace HangarGame.Mechs
     public class MechPart : MonoBehaviour, IInteractable
     {
         [SerializeField] private MechPartData data;
+        [SerializeField] private GameObject pristineVisual;
+        [SerializeField] private GameObject brokenVisual;
+
         public MechPartData Data { get => data; set => data = value; }
         public float DurabilityPercent => maxHp > 0 ? Mathf.Clamp01(currentHp / maxHp) : 1f;
         public bool IsOnWorkbench { get; set; } = false;
 
         private float maxHp = 100f, currentHp = 100f;
-        private Vector3 socketPos; private Quaternion socketRot; private Transform socketParent;
-        private Renderer rend; private Color baseColor;
+        private Vector3 socketPos;
+        private Quaternion socketRot;
+        private Transform socketParent;
+        private Renderer rend;
+        private Color baseColor;
 
         private void Awake()
         {
-            rend = GetComponent<Renderer>();
-            if (rend != null) baseColor = rend.material.color;
-            socketPos = transform.localPosition; socketRot = transform.localRotation; socketParent = transform.parent;
+            rend = GetComponent<Renderer>() ?? GetComponentInChildren<Renderer>();
+            if (rend != null && rend.sharedMaterial != null)
+            {
+                baseColor = rend.material.color;
+            }
+            socketPos = transform.localPosition;
+            socketRot = transform.localRotation;
+            socketParent = transform.parent;
             if (data == null) data = new MechPartData { partName = gameObject.name };
         }
 
-        public void Setup(MechPartData d) { data = d; currentHp = maxHp; UpdateVis(); }
-        public void Damage(float a) { currentHp = Mathf.Max(0f, currentHp - a); UpdateVis(); }
-        public void RepairFull() { currentHp = maxHp; UpdateVis(); }
+        public void Setup(MechPartData d)
+        {
+            data = d;
+            currentHp = maxHp;
+            UpdateVis();
+        }
+
+        public void SetVisuals(GameObject pristine, GameObject broken)
+        {
+            pristineVisual = pristine;
+            brokenVisual = broken;
+            UpdateVis();
+        }
+
+        public void Damage(float a)
+        {
+            currentHp = Mathf.Max(0f, currentHp - a);
+            UpdateVis();
+        }
+
+        public void RepairFull()
+        {
+            currentHp = maxHp;
+            UpdateVis();
+        }
 
         public void ReturnToSocket()
         {
@@ -39,29 +72,67 @@ namespace HangarGame.Mechs
 
         private void InstantReturn()
         {
-            transform.SetParent(socketParent); transform.localPosition = socketPos; transform.localRotation = socketRot;
-            IsOnWorkbench = false; UpdateVis();
+            transform.SetParent(socketParent);
+            transform.localPosition = socketPos;
+            transform.localRotation = socketRot;
+            IsOnWorkbench = false;
+            foreach (var col in GetComponentsInChildren<Collider>()) col.enabled = true;
+            UpdateVis();
         }
 
         private IEnumerator SlideBack()
         {
-            Vector3 sP = transform.position; Quaternion sR = transform.rotation;
+            Vector3 sP = transform.position;
+            Quaternion sR = transform.rotation;
             Vector3 eP = socketParent != null ? socketParent.TransformPoint(socketPos) : socketPos;
             Quaternion eR = socketParent != null ? socketParent.rotation * socketRot : socketRot;
             float el = 0f, d = 0.3f;
             while (el < d)
             {
-                el += Time.deltaTime; float t = Mathf.SmoothStep(0f, 1f, el / d);
-                transform.position = Vector3.Lerp(sP, eP, t); transform.rotation = Quaternion.Slerp(sR, eR, t);
+                el += Time.deltaTime;
+                float t = Mathf.SmoothStep(0f, 1f, el / d);
+                transform.position = Vector3.Lerp(sP, eP, t);
+                transform.rotation = Quaternion.Slerp(sR, eR, t);
                 yield return null;
             }
             InstantReturn();
         }
 
-        public void UpdateVis() { if (rend != null) rend.material.color = Color.Lerp(Color.red, baseColor, DurabilityPercent); }
+        public void UpdateVis()
+        {
+            bool damaged = DurabilityPercent < 0.99f;
+            if (brokenVisual != null && pristineVisual != null)
+            {
+                pristineVisual.SetActive(!damaged);
+                brokenVisual.SetActive(damaged);
+                if (rend != null && rend.gameObject == gameObject)
+                {
+                    rend.enabled = !damaged;
+                }
+            }
+            if (rend != null && rend.enabled)
+            {
+                rend.material.color = Color.Lerp(Color.red, baseColor, DurabilityPercent);
+            }
+        }
+
         public string GetPrompt() => $"[{(Data != null ? Data.partName : gameObject.name)}] {Mathf.RoundToInt(DurabilityPercent * 100f)}% HP. Клик для ТО.";
-        public void OnHover(bool h) { if (!IsOnWorkbench && rend != null) rend.material.color = h ? Color.cyan : Color.Lerp(Color.red, baseColor, DurabilityPercent); }
-        public void OnInteract() { if (!IsOnWorkbench && HangarMechManager.Instance != null && !HangarMechManager.Instance.CurrentMech.isDeployed) RepairWorkbench.Instance?.ReceivePart(this); }
+
+        public void OnHover(bool h)
+        {
+            if (!IsOnWorkbench && rend != null)
+            {
+                rend.material.color = h ? Color.cyan : Color.Lerp(Color.red, baseColor, DurabilityPercent);
+            }
+        }
+
+        public void OnInteract()
+        {
+            if (!IsOnWorkbench && HangarMechManager.Instance != null && !HangarMechManager.Instance.CurrentMech.isDeployed)
+            {
+                RepairWorkbench.Instance?.ReceivePart(this);
+            }
+        }
     }
 
     public class MechUnit : MonoBehaviour
@@ -95,7 +166,10 @@ namespace HangarGame.Mechs
         {
             EnsurePartsLoaded();
             if (parts.Count == 0) return false;
-            foreach (var p in parts) if (p != null && p.IsOnWorkbench) return true;
+            foreach (var p in parts)
+            {
+                if (p != null && p.IsOnWorkbench) return true;
+            }
             return false;
         }
 
@@ -114,13 +188,19 @@ namespace HangarGame.Mechs
         {
             currentHp = Mathf.Max(0f, currentHp - dmg);
             float perPart = (dmg * 0.5f) / Mathf.Max(1, parts.Count);
-            foreach (var p in parts) if (p != null) p.Damage(perPart);
+            foreach (var p in parts)
+            {
+                if (p != null) p.Damage(perPart);
+            }
         }
 
         public void RepairAll()
         {
             currentHp = maxHp;
-            foreach (var p in parts) if (p != null) p.RepairFull();
+            foreach (var p in parts)
+            {
+                if (p != null) p.RepairFull();
+            }
         }
 
         public float GetTotalHpPercent() => maxHp > 0 ? (currentHp / maxHp) : 1f;

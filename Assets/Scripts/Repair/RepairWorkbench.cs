@@ -107,8 +107,7 @@ namespace HangarGame.Repair
             if (HasItem) return;
             CurrentPart = p; p.IsOnWorkbench = true;
 
-            var col = p.GetComponent<Collider>();
-            if (col != null) col.enabled = false;
+            foreach (var col in p.GetComponentsInChildren<Collider>()) col.enabled = false;
 
             ResetRotation();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
@@ -120,8 +119,7 @@ namespace HangarGame.Repair
             if (HasItem) return;
             CurrentJaegerModule = mod; currentJaegerName = name; onJaegerDone = onDone;
 
-            var col = mod.GetComponent<Collider>();
-            if (col != null) col.enabled = false;
+            foreach (var col in mod.GetComponentsInChildren<Collider>()) col.enabled = false;
 
             ResetRotation();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
@@ -428,16 +426,14 @@ namespace HangarGame.Repair
             ClearSubObjects();
             if (CurrentJaegerModule != null)
             {
-                var col = CurrentJaegerModule.GetComponent<Collider>();
-                if (col != null) col.enabled = true;
+                foreach (var col in CurrentJaegerModule.GetComponentsInChildren<Collider>()) col.enabled = true;
                 Destroy(CurrentJaegerModule); CurrentJaegerModule = null;
                 onJaegerDone?.Invoke(); HangarAudioLight.Instance?.PlaySuccess();
                 GameManager.Instance?.SwitchView(RoomView.Hangar);
             }
             else if (CurrentPart != null)
             {
-                var col = CurrentPart.GetComponent<Collider>();
-                if (col != null) col.enabled = true;
+                foreach (var col in CurrentPart.GetComponentsInChildren<Collider>()) col.enabled = true;
 
                 if (CurrentPart.Data != null)
                     GameManager.Instance?.TrySpend(CurrentPart.Data.repairCredits, CurrentPart.Data.repairAlloy);
@@ -455,14 +451,12 @@ namespace HangarGame.Repair
             ClearSubObjects();
             if (CurrentJaegerModule != null)
             {
-                var col = CurrentJaegerModule.GetComponent<Collider>();
-                if (col != null) col.enabled = true;
+                foreach (var col in CurrentJaegerModule.GetComponentsInChildren<Collider>()) col.enabled = true;
                 Destroy(CurrentJaegerModule); CurrentJaegerModule = null;
             }
             if (CurrentPart != null)
             {
-                var col = CurrentPart.GetComponent<Collider>();
-                if (col != null) col.enabled = true;
+                foreach (var col in CurrentPart.GetComponentsInChildren<Collider>()) col.enabled = true;
                 CurrentPart.ReturnToSocket(); CurrentPart = null;
             }
             HangarMechManager.Instance?.UpdatePodiumDisplay();

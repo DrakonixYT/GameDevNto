@@ -13,12 +13,15 @@ namespace HangarGame.Repair
         public bool IsComplete => CurrentStage >= TotalStages;
 
         [SerializeField] private Transform[] stageVisualMarkers;
+        [SerializeField] private GameObject platePrefab;
+
         private readonly string[] names = { "Термоядерный Реактор 'Гиперион'", "Титановый Силовой Экзоскелет", "Тяжелый Ионный Излучатель", "Нейро-Командный Шлем 'Апокалипсис'" };
         private readonly int[] credits = { 150, 200, 250, 300 }, alloys = { 60, 100, 120, 150 };
 
         private void Awake() => Instance = this;
 
         public void SetMarkers(Transform[] m) { stageVisualMarkers = m; UpdateMarkers(); }
+        public void SetPlatePrefab(GameObject p) => platePrefab = p;
 
         public string GetNextStageInfo() => IsComplete ? "ПРОЕКТ 'ЕГЕРЬ': 100% (ПОСТРОЕН)" : $"ПРОЕКТ 'ЕГЕРЬ' ({CurrentStage}/4): {names[CurrentStage]} [{credits[CurrentStage]}¢, {alloys[CurrentStage]}т]";
 
@@ -41,16 +44,36 @@ namespace HangarGame.Repair
         private void UpdateMarkers()
         {
             if (stageVisualMarkers == null) return;
-            for (int i = 0; i < stageVisualMarkers.Length; i++) if (stageVisualMarkers[i] != null) stageVisualMarkers[i].gameObject.SetActive(i < CurrentStage);
+            for (int i = 0; i < stageVisualMarkers.Length; i++)
+            {
+                if (stageVisualMarkers[i] != null) stageVisualMarkers[i].gameObject.SetActive(i < CurrentStage);
+            }
         }
 
         private GameObject CreateStageModel(int s)
         {
-            GameObject m = new GameObject($"Jaeger_Mod_{s + 1}");
-            if (s == 0) { var c = GameObject.CreatePrimitive(PrimitiveType.Cylinder); c.transform.SetParent(m.transform, false); c.transform.localScale = new Vector3(0.5f, 0.25f, 0.5f); c.GetComponent<Renderer>().material.color = Color.cyan; }
-            else if (s == 1) { var c = GameObject.CreatePrimitive(PrimitiveType.Cube); c.transform.SetParent(m.transform, false); c.transform.localScale = new Vector3(0.7f, 0.4f, 0.4f); c.GetComponent<Renderer>().material.color = new Color(0.3f, 0.35f, 0.4f); }
-            else if (s == 2) { var c = GameObject.CreatePrimitive(PrimitiveType.Cylinder); c.transform.SetParent(m.transform, false); c.transform.localScale = new Vector3(0.25f, 0.7f, 0.25f); c.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); c.GetComponent<Renderer>().material.color = new Color(0.9f, 0.4f, 0.1f); }
-            else { var c = GameObject.CreatePrimitive(PrimitiveType.Cube); c.transform.SetParent(m.transform, false); c.transform.localScale = new Vector3(0.5f, 0.35f, 0.5f); c.GetComponent<Renderer>().material.color = new Color(1f, 0.8f, 0.1f); }
+            GameObject m;
+            if (platePrefab != null)
+            {
+                m = new GameObject($"Jaeger_Plate_Mod_{s + 1}");
+                GameObject sub = Instantiate(platePrefab, m.transform);
+                sub.name = "Model";
+                sub.transform.localPosition = new Vector3(5.19f, -1.46f, 0.40f);
+                sub.transform.localRotation = Quaternion.identity;
+                m.transform.localScale = Vector3.one * 0.7f;
+                Color col = s == 0 ? Color.cyan : (s == 1 ? new Color(0.2f, 0.5f, 0.9f) : (s == 2 ? new Color(0.95f, 0.45f, 0.1f) : new Color(1f, 0.85f, 0.2f)));
+                foreach (var r in m.GetComponentsInChildren<Renderer>())
+                {
+                    r.material.color = col;
+                }
+            }
+            else
+            {
+                m = new GameObject($"Jaeger_Mod_{s + 1}");
+                var c = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                c.transform.SetParent(m.transform, false);
+                c.transform.localScale = new Vector3(0.6f, 0.3f, 0.6f);
+            }
             return m;
         }
     }

@@ -1,6 +1,10 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 using HangarGame.Core;
 using HangarGame.CameraControl;
 using HangarGame.Interaction;
@@ -113,25 +117,77 @@ namespace HangarGame.Prototype
             l.intensity = intensity;
         }
 
+        private GameObject LoadAsset(string path)
+        {
+#if UNITY_EDITOR
+            return AssetDatabase.LoadAssetAtPath<GameObject>(path);
+#else
+            return null;
+#endif
+        }
+
+        private Material LoadMaterial(string path)
+        {
+#if UNITY_EDITOR
+            return AssetDatabase.LoadAssetAtPath<Material>(path);
+#else
+            return null;
+#endif
+        }
+
+        private GameObject InstantiateModel(GameObject prefab, Transform parent)
+        {
+            if (prefab == null) return null;
+#if UNITY_EDITOR
+            GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
+            if (instance == null) instance = Instantiate(prefab, parent);
+            return instance;
+#else
+            return Instantiate(prefab, parent);
+#endif
+        }
+
         private void CreateHangarRoom()
         {
             GameObject grp = new GameObject("--- 03_HANGAR_ROOM ---");
             grp.transform.position = Vector3.zero; grp.transform.rotation = Quaternion.identity;
 
-            CreateBox(grp.transform, "Floor", new Vector3(0f, -0.5f, 0f), new Vector3(18f, 1f, 18f), new Color(0.18f, 0.2f, 0.23f));
-            CreateBox(grp.transform, "Ceiling", new Vector3(0f, 5.5f, 0f), new Vector3(18f, 0.5f, 18f), new Color(0.12f, 0.14f, 0.16f));
-            CreateBox(grp.transform, "Crane_Beam", new Vector3(0f, 4.8f, 2.5f), new Vector3(17f, 0.4f, 0.8f), new Color(0.85f, 0.65f, 0.1f));
+            GameObject fullPrefab = LoadAsset("Assets/Prefabs/Base/HANGARFULL.prefab");
+            GameObject hangarPrefab = LoadAsset("Assets/Prefabs/Hangar/Hangar.prefab");
 
-            CreateBox(grp.transform, "Wall_Back", new Vector3(0f, 2.5f, 8.5f), new Vector3(18f, 6f, 0.6f), new Color(0.14f, 0.16f, 0.19f));
-            CreateBox(grp.transform, "Blast_Doors", new Vector3(0f, 2.4f, 8.25f), new Vector3(7.5f, 4.8f, 0.1f), new Color(0.22f, 0.25f, 0.28f));
-            CreateBox(grp.transform, "Wall_Front", new Vector3(0f, 2.5f, -8.5f), new Vector3(18f, 6f, 0.6f), new Color(0.12f, 0.14f, 0.17f));
-            CreateBox(grp.transform, "Wall_Left", new Vector3(-8.8f, 2.5f, 0f), new Vector3(0.6f, 6f, 18f), new Color(0.15f, 0.17f, 0.2f));
-            CreateBox(grp.transform, "Wall_Right", new Vector3(8.8f, 2.5f, 0f), new Vector3(0.6f, 6f, 18f), new Color(0.15f, 0.17f, 0.2f));
+            if (fullPrefab != null)
+            {
+                GameObject fullObj = InstantiateModel(fullPrefab, grp.transform);
+                fullObj.name = "Hangar_Full_Base";
+                fullObj.transform.localPosition = new Vector3(13.87f, 0f, 0f);
+                fullObj.transform.localRotation = Quaternion.identity;
+            }
 
-            CreateBox(grp.transform, "Pillar_1", new Vector3(-5.5f, 2.5f, 5.5f), new Vector3(0.8f, 5.5f, 0.8f), new Color(0.24f, 0.26f, 0.3f));
-            CreateBox(grp.transform, "Pillar_2", new Vector3(5.5f, 2.5f, 5.5f), new Vector3(0.8f, 5.5f, 0.8f), new Color(0.24f, 0.26f, 0.3f));
-            CreateBox(grp.transform, "Pillar_3", new Vector3(-5.5f, 2.5f, -5.5f), new Vector3(0.8f, 5.5f, 0.8f), new Color(0.24f, 0.26f, 0.3f));
-            CreateBox(grp.transform, "Pillar_4", new Vector3(5.5f, 2.5f, -5.5f), new Vector3(0.8f, 5.5f, 0.8f), new Color(0.24f, 0.26f, 0.3f));
+            if (hangarPrefab != null)
+            {
+                GameObject hObj = InstantiateModel(hangarPrefab, grp.transform);
+                hObj.name = "Hangar_Gantry_Rig";
+                hObj.transform.localPosition = new Vector3(23.14f, 0f, 0f);
+                hObj.transform.localRotation = Quaternion.identity;
+            }
+
+            if (fullPrefab == null && hangarPrefab == null)
+            {
+                CreateBox(grp.transform, "Floor", new Vector3(0f, -0.5f, 0f), new Vector3(18f, 1f, 18f), new Color(0.18f, 0.2f, 0.23f));
+                CreateBox(grp.transform, "Ceiling", new Vector3(0f, 5.5f, 0f), new Vector3(18f, 0.5f, 18f), new Color(0.12f, 0.14f, 0.16f));
+                CreateBox(grp.transform, "Crane_Beam", new Vector3(0f, 4.8f, 2.5f), new Vector3(17f, 0.4f, 0.8f), new Color(0.85f, 0.65f, 0.1f));
+                CreateBox(grp.transform, "Wall_Back", new Vector3(0f, 2.5f, 8.5f), new Vector3(18f, 6f, 0.6f), new Color(0.14f, 0.16f, 0.19f));
+                CreateBox(grp.transform, "Blast_Doors", new Vector3(0f, 2.4f, 8.25f), new Vector3(7.5f, 4.8f, 0.1f), new Color(0.22f, 0.25f, 0.28f));
+                CreateBox(grp.transform, "Wall_Front", new Vector3(0f, 2.5f, -8.5f), new Vector3(18f, 6f, 0.6f), new Color(0.12f, 0.14f, 0.17f));
+                CreateBox(grp.transform, "Wall_Left", new Vector3(-8.8f, 2.5f, 0f), new Vector3(0.6f, 6f, 18f), new Color(0.15f, 0.17f, 0.2f));
+                CreateBox(grp.transform, "Wall_Right", new Vector3(8.8f, 2.5f, 0f), new Vector3(0.6f, 6f, 18f), new Color(0.15f, 0.17f, 0.2f));
+            }
+
+            GameObject fl = new GameObject("Hangar_Floor_Collider");
+            fl.transform.SetParent(grp.transform, false);
+            fl.transform.localPosition = new Vector3(0f, -0.2f, 0f);
+            var col = fl.AddComponent<BoxCollider>();
+            col.size = new Vector3(50f, 0.4f, 50f);
         }
 
         private void CreateMechsHangar()
@@ -145,14 +201,9 @@ namespace HangarGame.Prototype
             CreateBox(grp.transform, "Scaffold_L", new Vector3(-2.2f, 2.2f, 5.5f), new Vector3(0.2f, 4.4f, 2.4f), new Color(0.85f, 0.65f, 0.1f));
             CreateBox(grp.transform, "Scaffold_R", new Vector3(2.2f, 2.2f, 5.5f), new Vector3(0.2f, 4.4f, 2.4f), new Color(0.85f, 0.65f, 0.1f));
 
-            var m0 = BuildMechUnit(grp.transform, 0, "Страж-1 (Лёгкий)", new Color(0.15f, 0.75f, 0.85f), 80f, 32f, 85f,
-                new Vector3(1.3f, 1.5f, 1.0f), new Vector3(0.65f, 0.55f, 0.65f), new Vector3(0.45f, 1.4f, 0.45f), new Vector3(1.1f, 1.6f, 0.9f));
-
-            var m1 = BuildMechUnit(grp.transform, 1, "Атлант-2 (Штурм)", new Color(0.2f, 0.45f, 0.85f), 110f, 45f, 60f,
-                new Vector3(1.6f, 1.8f, 1.2f), new Vector3(0.8f, 0.6f, 0.8f), new Vector3(0.55f, 1.6f, 0.6f), new Vector3(1.4f, 1.8f, 1.1f));
-
-            var m2 = BuildMechUnit(grp.transform, 2, "Голиаф-3 (Тяжёлый)", new Color(0.85f, 0.5f, 0.15f), 160f, 62f, 42f,
-                new Vector3(2.1f, 2.0f, 1.5f), new Vector3(0.95f, 0.75f, 0.95f), new Vector3(0.75f, 1.8f, 0.8f), new Vector3(1.7f, 1.9f, 1.3f));
+            var m0 = BuildMechUnit(grp.transform, 0, "Страж-1 (Лёгкий)", new Color(0.15f, 0.75f, 0.85f), 80f, 32f, 85f, 0.88f);
+            var m1 = BuildMechUnit(grp.transform, 1, "Атлант-2 (Штурм)", new Color(0.2f, 0.45f, 0.85f), 110f, 45f, 60f, 1.0f);
+            var m2 = BuildMechUnit(grp.transform, 2, "Голиаф-3 (Тяжёлый)", new Color(0.85f, 0.5f, 0.15f), 160f, 62f, 42f, 1.18f);
 
             mgr.Mechs.Add(m0);
             mgr.Mechs.Add(m1);
@@ -163,14 +214,26 @@ namespace HangarGame.Prototype
             m2.gameObject.SetActive(false);
         }
 
-        private MechUnit BuildMechUnit(Transform parent, int id, string name, Color theme, float hp, float atk, float spd,
-            Vector3 torScale, Vector3 headScale, Vector3 armScale, Vector3 legScale)
+        private MechUnit BuildMechUnit(Transform parent, int id, string name, Color theme, float hp, float atk, float spd, float scaleMult)
         {
-            GameObject obj = new GameObject($"Mech_{id}_{name}");
-            obj.transform.SetParent(parent, false);
-            obj.transform.position = Vector3.zero;
+            GameObject mechPrefab = LoadAsset("Assets/Prefabs/Mech01/Mech01.prefab");
+            GameObject obj;
+            if (mechPrefab != null)
+            {
+                obj = InstantiateModel(mechPrefab, parent);
+            }
+            else
+            {
+                obj = new GameObject();
+                obj.transform.SetParent(parent, false);
+            }
+            obj.name = $"Mech_{id}_{name}";
+            obj.transform.position = new Vector3(0f, 2.5f * scaleMult, 5.5f);
+            obj.transform.rotation = Quaternion.Euler(0f, 180f, 0f);
+            obj.transform.localScale = Vector3.one * scaleMult;
 
-            MechUnit unit = obj.AddComponent<MechUnit>();
+            MechUnit unit = obj.GetComponent<MechUnit>();
+            if (unit == null) unit = obj.AddComponent<MechUnit>();
             unit.id = id;
             unit.mechName = name;
             unit.themeColor = theme;
@@ -178,43 +241,165 @@ namespace HangarGame.Prototype
             unit.currentHp = hp;
             unit.attackPower = atk;
             unit.moveSpeed = spd;
+            unit.parts.Clear();
 
-            var pTorso = SetupPart(obj.transform, "Torso_Core", PrimitiveType.Cube, new Vector3(0f, 2.8f, 5.5f), torScale, theme,
-                new MechPartData { partName = $"{name}: Корпус", slot = PartSlot.Torso, attackType = DamageType.Physical, attackPower = 15f, defenseType = DamageType.Physical, defensePower = 60f });
+            Material mechMat = LoadMaterial("Assets/Prefabs/Mech01/Mech01.mat");
+            Material tintedMat = mechMat != null ? new Material(mechMat) : null;
+            if (tintedMat != null)
+            {
+                tintedMat.color = theme;
+                foreach (var r in obj.GetComponentsInChildren<Renderer>(true))
+                {
+                    r.material = tintedMat;
+                }
+            }
 
-            var pHead = SetupPart(obj.transform, "Cockpit_Head", PrimitiveType.Sphere, new Vector3(0f, 3.8f, 5.4f), headScale, new Color(0.95f, 0.7f, 0.2f),
-                new MechPartData { partName = $"{name}: Сенсорная Рубка", slot = PartSlot.Head, attackType = DamageType.Plasma, attackPower = 10f, defenseType = DamageType.Plasma, defensePower = 30f });
+            Transform tTorso = obj.transform;
+            Transform tHead = obj.transform.Find("HeadLow02");
+            Transform tArmL = obj.transform.Find("LeftArmLow02");
+            Transform tArmR = obj.transform.Find("RightArmLow02");
+            Transform tLegs = obj.transform.Find("LowerBody02");
+            Transform tLegL = obj.transform.Find("LeftLegLow02");
+            Transform tLegR = obj.transform.Find("RightLegLow02");
 
-            var pArmL = SetupPart(obj.transform, "LeftArm_Shield", PrimitiveType.Cube, new Vector3(-torScale.x * 0.75f, 2.7f, 5.3f), armScale, theme * 0.85f,
-                new MechPartData { partName = $"{name}: Энергощит", slot = PartSlot.LeftArm, attackType = DamageType.Physical, attackPower = 10f, defenseType = DamageType.Physical, defensePower = 70f });
+            if (tLegs != null)
+            {
+                if (tLegL != null) tLegL.SetParent(tLegs, true);
+                if (tLegR != null) tLegR.SetParent(tLegs, true);
+            }
 
-            var pArmR = SetupPart(obj.transform, "RightArm_Cannon", PrimitiveType.Cylinder, new Vector3(torScale.x * 0.75f, 2.7f, 5.3f), armScale, new Color(0.9f, 0.35f, 0.15f),
-                new MechPartData { partName = $"{name}: Пушка", slot = PartSlot.RightArm, attackType = DamageType.Plasma, attackPower = atk, defenseType = DamageType.Thermal, defensePower = 20f });
+            GameObject brokenHeadPrefab = LoadAsset("Assets/Prefabs/Mech01/BrokenParts/HeadBroken.fbx");
+            GameObject brokenLeftArmPrefab = LoadAsset("Assets/Prefabs/Mech01/BrokenParts/LeftArmBroken.fbx");
+            GameObject brokenRightArmPrefab = LoadAsset("Assets/Prefabs/Mech01/BrokenParts/RightArmBroken.fbx");
 
-            var pLegs = SetupPart(obj.transform, "Legs_Chassis", PrimitiveType.Cube, new Vector3(0f, 0.9f, 5.5f), legScale, new Color(0.22f, 0.25f, 0.28f),
-                new MechPartData { partName = $"{name}: Приводное Шасси", slot = PartSlot.Legs, attackType = DamageType.Physical, attackPower = 10f, defenseType = DamageType.Physical, defensePower = 50f });
+            var pTorso = SetupPartComponent(tTorso.gameObject, new MechPartData
+            {
+                partName = $"{name}: Корпус",
+                slot = PartSlot.Torso,
+                attackType = DamageType.Physical,
+                attackPower = 15f,
+                defenseType = DamageType.Physical,
+                defensePower = 60f
+            }, null, Vector3.zero);
 
-            unit.parts.Add(pTorso);
-            unit.parts.Add(pHead);
-            unit.parts.Add(pArmL);
-            unit.parts.Add(pArmR);
-            unit.parts.Add(pLegs);
+            var pHead = SetupPartComponent(tHead != null ? tHead.gameObject : null, new MechPartData
+            {
+                partName = $"{name}: Сенсорная Рубка",
+                slot = PartSlot.Head,
+                attackType = DamageType.Plasma,
+                attackPower = 10f,
+                defenseType = DamageType.Plasma,
+                defensePower = 30f
+            }, brokenHeadPrefab, new Vector3(5.03f, -0.57f, 0.27f), mechMat);
+
+            var pArmL = SetupPartComponent(tArmL != null ? tArmL.gameObject : null, new MechPartData
+            {
+                partName = $"{name}: Энергощит",
+                slot = PartSlot.LeftArm,
+                attackType = DamageType.Physical,
+                attackPower = 10f,
+                defenseType = DamageType.Physical,
+                defensePower = 70f
+            }, brokenLeftArmPrefab, new Vector3(7.06f, 0.02f, 0.42f), mechMat);
+
+            var pArmR = SetupPartComponent(tArmR != null ? tArmR.gameObject : null, new MechPartData
+            {
+                partName = $"{name}: Пушка",
+                slot = PartSlot.RightArm,
+                attackType = DamageType.Plasma,
+                attackPower = atk,
+                defenseType = DamageType.Thermal,
+                defensePower = 20f
+            }, brokenRightArmPrefab, new Vector3(4.15f, 0.02f, 0.42f), mechMat);
+
+            var pLegs = SetupPartComponent(tLegs != null ? tLegs.gameObject : null, new MechPartData
+            {
+                partName = $"{name}: Приводное Шасси",
+                slot = PartSlot.Legs,
+                attackType = DamageType.Physical,
+                attackPower = 10f,
+                defenseType = DamageType.Physical,
+                defensePower = 50f
+            }, null, Vector3.zero);
+
+            if (pTorso != null) unit.parts.Add(pTorso);
+            if (pHead != null) unit.parts.Add(pHead);
+            if (pArmL != null) unit.parts.Add(pArmL);
+            if (pArmR != null) unit.parts.Add(pArmR);
+            if (pLegs != null) unit.parts.Add(pLegs);
 
             return unit;
         }
 
-        private MechPart SetupPart(Transform parent, string name, PrimitiveType prim, Vector3 pos, Vector3 scale, Color color, MechPartData data)
+        private MechPart SetupPartComponent(GameObject target, MechPartData data, GameObject brokenPrefab, Vector3 brokenOffset, Material brokenMat = null)
         {
-            GameObject obj = GameObject.CreatePrimitive(prim);
-            obj.name = name;
-            obj.transform.SetParent(parent, false);
-            obj.transform.localPosition = pos;
-            obj.transform.localScale = scale;
-            SetColor(obj, color);
-
-            MechPart p = obj.AddComponent<MechPart>();
+            if (target == null) return null;
+            MechPart p = target.GetComponent<MechPart>();
+            if (p == null) p = target.AddComponent<MechPart>();
             p.Setup(data);
+
+            AddFittedCollider(target);
+
+            if (brokenPrefab != null)
+            {
+                GameObject brokenObj = InstantiateModel(brokenPrefab, target.transform);
+                brokenObj.name = "Broken_Visual";
+                brokenObj.transform.localPosition = brokenOffset;
+                brokenObj.transform.localRotation = Quaternion.identity;
+
+                if (brokenMat != null)
+                {
+                    foreach (var br in brokenObj.GetComponentsInChildren<Renderer>(true))
+                    {
+                        br.sharedMaterial = brokenMat;
+                    }
+                }
+                foreach (var col in brokenObj.GetComponentsInChildren<Collider>(true))
+                {
+                    DestroyImmediate(col);
+                }
+                brokenObj.SetActive(false);
+
+                GameObject pristineHolder = null;
+                var r = target.GetComponent<Renderer>();
+                if (r != null)
+                {
+                    pristineHolder = r.gameObject;
+                }
+                else
+                {
+                    pristineHolder = target;
+                }
+
+                p.SetVisuals(pristineHolder, brokenObj);
+            }
+
             return p;
+        }
+
+        private BoxCollider AddFittedCollider(GameObject go)
+        {
+            BoxCollider box = go.GetComponent<BoxCollider>();
+            if (box == null) box = go.AddComponent<BoxCollider>();
+            var rends = go.GetComponentsInChildren<Renderer>(true);
+            if (rends.Length > 0)
+            {
+                Bounds b = rends[0].bounds;
+                for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+                box.center = go.transform.InverseTransformPoint(b.center);
+                Vector3 s = go.transform.lossyScale;
+                box.size = new Vector3(
+                    Mathf.Abs(s.x) > 0.001f ? b.size.x / Mathf.Abs(s.x) : b.size.x,
+                    Mathf.Abs(s.y) > 0.001f ? b.size.y / Mathf.Abs(s.y) : b.size.y,
+                    Mathf.Abs(s.z) > 0.001f ? b.size.z / Mathf.Abs(s.z) : b.size.z
+                );
+            }
+            else
+            {
+                box.center = Vector3.zero;
+                box.size = Vector3.one;
+            }
+            return box;
         }
 
         private void CreateJaegerFrame()
@@ -225,26 +410,77 @@ namespace HangarGame.Prototype
             CreateBox(grp.transform, "Tower_L", new Vector3(3.2f, 3.5f, 4.8f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
             CreateBox(grp.transform, "Tower_R", new Vector3(6.4f, 3.5f, 4.8f), new Vector3(0.35f, 7f, 3.5f), new Color(0.9f, 0.7f, 0.15f));
 
-            CreateBox(grp.transform, "Pelvis", new Vector3(4.8f, 2.2f, 4.8f), new Vector3(1.8f, 0.8f, 1.2f), new Color(0.2f, 0.22f, 0.25f));
-            CreateBox(grp.transform, "Leg_L", new Vector3(4.1f, 1.1f, 4.8f), new Vector3(0.7f, 2.2f, 0.8f), new Color(0.18f, 0.2f, 0.22f));
-            CreateBox(grp.transform, "Leg_R", new Vector3(5.5f, 1.1f, 4.8f), new Vector3(0.7f, 2.2f, 0.8f), new Color(0.18f, 0.2f, 0.22f));
-            CreateCyl(grp.transform, "Spine", new Vector3(4.8f, 3.4f, 4.8f), new Vector3(0.4f, 1.4f, 0.4f), new Color(0.3f, 0.32f, 0.35f));
+            GameObject egerPrefab = LoadAsset("Assets/Prefabs/Eger/Eger.fbx");
+            GameObject platePrefab = LoadAsset("Assets/Prefabs/Eger/Plate.fbx");
 
-            GameObject m1 = CreateCyl(grp.transform, "Stage1_Reactor", new Vector3(4.8f, 3.4f, 4.5f), new Vector3(0.85f, 0.35f, 0.85f), Color.cyan);
-            m1.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            m1.SetActive(false);
+            GameObject egerObj;
+            if (egerPrefab != null)
+            {
+                egerObj = InstantiateModel(egerPrefab, grp.transform);
+                egerObj.name = "Jaeger_Titan_Chassis";
+                egerObj.transform.position = new Vector3(4.8f, 0.1f, 4.8f);
+                egerObj.transform.rotation = Quaternion.Euler(0f, -40f, 0f);
+                egerObj.transform.localScale = Vector3.one * 1.5f;
+            }
+            else
+            {
+                egerObj = new GameObject("Jaeger_Titan_Chassis");
+                egerObj.transform.SetParent(grp.transform, false);
+                egerObj.transform.position = new Vector3(4.8f, 0.1f, 4.8f);
+            }
 
-            GameObject m2 = CreateBox(grp.transform, "Stage2_Torso", new Vector3(4.8f, 3.5f, 4.8f), new Vector3(2.2f, 2.0f, 1.6f), new Color(0.25f, 0.45f, 0.65f));
-            m2.SetActive(false);
+            Transform[] markers = new Transform[4];
+            Vector3[] platePositions = {
+                new Vector3(0f, 1.3f, 0.1f),
+                new Vector3(0f, 1.8f, 0.25f),
+                new Vector3(0.45f, 2.1f, 0.1f),
+                new Vector3(0f, 2.5f, 0.15f)
+            };
+            Vector3[] plateRotations = {
+                Vector3.zero,
+                new Vector3(12f, 0f, 0f),
+                new Vector3(0f, 15f, 0f),
+                Vector3.zero
+            };
+            Color[] stageColors = {
+                Color.cyan,
+                new Color(0.2f, 0.5f, 0.9f),
+                new Color(0.95f, 0.45f, 0.1f),
+                new Color(1f, 0.85f, 0.2f)
+            };
 
-            GameObject m3 = CreateCyl(grp.transform, "Stage3_Cannon", new Vector3(6.3f, 4.2f, 4.7f), new Vector3(0.45f, 2.2f, 0.45f), new Color(0.9f, 0.45f, 0.1f));
-            m3.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            m3.SetActive(false);
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject markerRoot = new GameObject($"Jaeger_Plate_Stage_{i + 1}");
+                markerRoot.transform.SetParent(egerObj.transform, false);
+                markerRoot.transform.localPosition = platePositions[i];
+                markerRoot.transform.localRotation = Quaternion.Euler(plateRotations[i]);
 
-            GameObject m4 = CreateBox(grp.transform, "Stage4_Helm", new Vector3(4.8f, 5.0f, 4.6f), new Vector3(0.9f, 0.7f, 0.9f), new Color(0.95f, 0.75f, 0.1f));
-            m4.SetActive(false);
+                if (platePrefab != null)
+                {
+                    GameObject pObj = InstantiateModel(platePrefab, markerRoot.transform);
+                    pObj.name = "Model";
+                    pObj.transform.localPosition = new Vector3(5.19f, -1.46f, 0.40f);
+                    pObj.transform.localRotation = Quaternion.identity;
+                    pObj.transform.localScale = Vector3.one * 0.85f;
+                    foreach (var r in pObj.GetComponentsInChildren<Renderer>(true))
+                    {
+                        r.material.color = stageColors[i];
+                    }
+                }
+                else
+                {
+                    CreateBox(markerRoot.transform, "Box", Vector3.zero, new Vector3(0.6f, 0.2f, 0.6f), stageColors[i]);
+                }
+                markerRoot.SetActive(false);
+                markers[i] = markerRoot.transform;
+            }
 
-            JaegerProject.Instance?.SetMarkers(new Transform[] { m1.transform, m2.transform, m3.transform, m4.transform });
+            if (JaegerProject.Instance != null)
+            {
+                JaegerProject.Instance.SetMarkers(markers);
+                if (platePrefab != null) JaegerProject.Instance.SetPlatePrefab(platePrefab);
+            }
         }
 
         private void CreateWorkbench()
