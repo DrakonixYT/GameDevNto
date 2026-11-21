@@ -107,11 +107,11 @@ namespace HangarGame.Repair
             if (HasItem) return;
             CurrentPart = p; p.IsOnWorkbench = true;
 
-            foreach (var col in p.GetComponentsInChildren<Collider>()) col.enabled = false;
+            foreach (var col in p.GetComponentsInChildren<Collider>(true)) col.enabled = false;
 
             ResetRotation();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            Vector3 tablePos = transform.position + new Vector3(0f, 1.05f, 0f);
+            Vector3 tablePos = transform.TransformPoint(new Vector3(0f, 0.85f, 0f));
             StartCoroutine(SlideToWorkbench(p.transform, tablePos, Quaternion.Euler(0f, 180f, 0f), StartBoltsPhase));
         }
 
@@ -120,12 +120,12 @@ namespace HangarGame.Repair
             if (HasItem) return;
             CurrentJaegerModule = mod; currentJaegerName = name; onJaegerDone = onDone;
 
-            foreach (var col in mod.GetComponentsInChildren<Collider>()) col.enabled = false;
+            foreach (var col in mod.GetComponentsInChildren<Collider>(true)) col.enabled = false;
 
             ResetRotation();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            Vector3 tablePos = transform.position + new Vector3(0f, 1.05f, 0f);
-            mod.transform.position = tablePos + new Vector3(0f, 0.9f, 0f);
+            Vector3 tablePos = transform.TransformPoint(new Vector3(0f, 0.85f, 0f));
+            mod.transform.position = tablePos + new Vector3(0f, 0.5f, 0f);
             StartCoroutine(SlideToWorkbench(mod.transform, tablePos, Quaternion.Euler(0f, 180f, 0f), StartBoltsPhase));
         }
 

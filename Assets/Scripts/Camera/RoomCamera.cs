@@ -10,10 +10,12 @@ namespace HangarGame.CameraControl
     public class RoomCamera : MonoBehaviour
     {
         public static RoomCamera Instance { get; private set; }
-        private readonly Vector3 hangarPos = new Vector3(0f, 1.6f, -0.6f);
-        private readonly Vector3 dispatchPos = new Vector3(0f, 1.55f, -3.2f);
+        private Vector3 hangarPos = new Vector3(0f, 1.6f, -0.6f);
+        private Vector3 dispatchPos = new Vector3(0f, 1.55f, -3.2f);
         private readonly Vector3 fallbackWbPos = new Vector3(-2.6f, 1.35f, 0.9f);
 
+        private float hangarYaw = 0f;
+        private float dispatchYaw = 180f;
         private float targetBaseYaw = 0f;
         private float curBaseYaw = 0f;
         private float wbZoom = 0f;
@@ -21,12 +23,38 @@ namespace HangarGame.CameraControl
 
         private void Awake() => Instance = this;
 
+        public void ConfigureAnchor(Vector3 hPos, Vector3 dPos, float hYaw, float dYaw)
+        {
+            hangarPos = hPos;
+            dispatchPos = dPos;
+            hangarYaw = hYaw;
+            dispatchYaw = dYaw;
+            targetBaseYaw = hYaw;
+            curBaseYaw = hYaw;
+            transform.position = hPos;
+            transform.rotation = Quaternion.Euler(0f, hYaw, 0f);
+        }
+
         private void Start()
         {
-            transform.position = hangarPos;
-            transform.rotation = Quaternion.identity;
-            targetBaseYaw = 0f;
-            curBaseYaw = 0f;
+            var hf = GameObject.Find("HANGARFULL");
+            if (hf != null)
+            {
+                var c85 = hf.transform.Find("Cube.085");
+                var c104 = hf.transform.Find("Cube.104");
+                if (c85 != null && c104 != null)
+                {
+                    Vector3 mid = Vector3.Lerp(c85.position, c104.position, 0.45f) + Vector3.up * 0.75f;
+                    hangarPos = mid;
+                    dispatchPos = mid;
+                    hangarYaw = Quaternion.LookRotation(c85.position - mid).eulerAngles.y;
+                    dispatchYaw = Quaternion.LookRotation(c104.position - mid).eulerAngles.y;
+                    targetBaseYaw = hangarYaw;
+                    curBaseYaw = hangarYaw;
+                    transform.position = hangarPos;
+                    transform.rotation = Quaternion.Euler(0f, hangarYaw, 0f);
+                }
+            }
 
             if (GameManager.Instance != null)
             {
@@ -46,11 +74,11 @@ namespace HangarGame.CameraControl
         {
             if (view == RoomView.Hangar)
             {
-                targetBaseYaw = 0f;
+                targetBaseYaw += Mathf.DeltaAngle(targetBaseYaw, hangarYaw);
             }
             else if (view == RoomView.DispatchConsole)
             {
-                targetBaseYaw = 180f;
+                targetBaseYaw += Mathf.DeltaAngle(targetBaseYaw, dispatchYaw);
             }
         }
 
@@ -100,14 +128,15 @@ namespace HangarGame.CameraControl
 
             curBaseYaw = Mathf.Lerp(curBaseYaw, targetBaseYaw, Time.deltaTime * 8f);
 
-            float p = (v == RoomView.WorkbenchFocus) ? (32f - ny * 5f) : (-ny * 7f);
-            float y = (v == RoomView.WorkbenchFocus) ? (25f + nx * 5f) : (curBaseYaw + nx * 12f);
+            float wbYaw = (RepairWorkbench.Instance != null) ? RepairWorkbench.Instance.transform.eulerAngles.y : 25f;
+            float p = (v == RoomView.WorkbenchFocus) ? (30f - ny * 5f) : (-ny * 7f);
+            float y = (v == RoomView.WorkbenchFocus) ? (wbYaw + nx * 5f) : (curBaseYaw + nx * 12f);
 
             Vector3 targetPos = hangarPos;
             if (v == RoomView.WorkbenchFocus)
             {
                 Vector3 wbBase = (RepairWorkbench.Instance != null)
-                    ? RepairWorkbench.Instance.transform.position + new Vector3(0f, 0.65f, -1.05f)
+                    ? RepairWorkbench.Instance.transform.TransformPoint(new Vector3(0f, 1.45f, -1.15f))
                     : fallbackWbPos;
                 targetPos = wbBase + new Vector3(0f, wbZoom * 0.2f, -wbZoom);
             }
@@ -134,8 +163,8 @@ namespace HangarGame.CameraControl
                 RepairWorkbench.Instance?.CancelWork();
                 return;
             }
-            var nextView = (GameManager.Instance.CurrentView == RoomView.Hangar) ? RoomView.DispatchConsole : RoomView.Hangar;
-            GameManager.Instance.SwitchView(nextView);
+            targetBaseYaw -= 180f;
+            SyncViewWithYaw();
         }
 
         public void TurnRight()
@@ -146,8 +175,20 @@ namespace HangarGame.CameraControl
                 RepairWorkbench.Instance?.CancelWork();
                 return;
             }
-            var nextView = (GameManager.Instance.CurrentView == RoomView.Hangar) ? RoomView.DispatchConsole : RoomView.Hangar;
-            GameManager.Instance.SwitchView(nextView);
+            targetBaseYaw += 180f;
+            SyncViewWithYaw();
+        }
+
+        private void SyncViewWithYaw()
+        {
+            float norm = Mathf.Repeat(targetBaseYaw, 360f);
+            float dH = Mathf.Abs(Mathf.DeltaAngle(norm, hangarYaw));
+            float dD = Mathf.Abs(Mathf.DeltaAngle(norm, dispatchYaw));
+            RoomView next = (dD < dH) ? RoomView.DispatchConsole : RoomView.Hangar;
+            if (GameManager.Instance.CurrentView != next)
+            {
+                GameManager.Instance.SwitchView(next);
+            }
         }
 
         public void Shake(float dur, float mag)

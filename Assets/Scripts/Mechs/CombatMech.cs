@@ -11,7 +11,7 @@ namespace HangarGame.Mechs
     public class MechPart : MonoBehaviour, IInteractable
     {
         [SerializeField] private MechPartData data;
-        [SerializeField] private GameObject pristineVisual;
+        [SerializeField] private Renderer pristineRenderer;
         [SerializeField] private GameObject brokenVisual;
 
         public MechPartData Data { get => data; set => data = value; }
@@ -30,7 +30,14 @@ namespace HangarGame.Mechs
             rend = GetComponent<Renderer>() ?? GetComponentInChildren<Renderer>();
             if (rend != null && rend.sharedMaterial != null)
             {
-                baseColor = rend.material.color;
+                if (rend.sharedMaterial.HasProperty("_BaseColor"))
+                    baseColor = rend.sharedMaterial.GetColor("_BaseColor");
+                else
+                    baseColor = rend.sharedMaterial.color;
+                if (baseColor.a < 0.05f && baseColor.r < 0.05f && baseColor.g < 0.05f && baseColor.b < 0.05f)
+                {
+                    baseColor = Color.white;
+                }
             }
             socketPos = transform.localPosition;
             socketRot = transform.localRotation;
@@ -42,12 +49,24 @@ namespace HangarGame.Mechs
         {
             data = d;
             currentHp = maxHp;
+            if (rend == null) rend = GetComponent<Renderer>() ?? GetComponentInChildren<Renderer>();
+            if (rend != null && rend.sharedMaterial != null)
+            {
+                if (rend.sharedMaterial.HasProperty("_BaseColor"))
+                    baseColor = rend.sharedMaterial.GetColor("_BaseColor");
+                else
+                    baseColor = rend.sharedMaterial.color;
+                if (baseColor.a < 0.05f && baseColor.r < 0.05f && baseColor.g < 0.05f && baseColor.b < 0.05f)
+                {
+                    baseColor = Color.white;
+                }
+            }
             UpdateVis();
         }
 
-        public void SetVisuals(GameObject pristine, GameObject broken)
+        public void SetVisuals(Renderer pristine, GameObject broken)
         {
-            pristineVisual = pristine;
+            pristineRenderer = pristine;
             brokenVisual = broken;
             UpdateVis();
         }
@@ -82,7 +101,7 @@ namespace HangarGame.Mechs
             transform.localPosition = socketPos;
             transform.localRotation = socketRot;
             IsOnWorkbench = false;
-            foreach (var col in GetComponentsInChildren<Collider>()) col.enabled = true;
+            foreach (var col in GetComponentsInChildren<Collider>(true)) col.enabled = true;
             UpdateVis();
         }
 
@@ -107,19 +126,31 @@ namespace HangarGame.Mechs
         public void UpdateVis()
         {
             bool damaged = DurabilityPercent < 0.99f;
-            if (brokenVisual != null && pristineVisual != null)
+            if (pristineRenderer != null)
             {
-                pristineVisual.SetActive(!damaged);
-                brokenVisual.SetActive(damaged);
-                if (rend != null && rend.gameObject == gameObject)
-                {
-                    rend.enabled = !damaged;
-                }
+                pristineRenderer.enabled = !damaged;
             }
-            if (rend != null && rend.enabled)
+            if (brokenVisual != null)
             {
-                if (Application.isPlaying) rend.material.color = Color.Lerp(Color.red, baseColor, DurabilityPercent);
-                else if (rend.sharedMaterial != null) rend.sharedMaterial.color = Color.Lerp(Color.red, baseColor, DurabilityPercent);
+                brokenVisual.SetActive(damaged);
+            }
+            Color targetCol = Color.Lerp(Color.red, baseColor, DurabilityPercent);
+            var rends = GetComponentsInChildren<Renderer>(false);
+            foreach (var r in rends)
+            {
+                if (r != null && r.sharedMaterial != null)
+                {
+                    if (Application.isPlaying)
+                    {
+                        if (r.material.HasProperty("_BaseColor")) r.material.SetColor("_BaseColor", targetCol);
+                        if (r.material.HasProperty("_Color")) r.material.color = targetCol;
+                    }
+                    else
+                    {
+                        if (r.sharedMaterial.HasProperty("_BaseColor")) r.sharedMaterial.SetColor("_BaseColor", targetCol);
+                        if (r.sharedMaterial.HasProperty("_Color")) r.sharedMaterial.color = targetCol;
+                    }
+                }
             }
         }
 
@@ -127,18 +158,33 @@ namespace HangarGame.Mechs
 
         public void OnHover(bool h)
         {
-            if (!IsOnWorkbench && rend != null)
+            if (IsOnWorkbench) return;
+            Color targetCol = h ? Color.cyan : Color.Lerp(Color.red, baseColor, DurabilityPercent);
+            var rends = GetComponentsInChildren<Renderer>(false);
+            foreach (var r in rends)
             {
-                rend.material.color = h ? Color.cyan : Color.Lerp(Color.red, baseColor, DurabilityPercent);
+                if (r != null && r.sharedMaterial != null)
+                {
+                    if (Application.isPlaying)
+                    {
+                        if (r.material.HasProperty("_BaseColor")) r.material.SetColor("_BaseColor", targetCol);
+                        if (r.material.HasProperty("_Color")) r.material.color = targetCol;
+                    }
+                    else
+                    {
+                        if (r.sharedMaterial.HasProperty("_BaseColor")) r.sharedMaterial.SetColor("_BaseColor", targetCol);
+                        if (r.sharedMaterial.HasProperty("_Color")) r.sharedMaterial.color = targetCol;
+                    }
+                }
             }
         }
 
         public void OnInteract()
         {
-            if (!IsOnWorkbench && HangarMechManager.Instance != null && !HangarMechManager.Instance.CurrentMech.isDeployed)
-            {
-                RepairWorkbench.Instance?.ReceivePart(this);
-            }
+            if (IsOnWorkbench) return;
+            var unit = GetComponentInParent<MechUnit>();
+            if (unit != null && unit.isDeployed) return;
+            RepairWorkbench.Instance?.ReceivePart(this);
         }
     }
 
