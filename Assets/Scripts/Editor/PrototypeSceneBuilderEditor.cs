@@ -13,7 +13,7 @@ namespace HangarGame.EditorTools
             DrawDefaultInspector();
             GUILayout.Space(10);
             GUI.backgroundColor = new Color(0.2f, 0.8f, 0.4f);
-            if (GUILayout.Button("🚀 Сгенерировать сцену (Bake)", GUILayout.Height(45)))
+            if (GUILayout.Button("Сгенерировать сцену (Bake)", GUILayout.Height(45)))
             {
                 HangarSceneGenerator.BakeIntoCurrentScene();
             }

@@ -127,14 +127,14 @@ namespace HangarGame.UI
                     if (txtCurrentMech != null)
                     {
                         string status = cur.isDeployed ? "В БОЮ" : "В АНГАРЕ";
-                        txtCurrentMech.text = $"◀ [{HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}] {cur.mechName} | {status} | ♥ {cur.currentHp:F0}/{cur.maxHp:F0} HP | ⚡ {cur.currentEnergy:F0}% ▶";
+                        txtCurrentMech.text = $"◀ [{HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}] {cur.mechName} | {status} | {cur.currentHp:F0}/{cur.maxHp:F0} HP | {cur.currentEnergy:F0}% ▶";
                     }
 
                     if (btnRechargeBattery != null)
                     {
                         btnRechargeBattery.interactable = !cur.isDeployed && cur.currentEnergy < 99f;
                         var bTxt = btnRechargeBattery.GetComponentInChildren<Text>();
-                        if (bTxt != null) bTxt.text = cur.currentEnergy >= 99f ? "⚡ БАТАРЕЯ 100%" : "⚡ ЗАРЯДИТЬ БАТАРЕЮ";
+                        if (bTxt != null) bTxt.text = cur.currentEnergy >= 99f ? "БАТАРЕЯ 100%" : "ЗАРЯДИТЬ БАТАРЕЮ";
                     }
                 }
             }
@@ -142,7 +142,7 @@ namespace HangarGame.UI
             if (isWb && RepairWorkbench.Instance != null)
             {
                 string name = RepairWorkbench.Instance.CurrentItemName ?? "Модуль";
-                if (txtWbTitle != null) txtWbTitle.text = $"🔧 ВЕРСТАК: {name}";
+                if (txtWbTitle != null) txtWbTitle.text = $"ВЕРСТАК: {name}";
                 if (txtWbInfo != null) txtWbInfo.text = RepairWorkbench.Instance.RepairStepInfo;
                 if (btnSwap != null) btnSwap.gameObject.SetActive(!RepairWorkbench.Instance.IsJaegerModule);
             }

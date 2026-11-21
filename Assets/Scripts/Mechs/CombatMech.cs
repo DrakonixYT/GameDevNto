@@ -384,7 +384,7 @@ namespace HangarGame.Mechs
             var mech = HangarMechManager.Instance != null ? HangarMechManager.Instance.CurrentMech : null;
             if (mech == null) return "[ЗАРЯДНАЯ СТАНЦИЯ] Нет активного робота на подиуме.";
             if (mech.isDeployed) return $"[ЗАРЯДНАЯ СТАНЦИЯ] {mech.mechName} в бою на выезде.";
-            return $"[ЗАРЯДНАЯ СТАНЦИЯ] Батарея: {mech.currentEnergy:F0}%. Клик: Зарядить до 100% ⚡";
+            return $"[ЗАРЯДНАЯ СТАНЦИЯ] Батарея: {mech.currentEnergy:F0}%. Клик: Зарядить до 100%";
         }
 
         public void OnHover(bool isHovered)

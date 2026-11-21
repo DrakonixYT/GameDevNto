@@ -102,7 +102,7 @@ namespace HangarGame.Dispatch
                 {
                     enemy.position = new Vector2(UnityEngine.Random.Range(-400f, 400f), 230f);
                     HangarAudioLight.Instance?.PlayBolt();
-                    LastBattleLog = $"⚠ {enemy.name} атаковал периметр базы!";
+                    LastBattleLog = $"{enemy.name} атаковал периметр базы!";
                 }
             }
         }
@@ -124,7 +124,7 @@ namespace HangarGame.Dispatch
                     if (!mech.isReturning)
                     {
                         RecallMech(mech.id);
-                        LastBattleLog = $"⚡ Разряд батареи {mech.mechName}! Экстренный отход на базу!";
+                        LastBattleLog = $"Разряд батареи {mech.mechName}! Экстренный отход на базу!";
                         HangarAudioLight.Instance?.PlayAlarm();
                     }
                 }
@@ -143,7 +143,7 @@ namespace HangarGame.Dispatch
                         mech.SyncPartsFromHp(mech.currentHp / mech.maxHp);
                         HangarMechManager.Instance?.UpdatePodiumDisplay();
                         HangarAudioLight.Instance?.PlayBolt();
-                        LastBattleLog = $"🔧 {mech.mechName} вернулся в ангар. Осмотрите повреждения!";
+                        LastBattleLog = $"{mech.mechName} вернулся в ангар. Осмотрите повреждения!";
                         continue;
                     }
                 }
@@ -157,7 +157,7 @@ namespace HangarGame.Dispatch
                     if (mech.currentHp <= 5f && !mech.isReturning)
                     {
                         RecallMech(mech.id);
-                        LastBattleLog = $"🚨 Критический урон {mech.mechName}! Экстренная эвакуация на базу!";
+                        LastBattleLog = $"Критический урон {mech.mechName}! Экстренная эвакуация на базу!";
                         HangarAudioLight.Instance?.PlayAlarm();
                     }
                 }
@@ -167,7 +167,7 @@ namespace HangarGame.Dispatch
         private void OnEnemyDefeated(EnemyDot enemy)
         {
             GameManager.Instance?.AddResources(enemy.rewardCredits, enemy.rewardAlloy);
-            LastBattleLog = $"✔ {enemy.name} уничтожен! Получено: +{enemy.rewardCredits}¢, +{enemy.rewardAlloy}т.";
+            LastBattleLog = $"{enemy.name} уничтожен! Получено: +{enemy.rewardCredits}¢, +{enemy.rewardAlloy}т.";
             HangarAudioLight.Instance?.PlayWeld();
             if (Enemies.Count == 0) HangarAudioLight.Instance?.SetAlarm(false);
         }
@@ -189,7 +189,7 @@ namespace HangarGame.Dispatch
             SelectedMechId = mechId;
             IsDeployMode = false;
             HangarAudioLight.Instance?.PlaySuccess();
-            LastBattleLog = $"🚀 {mech.mechName} высажен с базы! Направление: [{destination.x:F0}, {destination.y:F0}].";
+            LastBattleLog = $"{mech.mechName} высажен с базы! Направление: [{destination.x:F0}, {destination.y:F0}].";
             return true;
         }
 
@@ -201,7 +201,7 @@ namespace HangarGame.Dispatch
             mech.isReturning = true;
             mech.targetPos = basePos;
             HangarAudioLight.Instance?.PlayBolt();
-            LastBattleLog = $"🔙 {mech.mechName} отступает на базу для техобслуживания...";
+            LastBattleLog = $"{mech.mechName} отступает на базу для техобслуживания...";
         }
 
         public void ToggleMechShield(int mechId)
@@ -212,8 +212,8 @@ namespace HangarGame.Dispatch
             mech.ToggleShield();
             HangarAudioLight.Instance?.PlayWeld();
             LastBattleLog = mech.isShieldActive
-                ? $"🛡 {mech.mechName}: ЭНЕРГОЩИТ ВКЛЮЧЕН (-65% урона, высокий расход батареи)!"
-                : $"⚡ {mech.mechName}: энергощит отключен.";
+                ? $"{mech.mechName}: ЭНЕРГОЩИТ ВКЛЮЧЕН (-65% урона, высокий расход батареи)!"
+                : $"{mech.mechName}: энергощит отключен.";
         }
 
         public void OrderMechMove(int mechId, Vector2 radarPos)
@@ -224,7 +224,7 @@ namespace HangarGame.Dispatch
             mech.isReturning = false;
             mech.targetPos = radarPos;
             HangarAudioLight.Instance?.PlayClick();
-            LastBattleLog = $"📍 {mech.mechName}: движение к координатам [{radarPos.x:F0}, {radarPos.y:F0}].";
+            LastBattleLog = $"{mech.mechName}: движение к координатам [{radarPos.x:F0}, {radarPos.y:F0}].";
         }
 
         public EnemyDot GetClosestEnemy(Vector2 pos, float maxRange)

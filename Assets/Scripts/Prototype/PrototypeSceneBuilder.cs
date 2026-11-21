@@ -634,8 +634,8 @@ namespace HangarGame.Prototype
             tTitle.horizontalOverflow = HorizontalWrapMode.Overflow;
 
             Text tJaeger = CreateTxt(bg.transform, "Txt_JaegerInfo", "ПРОЕКТ 'ЕГЕРЬ' (0/4)", new Vector2(1f, 1f), new Vector2(-320f, -20f), new Vector2(380f, 25f), 14, font, Color.yellow);
-            Button bJaeger = CreateBtn(bg.transform, "Btn_BuildJaeger", "🔨 СОБРАТЬ МОДУЛЬ НА ВЕРСТАКЕ", new Vector2(1f, 1f), new Vector2(-320f, -50f), new Vector2(260f, 32f), font, new Color(0.18f, 0.45f, 0.7f));
-            Button bScan = CreateBtn(bg.transform, "Btn_ScanThreat", "📡 ВЫЗВАТЬ ВОЛНУ", new Vector2(1f, 1f), new Vector2(-90f, -50f), new Vector2(150f, 32f), font, new Color(0.2f, 0.6f, 0.35f));
+            Button bJaeger = CreateBtn(bg.transform, "Btn_BuildJaeger", "СОБРАТЬ МОДУЛЬ НА ВЕРСТАКЕ", new Vector2(1f, 1f), new Vector2(-320f, -50f), new Vector2(260f, 32f), font, new Color(0.18f, 0.45f, 0.7f));
+            Button bScan = CreateBtn(bg.transform, "Btn_ScanThreat", "ВЫЗВАТЬ ВОЛНУ", new Vector2(1f, 1f), new Vector2(-90f, -50f), new Vector2(150f, 32f), font, new Color(0.2f, 0.6f, 0.35f));
 
             GameObject rBox = CreatePanel(bg.transform, "Radar_Screen", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(920f, 430f), new Color(0.02f, 0.05f, 0.08f, 1f));
             RadarClickHandler rClick = rBox.AddComponent<RadarClickHandler>();
@@ -663,8 +663,8 @@ namespace HangarGame.Prototype
                 iSlots[i] = bMain.GetComponent<Image>();
                 tSlots[i] = bMain.GetComponentInChildren<Text>();
 
-                Button bShield = CreateBtn(slotRoot.transform, $"Btn_Shield_{i}", "🛡 ЩИТ", new Vector2(0f, 0f), new Vector2(85f, 14f), new Vector2(155f, 24f), font, new Color(0.2f, 0.5f, 0.75f));
-                Button bRecall = CreateBtn(slotRoot.transform, $"Btn_Recall_{i}", "🔙 НА БАЗУ", new Vector2(1f, 0f), new Vector2(-85f, 14f), new Vector2(155f, 24f), font, new Color(0.75f, 0.25f, 0.2f));
+                Button bShield = CreateBtn(slotRoot.transform, $"Btn_Shield_{i}", "ЩИТ", new Vector2(0f, 0f), new Vector2(85f, 14f), new Vector2(155f, 24f), font, new Color(0.2f, 0.5f, 0.75f));
+                Button bRecall = CreateBtn(slotRoot.transform, $"Btn_Recall_{i}", "НА БАЗУ", new Vector2(1f, 0f), new Vector2(-85f, 14f), new Vector2(155f, 24f), font, new Color(0.75f, 0.25f, 0.2f));
 
                 bShields[i] = bShield;
                 bRecalls[i] = bRecall;
@@ -712,7 +712,7 @@ namespace HangarGame.Prototype
             GameObject pnlMech = CreatePanel(cObj.transform, "MechSelectPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 85f), new Vector2(920f, 55f), new Color(0.06f, 0.08f, 0.12f, 0.9f));
             Button bPrev = CreateBtn(pnlMech.transform, "Btn_PrevMech", "◀ Смена", new Vector2(0f, 0.5f), new Vector2(65f, 0f), new Vector2(110f, 42f), font, new Color(0.18f, 0.35f, 0.55f));
             Button bNext = CreateBtn(pnlMech.transform, "Btn_NextMech", "Смена ▶", new Vector2(1f, 0.5f), new Vector2(-65f, 0f), new Vector2(110f, 42f), font, new Color(0.18f, 0.35f, 0.55f));
-            Button bCharge = CreateBtn(pnlMech.transform, "Btn_RechargeBattery", "⚡ ЗАРЯДИТЬ БАТАРЕЮ", new Vector2(0.5f, 0.5f), new Vector2(250f, 0f), new Vector2(200f, 42f), font, new Color(0.15f, 0.65f, 0.85f));
+            Button bCharge = CreateBtn(pnlMech.transform, "Btn_RechargeBattery", "ЗАРЯДИТЬ БАТАРЕЮ", new Vector2(0.5f, 0.5f), new Vector2(250f, 0f), new Vector2(200f, 42f), font, new Color(0.15f, 0.65f, 0.85f));
             Text tCurMech = CreateTxt(pnlMech.transform, "Txt_CurrentMech", "РОБОТ [1/3]: Страж-1 (Лёгкий)", new Vector2(0.5f, 0.5f), new Vector2(-100f, 0f), new Vector2(480f, 40f), 17, font, Color.cyan);
 
             GameObject pBox = CreatePanel(cObj.transform, "PromptBox", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 25f), new Vector2(800f, 40f), new Color(0.04f, 0.05f, 0.07f, 0.75f));
@@ -721,7 +721,7 @@ namespace HangarGame.Prototype
             Text tPrompt = CreateTxt(pBox.transform, "Txt_Prompt", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(780f, 35f), 16, font, Color.white);
 
             GameObject wb = CreatePanel(cObj.transform, "WorkbenchPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(980f, 180f), new Color(0.08f, 0.11f, 0.16f, 0.96f));
-            Text tWbTitle = CreateTxt(wb.transform, "Txt_WbTitle", "🔧 ВЕРСТАК ТО", new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(940f, 30f), 18, font, Color.yellow);
+            Text tWbTitle = CreateTxt(wb.transform, "Txt_WbTitle", "ВЕРСТАК ТО", new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(940f, 30f), 18, font, Color.yellow);
             Text tWbInfo = CreateTxt(wb.transform, "Txt_WbInfo", "Вращение A/D/W/S или ПКМ", new Vector2(0.5f, 1f), new Vector2(0f, -48f), new Vector2(940f, 25f), 15, font, Color.cyan);
 
             Button bYM = CreateBtn(wb.transform, "bYM", "◀ Y", new Vector2(0.5f, 0.5f), new Vector2(-200f, 10f), new Vector2(75f, 40f), font, new Color(0.2f, 0.35f, 0.55f));
@@ -730,15 +730,15 @@ namespace HangarGame.Prototype
             Button bPP = CreateBtn(wb.transform, "bPP", "P ▼", new Vector2(0.5f, 0.5f), new Vector2(55f, 10f), new Vector2(75f, 40f), font, new Color(0.2f, 0.35f, 0.55f));
             Button bRst = CreateBtn(wb.transform, "bRst", "Сброс", new Vector2(0.5f, 0.5f), new Vector2(145f, 10f), new Vector2(85f, 40f), font, new Color(0.35f, 0.38f, 0.45f));
 
-            Button bFin = CreateBtn(wb.transform, "bFin", "✔ Готово (Пробел)", new Vector2(0.5f, 0.5f), new Vector2(270f, 10f), new Vector2(145f, 40f), font, new Color(0.2f, 0.65f, 0.35f));
-            Button bSwap = CreateBtn(wb.transform, "bSwap", "🔄 Замена", new Vector2(0.5f, 0.5f), new Vector2(405f, 10f), new Vector2(105f, 40f), font, new Color(0.45f, 0.35f, 0.65f));
-            Button bExit = CreateBtn(wb.transform, "bExit", "✖ Выход (Esc)", new Vector2(0.5f, 0.5f), new Vector2(505f, 10f), new Vector2(110f, 40f), font, new Color(0.65f, 0.25f, 0.25f));
+            Button bFin = CreateBtn(wb.transform, "bFin", "Готово (Пробел)", new Vector2(0.5f, 0.5f), new Vector2(270f, 10f), new Vector2(145f, 40f), font, new Color(0.2f, 0.65f, 0.35f));
+            Button bSwap = CreateBtn(wb.transform, "bSwap", "Замена", new Vector2(0.5f, 0.5f), new Vector2(405f, 10f), new Vector2(105f, 40f), font, new Color(0.45f, 0.35f, 0.65f));
+            Button bExit = CreateBtn(wb.transform, "bExit", "Выход (Esc)", new Vector2(0.5f, 0.5f), new Vector2(505f, 10f), new Vector2(110f, 40f), font, new Color(0.65f, 0.25f, 0.25f));
             wb.SetActive(false);
 
             GameObject vic = CreatePanel(cObj.transform, "VictoryPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(750f, 320f), new Color(0.08f, 0.12f, 0.18f, 0.98f));
             CreateTxt(vic.transform, "Txt_Vic1", "ПОБЕДА! ПРОЕКТ 'ЕГЕРЬ' ЗАВЕРШЁН!", new Vector2(0.5f, 0.8f), Vector2.zero, new Vector2(700f, 50f), 28, font, Color.yellow);
             CreateTxt(vic.transform, "Txt_Vic2", "Тяжелый страж собран и готов защищать цитадель. Земля спасена от вторжения кайдзю!", new Vector2(0.5f, 0.5f), new Vector2(0f, 20f), new Vector2(620f, 60f), 20, font, Color.white);
-            Button bRest = CreateBtn(vic.transform, "bRest", "🔄 Играть снова", new Vector2(0.5f, 0f), new Vector2(0f, 45f), new Vector2(260f, 55f), font, new Color(0.2f, 0.75f, 0.35f));
+            Button bRest = CreateBtn(vic.transform, "bRest", "Играть снова", new Vector2(0.5f, 0f), new Vector2(0f, 45f), new Vector2(260f, 55f), font, new Color(0.2f, 0.75f, 0.35f));
             bRest.onClick.AddListener(() => UnityEngine.SceneManagement.SceneManager.LoadScene(0));
             vic.SetActive(false);
 

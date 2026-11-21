@@ -257,7 +257,7 @@ namespace HangarGame.Repair
                 sphCol.center = new Vector3(0f, 0.25f, 0f);
 
                 ClickableObject clk = bolt.AddComponent<ClickableObject>();
-                clk.promptText = "🔧 Крепёжный болт (Клик: открутить)";
+                clk.promptText = "Крепёжный болт (Клик: открутить)";
                 clk.onClick = () => OnBoltUnscrewed(bolt);
                 activeSubObjects.Add(bolt);
             }
@@ -385,7 +385,7 @@ namespace HangarGame.Repair
 
             string sideName = side == 0 ? "Входной" : "Выходной";
             ClickableObject clk = pin.AddComponent<ClickableObject>();
-            clk.promptText = $"⚡ {sideName} контакт #{colorId + 1} (Клик: подключить)";
+            clk.promptText = $"{sideName} контакт #{colorId + 1} (Клик: подключить)";
             clk.onClick = () => OnPinClicked(pin, colorId, side, c);
 
             activeSubObjects.Add(pin);
@@ -437,17 +437,17 @@ namespace HangarGame.Repair
                         if (wiresRemaining <= 0)
                         {
                             HangarAudioLight.Instance?.PlaySuccess();
-                            RepairStepInfo = "✔ Все цепи восстановлены! Нажмите [SPACE] для завершения.";
+                            RepairStepInfo = "Все цепи восстановлены! Нажмите [SPACE] для завершения.";
                         }
                         else
                         {
-                            RepairStepInfo = $"✔ Цепь замкнута! Осталось соединить: {wiresRemaining}";
+                            RepairStepInfo = $"Цепь замкнута! Осталось соединить: {wiresRemaining}";
                         }
                     }
                     else
                     {
                         HangarAudioLight.Instance?.PlayClick();
-                        RepairStepInfo = "❌ Короткое замыкание! Цвета не совпадают. Попробуйте снова.";
+                        RepairStepInfo = "Короткое замыкание! Цвета не совпадают. Попробуйте снова.";
                     }
                 }
                 else
