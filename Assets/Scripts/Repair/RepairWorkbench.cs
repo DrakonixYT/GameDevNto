@@ -515,8 +515,10 @@ namespace HangarGame.Repair
                 if (CurrentPart.Data != null)
                     GameManager.Instance?.TrySpend(CurrentPart.Data.repairCredits, CurrentPart.Data.repairAlloy);
                 CurrentPart.IsOnWorkbench = false;
+                var mechUnit = CurrentPart.GetComponentInParent<MechUnit>();
                 CurrentPart.RepairFull();
                 CurrentPart.ReturnToSocket();
+                if (mechUnit != null) mechUnit.SyncHpFromParts();
                 CurrentPart = null;
                 HangarAudioLight.Instance?.PlaySuccess();
                 HangarMechManager.Instance?.UpdatePodiumDisplay();

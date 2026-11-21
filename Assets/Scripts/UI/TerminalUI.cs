@@ -237,7 +237,7 @@ namespace HangarGame.UI
                     {
                         string mode = mech.isReturning ? "ОТХОДИТ НА БАЗУ" : (isSelected ? "▶ ВЫБРАН (КЛИКНИТЕ РАДАР)" : "В БОЮ (КЛИК ДЛЯ ВЫБОРА)");
                         string shieldInfo = mech.isShieldActive ? " [🛡 ЩИТ]" : "";
-                        txt.text = $"[ {mech.mechName} ]{shieldInfo}\n♥ {mech.currentHp:F0}% HP   ⚡ {mech.currentEnergy:F0}%\n{mode}";
+                        txt.text = $"[ {mech.mechName} ]{shieldInfo}\n♥ {mech.currentHp:F0}/{mech.maxHp:F0} HP   ⚡ {mech.currentEnergy:F0}%\n{mode}";
                     }
                     if (btn != null) btn.interactable = true;
 
@@ -265,20 +265,20 @@ namespace HangarGame.UI
                     {
                         float p = Mathf.PingPong(Time.time * 4f, 1f);
                         if (img != null) img.color = Color.Lerp(Color.yellow, Color.cyan, p);
-                        if (txt != null) txt.text = $"[ ВЫСАДКА: {mech.mechName} ]\nКЛИКНИТЕ В СЕКТОР РАДАРА\n♥ {mech.currentHp:F0}% HP   ⚡ {mech.currentEnergy:F0}%";
+                        if (txt != null) txt.text = $"[ ВЫСАДКА: {mech.mechName} ]\nКЛИКНИТЕ В СЕКТОР РАДАРА\n♥ {mech.currentHp:F0}/{mech.maxHp:F0} HP   ⚡ {mech.currentEnergy:F0}%";
                         if (btn != null) btn.interactable = true;
                     }
                     else if (mech.CanDeploy())
                     {
                         if (img != null) img.color = new Color(0.12f, 0.45f, 0.35f, 0.9f);
-                        if (txt != null) txt.text = $"[ {mech.mechName} ]\n♥ {mech.currentHp:F0}% HP   ⚡ {mech.currentEnergy:F0}%\nКЛИК: ВЫСАДИТЬ В БОЙ";
+                        if (txt != null) txt.text = $"[ {mech.mechName} ]\n♥ {mech.currentHp:F0}/{mech.maxHp:F0} HP   ⚡ {mech.currentEnergy:F0}%\nКЛИК: ВЫСАДИТЬ В БОЙ";
                         if (btn != null) btn.interactable = true;
                     }
                     else
                     {
                         if (img != null) img.color = new Color(0.3f, 0.15f, 0.15f, 0.75f);
-                        string reason = (mech.currentHp <= 10f) ? "ТРЕБУЕТСЯ РЕМОНТ (ХП < 10%)" : (mech.currentEnergy <= 10f ? "НУЖНА ЗАРЯДКА В АНГАРЕ" : "РАЗОБРАН НА ВЕРСТАКЕ");
-                        if (txt != null) txt.text = $"[ {mech.mechName} ]\n♥ {mech.currentHp:F0}%   ⚡ {mech.currentEnergy:F0}%\n{reason}";
+                        string reason = ((mech.currentHp / Mathf.Max(1f, mech.maxHp)) <= 0.10f) ? "ТРЕБУЕТСЯ РЕМОНТ (ХП < 10%)" : (mech.currentEnergy <= 10f ? "НУЖНА ЗАРЯДКА В АНГАРЕ" : "РАЗОБРАН НА ВЕРСТАКЕ");
+                        if (txt != null) txt.text = $"[ {mech.mechName} ]\n♥ {mech.currentHp:F0}/{mech.maxHp:F0} HP   ⚡ {mech.currentEnergy:F0}%\n{reason}";
                         if (btn != null) btn.interactable = false;
                     }
                 }
@@ -456,7 +456,7 @@ namespace HangarGame.UI
                 bool isSel = dispatch.SelectedMechId == mech.id;
                 string status = mech.isReturning ? "ОТХОД" : (mech.isShieldActive ? "ЩИТ" : "БОЙ");
                 string selMarker = isSel ? "▶ [ВЫБРАН] " : "";
-                if (txt != null) txt.text = $"{selMarker}▲ {mech.mechName} [{status}]\n♥ {mech.currentHp:F0}%  ⚡ {mech.currentEnergy:F0}%";
+                if (txt != null) txt.text = $"{selMarker}▲ {mech.mechName} [{status}]\n♥ {mech.currentHp:F0}/{mech.maxHp:F0} HP  ⚡ {mech.currentEnergy:F0}%";
 
                 int mechId = mech.id;
                 var btn = m.GetComponent<Button>();

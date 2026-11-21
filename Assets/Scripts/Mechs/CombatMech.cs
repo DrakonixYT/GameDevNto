@@ -87,18 +87,21 @@ namespace HangarGame.Mechs
         {
             currentHp = Mathf.Max(0f, currentHp - a);
             UpdateVis();
+            GetComponentInParent<MechUnit>()?.SyncHpFromParts();
         }
 
         public void RepairFull()
         {
             currentHp = maxHp;
             UpdateVis();
+            GetComponentInParent<MechUnit>()?.SyncHpFromParts();
         }
 
         public void SetDurabilityPercent(float pct)
         {
             currentHp = maxHp * Mathf.Clamp01(pct);
             UpdateVis();
+            GetComponentInParent<MechUnit>()?.SyncHpFromParts();
         }
 
         public void ReturnToSocket()
@@ -215,6 +218,7 @@ namespace HangarGame.Mechs
         public bool isShieldActive = false;
         public float currentEnergy = 100f, maxEnergy = 100f;
         public float currentHp = 100f, maxHp = 100f;
+        public float HpPercent => maxHp > 0f ? Mathf.Clamp01(currentHp / maxHp) * 100f : 100f;
         public Vector2 battlefieldPos, targetPos;
         public bool hasTarget = false;
         public float attackPower = 25f;
@@ -224,6 +228,15 @@ namespace HangarGame.Mechs
         {
             EnsurePartsLoaded();
             ApplyThemeColor();
+            SyncHpFromParts();
+        }
+
+        private void Update()
+        {
+            if (!isDeployed)
+            {
+                SyncHpFromParts();
+            }
         }
 
         public void ApplyThemeColor()
@@ -259,7 +272,7 @@ namespace HangarGame.Mechs
             return false;
         }
 
-        public bool CanDeploy() => !isDeployed && !isReturning && !HasMissingOrDetachedParts() && currentHp > 10f && currentEnergy > 10f;
+        public bool CanDeploy() => !isDeployed && !isReturning && !HasMissingOrDetachedParts() && (maxHp <= 0f || (currentHp / maxHp) > 0.10f) && currentEnergy > 10f;
 
         public void RechargeBattery()
         {

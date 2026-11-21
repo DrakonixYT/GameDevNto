@@ -127,7 +127,7 @@ namespace HangarGame.UI
                     if (txtCurrentMech != null)
                     {
                         string status = cur.isDeployed ? "В БОЮ" : "В АНГАРЕ";
-                        txtCurrentMech.text = $"◀ [{HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}] {cur.mechName} | {status} | ♥ {cur.currentHp:F0}% | ⚡ {cur.currentEnergy:F0}% ▶";
+                        txtCurrentMech.text = $"◀ [{HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}] {cur.mechName} | {status} | ♥ {cur.currentHp:F0}/{cur.maxHp:F0} HP | ⚡ {cur.currentEnergy:F0}% ▶";
                     }
 
                     if (btnRechargeBattery != null)
