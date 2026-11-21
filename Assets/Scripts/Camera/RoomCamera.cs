@@ -25,6 +25,9 @@ namespace HangarGame.CameraControl
         [SerializeField] private Vector3 wbCameraOffset = new Vector3(0f, 1.45f, -1.15f);
         [SerializeField] private float wbCameraPitch = 30f;
 
+        [Header("Dispatch Camera Setup")]
+        [SerializeField] private float dispatchDistance = 1.15f;
+
         private void Awake() => Instance = this;
 
         public void ConfigureAnchor(Vector3 hPos, Vector3 dPos, float hYaw, float dYaw)
@@ -50,9 +53,13 @@ namespace HangarGame.CameraControl
                 {
                     Vector3 mid = Vector3.Lerp(c85.position, c104.position, 0.45f) + Vector3.up * 0.75f;
                     hangarPos = mid;
-                    dispatchPos = mid;
                     hangarYaw = Quaternion.LookRotation(c85.position - mid).eulerAngles.y;
-                    dispatchYaw = Quaternion.LookRotation(c104.position - mid).eulerAngles.y;
+
+                    var tCanvas = GameObject.Find("Terminal_Canvas");
+                    Vector3 sPoint = (tCanvas != null) ? tCanvas.transform.position : (c104.position + Vector3.up * 0.34f);
+                    dispatchPos = new Vector3(sPoint.x, sPoint.y, sPoint.z - dispatchDistance);
+                    dispatchYaw = 0f;
+
                     targetBaseYaw = hangarYaw;
                     curBaseYaw = hangarYaw;
                     transform.position = hangarPos;

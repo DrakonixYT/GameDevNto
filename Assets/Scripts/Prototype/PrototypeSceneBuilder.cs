@@ -66,10 +66,11 @@ namespace HangarGame.Prototype
 
             Vector3 mid = Vector3.Lerp(podiumPos, screenCenter, 0.48f);
             Vector3 camPos = new Vector3(podiumPos.x, screenCenter.y + 0.15f, mid.z);
+            Vector3 dispatchPos = new Vector3(screenCenter.x, screenCenter.y, screenCenter.z - 1.15f);
             float hYaw = 180f;
             float dYaw = 0f;
 
-            UnityEngine.Camera cam = CreateCameraRig(camPos, hYaw, dYaw);
+            UnityEngine.Camera cam = CreateCameraRig(camPos, dispatchPos, hYaw, dYaw);
             CreateCoreManagers();
             CreateLightingAndAtmosphere(podiumPos, screenCenter);
             CreateHangarRoom(hf);
@@ -81,7 +82,7 @@ namespace HangarGame.Prototype
             CreateHUD();
         }
 
-        private UnityEngine.Camera CreateCameraRig(Vector3 camPos, float hYaw, float dYaw)
+        private UnityEngine.Camera CreateCameraRig(Vector3 camPos, Vector3 dispatchPos, float hYaw, float dYaw)
         {
             GameObject camObj = GameObject.Find("Main Camera");
             if (camObj == null)
@@ -105,7 +106,7 @@ namespace HangarGame.Prototype
 
             RoomCamera rCam = camObj.GetComponent<RoomCamera>();
             if (rCam == null) rCam = camObj.AddComponent<RoomCamera>();
-            rCam.ConfigureAnchor(camPos, camPos, hYaw, dYaw);
+            rCam.ConfigureAnchor(camPos, dispatchPos, hYaw, dYaw);
 
             if (camObj.GetComponent<PlayerRaycaster>() == null)
             {

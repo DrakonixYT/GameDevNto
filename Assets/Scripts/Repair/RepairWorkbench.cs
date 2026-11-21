@@ -23,37 +23,38 @@ namespace HangarGame.Repair
 
         [Header("Workbench Placement")]
         [SerializeField] private Vector3 tableRestOffset = new Vector3(0f, 0.85f, 0f);
-        [SerializeField] private Vector3 initialPartEuler = new Vector3(0f, 180f, 0f);
+        [SerializeField] private Vector3 initialPartEuler = new Vector3(0f, 270f, 0f);
 
         [Header("Service Hatch")]
-        [SerializeField] private Vector3 hatchLocalOffset = new Vector3(0f, 0f, -0.6f);
-        [SerializeField] private Vector3 hatchSize = new Vector3(1.25f, 0.95f, 0.06f);
+        [SerializeField] private Vector3 hatchLocalOffset = new Vector3(0f, 0f, -0.48f);
+        [SerializeField] private Vector3 hatchLocalRotation = new Vector3(0f, 180f, 0f);
+        [SerializeField] private Vector3 hatchSize = new Vector3(0.42f, 0.32f, 0.04f);
 
         [Header("Bolts Config")]
-        [SerializeField] private Vector3 boltScale = new Vector3(0.24f, 0.07f, 0.24f);
-        [SerializeField] private float boltColliderRadius = 0.55f;
+        [SerializeField] private Vector3 boltScale = new Vector3(0.08f, 0.025f, 0.08f);
+        [SerializeField] private float boltColliderRadius = 0.35f;
         [SerializeField] private Vector3[] boltOffsets = new Vector3[]
         {
-            new Vector3(-0.48f, 0.36f, 0.08f),
-            new Vector3(0.48f, 0.36f, 0.08f),
-            new Vector3(-0.48f, -0.36f, 0.08f),
-            new Vector3(0.48f, -0.36f, 0.08f)
+            new Vector3(-0.16f, 0.12f, 0.035f),
+            new Vector3(0.16f, 0.12f, 0.035f),
+            new Vector3(-0.16f, -0.12f, 0.035f),
+            new Vector3(0.16f, -0.12f, 0.035f)
         };
 
         [Header("Wires Config")]
-        [SerializeField] private Vector3 pinScale = new Vector3(0.24f, 0.24f, 0.24f);
-        [SerializeField] private float pinColliderRadius = 0.65f;
+        [SerializeField] private Vector3 pinScale = new Vector3(0.08f, 0.08f, 0.08f);
+        [SerializeField] private float pinColliderRadius = 0.35f;
         [SerializeField] private Vector3[] leftPinOffsets = new Vector3[]
         {
-            new Vector3(-0.38f, 0.26f, 0.08f),
-            new Vector3(-0.38f, 0.0f, 0.08f),
-            new Vector3(-0.38f, -0.26f, 0.08f)
+            new Vector3(-0.13f, 0.09f, 0.035f),
+            new Vector3(-0.13f, 0.0f, 0.035f),
+            new Vector3(-0.13f, -0.09f, 0.035f)
         };
         [SerializeField] private Vector3[] rightPinOffsets = new Vector3[]
         {
-            new Vector3(0.38f, -0.26f, 0.08f),
-            new Vector3(0.38f, 0.26f, 0.08f),
-            new Vector3(0.38f, 0.0f, 0.08f)
+            new Vector3(0.13f, -0.09f, 0.035f),
+            new Vector3(0.13f, 0.09f, 0.035f),
+            new Vector3(0.13f, 0.0f, 0.035f)
         };
         [SerializeField] private Color[] wireColors = new Color[]
         {
@@ -249,7 +250,7 @@ namespace HangarGame.Repair
             Vector3 inv = new Vector3(1f / Mathf.Max(0.1f, root.lossyScale.x), 1f / Mathf.Max(0.1f, root.lossyScale.y), 1f / Mathf.Max(0.1f, root.lossyScale.z));
             serviceHatchObj.transform.localScale = inv;
             serviceHatchObj.transform.localPosition = hatchLocalOffset;
-            serviceHatchObj.transform.localRotation = Quaternion.identity;
+            serviceHatchObj.transform.localRotation = Quaternion.Euler(hatchLocalRotation);
 
             GameObject plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
             plate.name = "Hatch_Backing";
@@ -360,7 +361,7 @@ namespace HangarGame.Repair
                 selectedOriginalColor = origColor;
 
                 pin.GetComponent<Renderer>().material = CreateMaterial(Color.white, true);
-                pin.transform.localScale = new Vector3(0.32f, 0.32f, 0.32f);
+                pin.transform.localScale = pinScale * 1.35f;
                 HangarAudioLight.Instance?.PlayClick();
                 RepairStepInfo = $"Выбран контакт #{colorId + 1}. Теперь кликните парный контакт того же цвета!";
             }
@@ -379,7 +380,7 @@ namespace HangarGame.Repair
                         var clk2 = pin.GetComponent<ClickableObject>();
                         if (clk2 != null) Destroy(clk2);
 
-                        selectedPinObj.transform.localScale = new Vector3(0.24f, 0.24f, 0.24f);
+                        selectedPinObj.transform.localScale = pinScale;
                         selectedPinObj.GetComponent<Renderer>().material = CreateMaterial(origColor, false);
                         pin.GetComponent<Renderer>().material = CreateMaterial(origColor, false);
 
@@ -409,7 +410,7 @@ namespace HangarGame.Repair
                 else
                 {
                     selectedPinObj.GetComponent<Renderer>().material = CreateMaterial(selectedOriginalColor, true);
-                    selectedPinObj.transform.localScale = new Vector3(0.24f, 0.24f, 0.24f);
+                    selectedPinObj.transform.localScale = pinScale;
 
                     selectedPinObj = pin;
                     selectedColorId = colorId;
@@ -417,7 +418,7 @@ namespace HangarGame.Repair
                     selectedOriginalColor = origColor;
 
                     pin.GetComponent<Renderer>().material = CreateMaterial(Color.white, true);
-                    pin.transform.localScale = new Vector3(0.32f, 0.32f, 0.32f);
+                    pin.transform.localScale = pinScale * 1.35f;
                     HangarAudioLight.Instance?.PlayClick();
                     RepairStepInfo = $"Переключено на контакт #{colorId + 1}. Найдите парный контакт того же цвета!";
                 }
@@ -430,7 +431,7 @@ namespace HangarGame.Repair
 
             Vector3 pL = leftPinPositions[colorId];
             Vector3 pR = rightPinPositions[colorId];
-            Vector3 mid = (pL + pR) * 0.5f + new Vector3(0f, 0f, 0.04f);
+            Vector3 mid = (pL + pR) * 0.5f + new Vector3(0f, 0f, 0.02f);
 
             GameObject wire = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             wire.name = $"Wire_Bridge_{colorId}";
@@ -439,7 +440,7 @@ namespace HangarGame.Repair
             wire.transform.localRotation = Quaternion.LookRotation(pR - pL) * Quaternion.Euler(90f, 0f, 0f);
 
             float dist = Vector3.Distance(pL, pR);
-            wire.transform.localScale = new Vector3(0.08f, dist * 0.5f, 0.08f);
+            wire.transform.localScale = new Vector3(0.03f, dist * 0.5f, 0.03f);
             wire.GetComponent<Renderer>().material = CreateMaterial(c, true);
 
             var col = wire.GetComponent<Collider>();
