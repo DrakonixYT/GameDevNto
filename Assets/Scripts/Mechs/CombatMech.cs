@@ -21,6 +21,7 @@ namespace HangarGame.Mechs
         private float maxHp = 100f, currentHp = 100f;
         private Vector3 socketPos;
         private Quaternion socketRot;
+        private Vector3 socketScale;
         private Transform socketParent;
         private Renderer rend;
         private Color baseColor;
@@ -34,6 +35,7 @@ namespace HangarGame.Mechs
             }
             socketPos = transform.localPosition;
             socketRot = transform.localRotation;
+            socketScale = transform.localScale;
             socketParent = transform.parent;
             if (data == null) data = new MechPartData { partName = gameObject.name };
         }
@@ -81,6 +83,7 @@ namespace HangarGame.Mechs
             transform.SetParent(socketParent);
             transform.localPosition = socketPos;
             transform.localRotation = socketRot;
+            transform.localScale = socketScale;
             IsOnWorkbench = false;
             foreach (var col in GetComponentsInChildren<Collider>(true)) col.enabled = true;
             UpdateVis();
@@ -90,6 +93,7 @@ namespace HangarGame.Mechs
         {
             Vector3 sP = transform.position;
             Quaternion sR = transform.rotation;
+            Vector3 sS = transform.localScale;
             Vector3 eP = socketParent != null ? socketParent.TransformPoint(socketPos) : socketPos;
             Quaternion eR = socketParent != null ? socketParent.rotation * socketRot : socketRot;
             float el = 0f, d = 0.3f;
@@ -99,6 +103,7 @@ namespace HangarGame.Mechs
                 float t = Mathf.SmoothStep(0f, 1f, el / d);
                 transform.position = Vector3.Lerp(sP, eP, t);
                 transform.rotation = Quaternion.Slerp(sR, eR, t);
+                transform.localScale = Vector3.Lerp(sS, socketScale, t);
                 yield return null;
             }
             InstantReturn();
@@ -107,13 +112,20 @@ namespace HangarGame.Mechs
         public void UpdateVis()
         {
             bool damaged = DurabilityPercent < 0.99f;
-            if (pristineRenderer != null)
-            {
-                pristineRenderer.enabled = !damaged;
-            }
             if (brokenVisual != null)
             {
+                if (pristineRenderer != null)
+                {
+                    pristineRenderer.enabled = !damaged;
+                }
                 brokenVisual.SetActive(damaged);
+            }
+            else
+            {
+                if (pristineRenderer != null)
+                {
+                    pristineRenderer.enabled = true;
+                }
             }
             Color targetCol = Color.Lerp(Color.red, baseColor, DurabilityPercent);
             var rends = GetComponentsInChildren<Renderer>(false);
@@ -121,8 +133,10 @@ namespace HangarGame.Mechs
             {
                 if (r != null && r.sharedMaterial != null)
                 {
+                    var owner = r.GetComponentInParent<MechPart>();
+                    if (owner != this) continue;
+
                     if (Application.isPlaying) r.material.color = targetCol;
-                    else r.sharedMaterial.color = targetCol;
                 }
             }
         }
@@ -138,8 +152,10 @@ namespace HangarGame.Mechs
             {
                 if (r != null && r.sharedMaterial != null)
                 {
+                    var owner = r.GetComponentInParent<MechPart>();
+                    if (owner != this) continue;
+
                     if (Application.isPlaying) r.material.color = targetCol;
-                    else r.sharedMaterial.color = targetCol;
                 }
             }
         }

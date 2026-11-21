@@ -329,18 +329,6 @@ namespace HangarGame.Prototype
             Transform tArmR = obj.transform.Find("RightArmLow02");
             Transform tLegs = obj.transform.Find("LowerBody02");
 
-            GameObject brokenHead = LoadAsset("Assets/Prefabs/Mech01/HeadLow02.fbx");
-            GameObject brokenArmL = LoadAsset("Assets/Prefabs/Mech01/LeftArmLow02.fbx");
-            GameObject brokenArmR = LoadAsset("Assets/Prefabs/Mech01/RightArmLow02.fbx");
-            GameObject brokenLegs = LoadAsset("Assets/Prefabs/Mech01/LowerBody02.fbx");
-
-            Material brokenMat = LoadMaterial("Assets/Prefabs/Mech01/Materials/brokenMat.mat");
-            if (brokenMat == null)
-            {
-                brokenMat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-                brokenMat.color = new Color(0.35f, 0.35f, 0.35f);
-            }
-
             var pTorso = SetupPartComponent(tTorso.gameObject, new MechPartData
             {
                 partName = "Корпус (Торс)",
@@ -360,7 +348,7 @@ namespace HangarGame.Prototype
                 defensePower = 10f,
                 repairCredits = 40,
                 repairAlloy = 20
-            }, brokenHead, Vector3.zero, brokenMat);
+            }, null, Vector3.zero, null);
             if (pHead != null) unit.parts.Add(pHead);
 
             var pArmL = SetupPartComponent(tArmL != null ? tArmL.gameObject : null, new MechPartData
@@ -371,7 +359,7 @@ namespace HangarGame.Prototype
                 defensePower = 20f,
                 repairCredits = 45,
                 repairAlloy = 25
-            }, brokenArmL, Vector3.zero, brokenMat);
+            }, null, Vector3.zero, null);
             if (pArmL != null) unit.parts.Add(pArmL);
 
             var pArmR = SetupPartComponent(tArmR != null ? tArmR.gameObject : null, new MechPartData
@@ -382,7 +370,7 @@ namespace HangarGame.Prototype
                 defensePower = 5f,
                 repairCredits = 50,
                 repairAlloy = 25
-            }, brokenArmR, Vector3.zero, brokenMat);
+            }, null, Vector3.zero, null);
             if (pArmR != null) unit.parts.Add(pArmR);
 
             var pLegs = SetupPartComponent(tLegs != null ? tLegs.gameObject : null, new MechPartData
@@ -393,7 +381,7 @@ namespace HangarGame.Prototype
                 defensePower = 15f,
                 repairCredits = 40,
                 repairAlloy = 20
-            }, brokenLegs, Vector3.zero, brokenMat);
+            }, null, Vector3.zero, null);
             if (pLegs != null) unit.parts.Add(pLegs);
 
             var activeRends = obj.GetComponentsInChildren<Renderer>(false);
@@ -424,6 +412,7 @@ namespace HangarGame.Prototype
                 brokenObj.name = "Broken_Visual";
                 brokenObj.transform.localPosition = brokenOffset;
                 brokenObj.transform.localRotation = Quaternion.identity;
+                brokenObj.transform.localScale = Vector3.one;
 
                 if (brokenMat != null)
                 {
@@ -437,6 +426,11 @@ namespace HangarGame.Prototype
 
                 var r = target.GetComponent<Renderer>() ?? target.GetComponentInChildren<Renderer>();
                 p.SetVisuals(r, brokenObj);
+            }
+            else
+            {
+                var r = target.GetComponent<Renderer>() ?? target.GetComponentInChildren<Renderer>();
+                p.SetVisuals(r, null);
             }
 
             return p;
