@@ -330,7 +330,30 @@ namespace HangarGame.Prototype
                 }
             }
 
-            Transform tTorso = obj.transform;
+            GameObject torsoObj = new GameObject("Torso_Armor");
+            torsoObj.transform.SetParent(obj.transform, false);
+            torsoObj.transform.localPosition = Vector3.zero;
+            torsoObj.transform.localRotation = Quaternion.identity;
+            torsoObj.transform.localScale = Vector3.one;
+
+            var rootMF = obj.GetComponent<MeshFilter>();
+            var rootMR = obj.GetComponent<MeshRenderer>();
+            if (rootMF != null)
+            {
+                var tMF = torsoObj.AddComponent<MeshFilter>();
+                tMF.sharedMesh = rootMF.sharedMesh;
+                DestroyImmediate(rootMF);
+            }
+            if (rootMR != null)
+            {
+                var tMR = torsoObj.AddComponent<MeshRenderer>();
+                tMR.sharedMaterial = rootMR.sharedMaterial;
+                DestroyImmediate(rootMR);
+            }
+            var rootCol = obj.GetComponent<Collider>();
+            if (rootCol != null) DestroyImmediate(rootCol);
+
+            Transform tTorso = torsoObj.transform;
             Transform tHead = obj.transform.Find("HeadLow02");
             Transform tArmL = obj.transform.Find("LeftArmLow02");
             Transform tArmR = obj.transform.Find("RightArmLow02");

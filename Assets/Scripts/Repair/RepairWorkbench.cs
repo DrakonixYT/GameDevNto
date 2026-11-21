@@ -162,7 +162,16 @@ namespace HangarGame.Repair
             ResetRotation();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
             Vector3 tablePos = transform.TransformPoint(tableRestOffset);
-            StartCoroutine(SlideToWorkbench(p.transform, tablePos, Quaternion.Euler(initialPartEuler), StartBoltsPhase));
+            if (Application.isPlaying)
+            {
+                StartCoroutine(SlideToWorkbench(p.transform, tablePos, Quaternion.Euler(initialPartEuler), StartBoltsPhase));
+            }
+            else
+            {
+                p.transform.position = tablePos;
+                p.transform.rotation = Quaternion.Euler(initialPartEuler);
+                StartBoltsPhase();
+            }
         }
 
         public void ReceiveJaegerModule(GameObject mod, string name, Action onDone)
@@ -176,7 +185,16 @@ namespace HangarGame.Repair
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
             Vector3 tablePos = transform.TransformPoint(tableRestOffset);
             mod.transform.position = tablePos + new Vector3(0f, 0.5f, 0f);
-            StartCoroutine(SlideToWorkbench(mod.transform, tablePos, Quaternion.Euler(initialPartEuler), StartBoltsPhase));
+            if (Application.isPlaying)
+            {
+                StartCoroutine(SlideToWorkbench(mod.transform, tablePos, Quaternion.Euler(initialPartEuler), StartBoltsPhase));
+            }
+            else
+            {
+                mod.transform.position = tablePos;
+                mod.transform.rotation = Quaternion.Euler(initialPartEuler);
+                StartBoltsPhase();
+            }
         }
 
         private IEnumerator SlideToWorkbench(Transform t, Vector3 targetPos, Quaternion targetRot, Action onDone)
@@ -230,10 +248,10 @@ namespace HangarGame.Repair
                 washer.transform.localScale = new Vector3(1.35f, 0.4f, 1.35f);
                 washer.GetComponent<Renderer>().material = CreateMaterial(new Color(0.25f, 0.28f, 0.32f), false);
                 var wCol = washer.GetComponent<Collider>();
-                if (wCol != null) Destroy(wCol);
+                if (wCol != null) SafeDestroy(wCol);
 
                 var capCol = bolt.GetComponent<Collider>();
-                if (capCol != null) DestroyImmediate(capCol);
+                if (capCol != null) SafeDestroy(capCol);
                 var sphCol = bolt.AddComponent<SphereCollider>();
                 sphCol.radius = boltColliderRadius;
                 sphCol.center = new Vector3(0f, 0.25f, 0f);
@@ -252,8 +270,27 @@ namespace HangarGame.Repair
 
             Vector3 inv = new Vector3(1f / Mathf.Max(0.1f, root.lossyScale.x), 1f / Mathf.Max(0.1f, root.lossyScale.y), 1f / Mathf.Max(0.1f, root.lossyScale.z));
             serviceHatchObj.transform.localScale = inv;
-            serviceHatchObj.transform.localPosition = hatchLocalOffset;
-            serviceHatchObj.transform.localRotation = Quaternion.Euler(hatchLocalRotation);
+
+            Bounds b = new Bounds(root.position, Vector3.one * 0.2f);
+            var rends = root.GetComponentsInChildren<Renderer>(false);
+            if (rends.Length > 0)
+            {
+                b = rends[0].bounds;
+                for (int i = 1; i < rends.Length; i++)
+                {
+                    var owner = rends[i].GetComponentInParent<MechPart>();
+                    if (owner == null || owner.transform == root || owner.transform.IsChildOf(root))
+                        b.Encapsulate(rends[i].bounds);
+                }
+            }
+
+            Vector3 camPos = transform.TransformPoint(new Vector3(0f, 1.45f, -1.15f));
+            Vector3 toCam = (camPos - b.center).normalized;
+            Vector3 worldHatchPos = b.center + toCam * Mathf.Clamp(b.extents.magnitude * 0.65f, 0.16f, 0.32f);
+            Quaternion worldHatchRot = Quaternion.LookRotation(toCam, Vector3.up);
+
+            serviceHatchObj.transform.position = worldHatchPos;
+            serviceHatchObj.transform.rotation = worldHatchRot;
 
             GameObject plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
             plate.name = "Hatch_Backing";
@@ -261,7 +298,7 @@ namespace HangarGame.Repair
             plate.transform.localPosition = Vector3.zero;
             plate.transform.localScale = hatchSize;
             var col = plate.GetComponent<Collider>();
-            if (col != null) Destroy(col);
+            if (col != null) SafeDestroy(col);
 
             plate.GetComponent<Renderer>().material = CreateMaterial(new Color(0.15f, 0.17f, 0.20f), false);
             activeSubObjects.Add(plate);
@@ -273,7 +310,7 @@ namespace HangarGame.Repair
             boltsRemaining--;
             HangarAudioLight.Instance?.PlayBolt();
             activeSubObjects.Remove(bolt);
-            Destroy(bolt);
+            SafeDestroy(bolt);
 
             if (boltsRemaining <= 0)
             {
@@ -292,7 +329,7 @@ namespace HangarGame.Repair
             {
                 if (activeSubObjects[i] != null && activeSubObjects[i] != serviceHatchObj)
                 {
-                    Destroy(activeSubObjects[i]);
+                    SafeDestroy(activeSubObjects[i]);
                     activeSubObjects.RemoveAt(i);
                 }
             }
@@ -342,7 +379,7 @@ namespace HangarGame.Repair
             r.material = CreateMaterial(c, true);
 
             var col = pin.GetComponent<Collider>();
-            if (col != null) DestroyImmediate(col);
+            if (col != null) SafeDestroy(col);
             var sphCol = pin.AddComponent<SphereCollider>();
             sphCol.radius = pinColliderRadius;
 
@@ -382,9 +419,9 @@ namespace HangarGame.Repair
                         CreateWireBridge(colorId, origColor);
 
                         var clk1 = selectedPinObj.GetComponent<ClickableObject>();
-                        if (clk1 != null) Destroy(clk1);
+                        if (clk1 != null) SafeDestroy(clk1);
                         var clk2 = pin.GetComponent<ClickableObject>();
-                        if (clk2 != null) Destroy(clk2);
+                        if (clk2 != null) SafeDestroy(clk2);
 
                         selectedPinObj.transform.localScale = pinScale;
                         selectedPinObj.GetComponent<Renderer>().material = CreateMaterial(origColor, false);
@@ -456,7 +493,7 @@ namespace HangarGame.Repair
             wire.GetComponent<Renderer>().material = CreateMaterial(c, true);
 
             var col = wire.GetComponent<Collider>();
-            if (col != null) Destroy(col);
+            if (col != null) SafeDestroy(col);
 
             activeSubObjects.Add(wire);
         }
@@ -467,7 +504,7 @@ namespace HangarGame.Repair
             if (CurrentJaegerModule != null)
             {
                 foreach (var col in CurrentJaegerModule.GetComponentsInChildren<Collider>()) col.enabled = true;
-                Destroy(CurrentJaegerModule); CurrentJaegerModule = null;
+                SafeDestroy(CurrentJaegerModule); CurrentJaegerModule = null;
                 onJaegerDone?.Invoke(); HangarAudioLight.Instance?.PlaySuccess();
                 GameManager.Instance?.SwitchView(RoomView.Hangar);
             }
@@ -493,7 +530,7 @@ namespace HangarGame.Repair
             if (CurrentJaegerModule != null)
             {
                 foreach (var col in CurrentJaegerModule.GetComponentsInChildren<Collider>()) col.enabled = true;
-                Destroy(CurrentJaegerModule); CurrentJaegerModule = null;
+                SafeDestroy(CurrentJaegerModule); CurrentJaegerModule = null;
             }
             if (CurrentPart != null)
             {
@@ -507,12 +544,19 @@ namespace HangarGame.Repair
 
         private void ClearSubObjects()
         {
-            foreach (var o in activeSubObjects) if (o != null) Destroy(o);
+            foreach (var o in activeSubObjects) if (o != null) SafeDestroy(o);
             activeSubObjects.Clear();
             serviceHatchObj = null;
             selectedPinObj = null;
             selectedColorId = -1;
             selectedSide = -1;
+        }
+
+        private void SafeDestroy(UnityEngine.Object obj)
+        {
+            if (obj == null) return;
+            if (Application.isPlaying) Destroy(obj);
+            else DestroyImmediate(obj);
         }
 
         private Material CreateMaterial(Color color, bool emissive = false)

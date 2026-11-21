@@ -19,10 +19,10 @@ namespace HangarGame.Mechs
         public bool IsOnWorkbench { get; set; } = false;
 
         private float maxHp = 100f, currentHp = 100f;
-        private Vector3 socketPos;
-        private Quaternion socketRot;
-        private Vector3 socketScale;
-        private Transform socketParent;
+        [SerializeField] private Vector3 socketPos;
+        [SerializeField] private Quaternion socketRot;
+        [SerializeField] private Vector3 socketScale = Vector3.one;
+        [SerializeField] private Transform socketParent;
         private Renderer rend;
         private Color baseColor;
 
@@ -36,11 +36,21 @@ namespace HangarGame.Mechs
                 baseColor = rend.sharedMaterial.GetColor("_BaseColor");
             else
                 baseColor = Color.white;
+
+            if (socketParent == null && transform.parent != null)
+            {
+                InitSocket();
+            }
+
+            if (data == null) data = new MechPartData { partName = gameObject.name };
+        }
+
+        public void InitSocket()
+        {
             socketPos = transform.localPosition;
             socketRot = transform.localRotation;
             socketScale = transform.localScale;
             socketParent = transform.parent;
-            if (data == null) data = new MechPartData { partName = gameObject.name };
         }
 
         public Color BaseColor
@@ -62,6 +72,7 @@ namespace HangarGame.Mechs
         {
             data = d;
             currentHp = maxHp;
+            InitSocket();
             UpdateVis();
         }
 
@@ -92,13 +103,13 @@ namespace HangarGame.Mechs
 
         public void ReturnToSocket()
         {
-            if (gameObject.activeInHierarchy) StartCoroutine(SlideBack());
+            if (Application.isPlaying && gameObject.activeInHierarchy) StartCoroutine(SlideBack());
             else InstantReturn();
         }
 
         private void InstantReturn()
         {
-            transform.SetParent(socketParent);
+            if (socketParent != null) transform.SetParent(socketParent);
             transform.localPosition = socketPos;
             transform.localRotation = socketRot;
             transform.localScale = socketScale;
