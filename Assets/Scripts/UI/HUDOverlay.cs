@@ -1,10 +1,11 @@
-using UnityEngine;
-using UnityEngine.UI;
-using HangarGame.Core;
 using HangarGame.CameraControl;
-using HangarGame.Repair;
+using HangarGame.Core;
 using HangarGame.Interaction;
 using HangarGame.Mechs;
+using HangarGame.Repair;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -13,33 +14,55 @@ namespace HangarGame.UI
 {
     public class HUDOverlay : MonoBehaviour
     {
-        [Header("Top Bar")]
+        [Header("Верхняя панель")]
         [SerializeField] private Text txtResources;
         [SerializeField] private Text txtRoomIndicator;
 
-        [Header("Navigation Buttons")]
+        [Header("Кнопки переворота")]
         [SerializeField] private Button btnTurnLeft;
         [SerializeField] private Button btnTurnRight;
 
-        [Header("Podium Mech Switcher")]
+        [Header("Панель подиума мехов")]
         [SerializeField] private GameObject mechSelectPanel;
         [SerializeField] private Button btnPrevMech;
         [SerializeField] private Button btnNextMech;
         [SerializeField] private Button btnRechargeBattery;
         [SerializeField] private Text txtCurrentMech;
 
-        [Header("Hover Prompt")]
+        [Header("Подсказка и инфо")]
         [SerializeField] private Text txtHoverPrompt;
 
-        [Header("Workbench Panel")]
+        [Header("Инфо-панель верстака (управление 3D кнопками)")]
         [SerializeField] private GameObject wbPanel;
         [SerializeField] private Text txtWbTitle;
         [SerializeField] private Text txtWbInfo;
-        [SerializeField] private Button btnRotYM, btnRotYP, btnRotPM, btnRotPP, btnResetRotation;
-        [SerializeField] private Button btnFinish, btnSwap, btnExit;
 
-        [Header("Victory Screen")]
+        [Header("Экран победы")]
         [SerializeField] private GameObject victoryPanel;
+        [SerializeField] private Button btnRestart;
+
+        public void Configure(
+            Text res, Text roomInd, Button turnL, Button turnR,
+            GameObject mechPnl, Button prev, Button next, Button recharge,
+            Text curMech, Text hoverPrompt,
+            GameObject wbPnl, Text wbTitle, Text wbInfo, GameObject vicPnl, Button restartBtn = null)
+        {
+            txtResources = res;
+            txtRoomIndicator = roomInd;
+            btnTurnLeft = turnL;
+            btnTurnRight = turnR;
+            mechSelectPanel = mechPnl;
+            btnPrevMech = prev;
+            btnNextMech = next;
+            btnRechargeBattery = recharge;
+            txtCurrentMech = curMech;
+            txtHoverPrompt = hoverPrompt;
+            wbPanel = wbPnl;
+            txtWbTitle = wbTitle;
+            txtWbInfo = wbInfo;
+            victoryPanel = vicPnl;
+            btnRestart = restartBtn;
+        }
 
         private void Start()
         {
@@ -48,28 +71,84 @@ namespace HangarGame.UI
 
             if (btnPrevMech != null) btnPrevMech.onClick.AddListener(() => HangarMechManager.Instance?.PrevMech());
             if (btnNextMech != null) btnNextMech.onClick.AddListener(() => HangarMechManager.Instance?.NextMech());
-            if (btnRechargeBattery != null) btnRechargeBattery.onClick.AddListener(() =>
+            if (btnRechargeBattery != null)
             {
-                HangarMechManager.Instance?.RechargeCurrentMech();
-                HangarAudioLight.Instance?.PlaySuccess();
-                HangarAudioLight.Instance?.PlayBolt();
-            });
+                btnRechargeBattery.onClick.AddListener(() =>
+                {
+                    HangarMechManager.Instance?.RechargeCurrentMech();
+                    HangarAudio.Instance?.PlayBattery();
+                });
+            }
 
-            if (btnRotYM != null) btnRotYM.onClick.AddListener(() => RepairWorkbench.Instance?.RotateYaw(-30f));
-            if (btnRotYP != null) btnRotYP.onClick.AddListener(() => RepairWorkbench.Instance?.RotateYaw(30f));
-            if (btnRotPM != null) btnRotPM.onClick.AddListener(() => RepairWorkbench.Instance?.RotatePitch(-20f));
-            if (btnRotPP != null) btnRotPP.onClick.AddListener(() => RepairWorkbench.Instance?.RotatePitch(20f));
-            if (btnResetRotation != null) btnResetRotation.onClick.AddListener(() => RepairWorkbench.Instance?.ResetRotation());
+            if (btnRestart == null && victoryPanel != null)
+                btnRestart = victoryPanel.transform.Find("bRest")?.GetComponent<Button>();
 
-            if (btnFinish != null) btnFinish.onClick.AddListener(() => RepairWorkbench.Instance?.FinishWork());
-            if (btnSwap != null) btnSwap.onClick.AddListener(() => RepairWorkbench.Instance?.CycleModule());
-            if (btnExit != null) btnExit.onClick.AddListener(() => RepairWorkbench.Instance?.CancelWork());
+            if (btnRestart != null)
+                btnRestart.onClick.AddListener(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex));
+
+            if (txtResources != null)
+            {
+                txtResources.horizontalOverflow = HorizontalWrapMode.Overflow;
+                if (txtRoomIndicator == null)
+                {
+                    var rt = txtResources.rectTransform;
+                    rt.anchorMin = new Vector2(0.5f, 0.5f);
+                    rt.anchorMax = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition = Vector2.zero;
+                    rt.sizeDelta = new Vector2(760f, 40f);
+                    txtResources.alignment = TextAnchor.MiddleCenter;
+                }
+            }
 
             if (GameManager.Instance != null)
             {
-                GameManager.Instance.OnResourcesChanged += (c, a) => UpdateResources(c, a);
-                GameManager.Instance.OnGameWon += () => { if (victoryPanel != null) victoryPanel.SetActive(true); };
+                GameManager.Instance.OnResourcesChanged += UpdateResources;
+                GameManager.Instance.OnBaseHpChanged += UpdateBaseHp;
+                GameManager.Instance.OnGameWon += ShowVictoryPanel;
+                GameManager.Instance.OnGameLost += ShowDefeatPanel;
+                UpdateResourceText();
             }
+        }
+
+        private void OnDestroy()
+        {
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnResourcesChanged -= UpdateResources;
+                GameManager.Instance.OnBaseHpChanged -= UpdateBaseHp;
+                GameManager.Instance.OnGameWon -= ShowVictoryPanel;
+                GameManager.Instance.OnGameLost -= ShowDefeatPanel;
+            }
+        }
+
+        private void ShowVictoryPanel()
+        {
+            if (victoryPanel == null) return;
+            var t1 = victoryPanel.transform.Find("Txt_Vic1")?.GetComponent<Text>();
+            var t2 = victoryPanel.transform.Find("Txt_Vic2")?.GetComponent<Text>();
+            if (t1 != null)
+            {
+                t1.text = "ПОБЕДА! ПРОЕКТ 'ЕГЕРЬ' ЗАВЕРШЁН!";
+                t1.color = Color.yellow;
+            }
+            if (t2 != null)
+                t2.text = "Егерь собран и готов защищать цитадель!";
+            victoryPanel.SetActive(true);
+        }
+
+        private void ShowDefeatPanel()
+        {
+            if (victoryPanel == null) return;
+            var t1 = victoryPanel.transform.Find("Txt_Vic1")?.GetComponent<Text>();
+            var t2 = victoryPanel.transform.Find("Txt_Vic2")?.GetComponent<Text>();
+            if (t1 != null)
+            {
+                t1.text = "ПОРАЖЕНИЕ! ЦИТАДЕЛЬ РАЗРУШЕНА";
+                t1.color = new Color(1f, 0.3f, 0.25f);
+            }
+            if (t2 != null)
+                t2.text = "Кайдзю прорвали периметр ангара. Запустите смену заново.";
+            victoryPanel.SetActive(true);
         }
 
         private void Update()
@@ -84,73 +163,97 @@ namespace HangarGame.UI
             bool isWb = GameManager.Instance.CurrentView == RoomView.WorkbenchFocus;
 
             if (wbPanel != null) wbPanel.SetActive(isWb);
+            if (mechSelectPanel != null) mechSelectPanel.SetActive(isHangar);
+
+            UpdateTurnButtons(isHangar, isWb);
+            UpdateRoomLabel(isHangar, isDispatch);
+
+            if (isHangar) UpdateHangarControls();
+            if (isWb) UpdateWorkbenchInfo();
+        }
+
+        private void UpdateTurnButtons(bool isHangar, bool isWb)
+        {
             if (btnTurnLeft != null)
             {
                 btnTurnLeft.gameObject.SetActive(!isWb);
                 var t = btnTurnLeft.GetComponentInChildren<Text>();
                 if (t != null) t.text = isHangar ? "◀ Рубка (Q)" : "◀ Ангар (Q)";
             }
+
             if (btnTurnRight != null)
             {
                 btnTurnRight.gameObject.SetActive(!isWb);
                 var t = btnTurnRight.GetComponentInChildren<Text>();
                 if (t != null) t.text = isHangar ? "Рубка ▶ (E)" : "Ангар ▶ (E)";
             }
-            if (mechSelectPanel != null) mechSelectPanel.SetActive(isHangar);
+        }
 
-            if (txtRoomIndicator != null)
-            {
-                if (isHangar) txtRoomIndicator.text = "СЕКТОР: АНГАР [0°] | [Q/E - Рубка]";
-                else if (isDispatch) txtRoomIndicator.text = "СЕКТОР: РУБКА УПРАВЛЕНИЯ [180°] | [Q/E - Ангар]";
-                else txtRoomIndicator.text = "РЕЖИМ: ВЕРСТАК ТО";
-            }
+        private void UpdateRoomLabel(bool isHangar, bool isDispatch)
+        {
+            if (txtRoomIndicator == null) return;
+            if (isHangar)
+                txtRoomIndicator.text = "СЕКТОР: АНГАР [Q/E - Рубка и Арсенал]";
+            else if (isDispatch)
+                txtRoomIndicator.text = (RoomCamera.Instance != null && RoomCamera.Instance.IsArmoryFocused)
+                    ? "АРСЕНАЛ МЕХОВ [Tab - К радару | Q/E - Ангар]"
+                    : "СЕКТОР: РУБКА [Q/E - Ангар | Справа: Арсенал (Tab)]";
+            else
+                txtRoomIndicator.text = "РЕЖИМ: ВЕРСТАК ТО (3D кнопки на столе)";
+        }
 
-            if (isHangar && HangarMechManager.Instance != null)
-            {
-                bool left = false, right = false;
+        private void UpdateHangarControls()
+        {
+            if (GameManager.Instance != null && (GameManager.Instance.IsGameWon || GameManager.Instance.IsGameLost))
+                return;
+
+            bool left = false, right = false;
 #if ENABLE_INPUT_SYSTEM
-                if (Keyboard.current != null)
-                {
-                    left = Keyboard.current.leftArrowKey.wasPressedThisFrame || Keyboard.current.aKey.wasPressedThisFrame;
-                    right = Keyboard.current.rightArrowKey.wasPressedThisFrame || Keyboard.current.dKey.wasPressedThisFrame;
-                }
+            if (Keyboard.current != null)
+            {
+                left = Keyboard.current.leftArrowKey.wasPressedThisFrame || Keyboard.current.aKey.wasPressedThisFrame;
+                right = Keyboard.current.rightArrowKey.wasPressedThisFrame || Keyboard.current.dKey.wasPressedThisFrame;
+            }
 #else
-                left = Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A);
-                right = Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
+            left = Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.A);
+            right = Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D);
 #endif
-                if (left) HangarMechManager.Instance.PrevMech();
-                if (right) HangarMechManager.Instance.NextMech();
+            if (left) HangarMechManager.Instance?.PrevMech();
+            if (right) HangarMechManager.Instance?.NextMech();
 
-                var cur = HangarMechManager.Instance.CurrentMech;
-                if (cur != null)
-                {
-                    if (txtCurrentMech != null)
-                    {
-                        string status = cur.isDeployed ? "В БОЮ" : "В АНГАРЕ";
-                        txtCurrentMech.text = $"◀ [{HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}] {cur.mechName} | {status} | {cur.currentHp:F0}/{cur.maxHp:F0} HP | {cur.currentEnergy:F0}% ▶";
-                    }
+            var cur = HangarMechManager.Instance != null ? HangarMechManager.Instance.CurrentMech : null;
+            if (cur == null) return;
 
-                    if (btnRechargeBattery != null)
-                    {
-                        btnRechargeBattery.interactable = !cur.isDeployed && cur.currentEnergy < 99f;
-                        var bTxt = btnRechargeBattery.GetComponentInChildren<Text>();
-                        if (bTxt != null) bTxt.text = cur.currentEnergy >= 99f ? "БАТАРЕЯ 100%" : "ЗАРЯДИТЬ БАТАРЕЮ";
-                    }
-                }
+            if (txtCurrentMech != null)
+            {
+                string status = cur.isDeployed ? "В БОЮ" : "В АНГАРЕ";
+                txtCurrentMech.text = $"◀ [{HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}] {cur.mechName} | {status} | {cur.currentHp:F0}/{cur.maxHp:F0} HP | {cur.currentEnergy:F0}% ▶";
             }
 
-            if (isWb && RepairWorkbench.Instance != null)
+            if (btnRechargeBattery != null)
             {
-                string name = RepairWorkbench.Instance.CurrentItemName ?? "Модуль";
-                if (txtWbTitle != null) txtWbTitle.text = $"ВЕРСТАК: {name}";
-                if (txtWbInfo != null) txtWbInfo.text = RepairWorkbench.Instance.RepairStepInfo;
-                if (btnSwap != null) btnSwap.gameObject.SetActive(!RepairWorkbench.Instance.IsJaegerModule);
+                btnRechargeBattery.interactable = !cur.isDeployed && cur.currentEnergy < 99f;
+                var bTxt = btnRechargeBattery.GetComponentInChildren<Text>();
+                if (bTxt != null) bTxt.text = cur.currentEnergy >= 99f ? "БАТАРЕЯ 100%" : "ЗАРЯДИТЬ БАТАРЕЮ";
             }
         }
 
-        private void UpdateResources(int credits, int alloy)
+        private void UpdateWorkbenchInfo()
         {
-            if (txtResources != null) txtResources.text = $"КРЕДИТЫ: {credits} ¢   |   СПЛАВ: {alloy} т.";
+            if (RepairWorkbench.Instance == null) return;
+            string itemName = RepairWorkbench.Instance.CurrentItemName ?? "Модуль";
+            if (txtWbTitle != null) txtWbTitle.text = $"ВЕРСТАК: {itemName}";
+            if (txtWbInfo != null) txtWbInfo.text = RepairWorkbench.Instance.RepairStepInfo;
+        }
+
+        private void UpdateResources(int credits, int alloy) => UpdateResourceText();
+        private void UpdateBaseHp(float hp, float maxHp) => UpdateResourceText();
+
+        private void UpdateResourceText()
+        {
+            if (txtResources == null || GameManager.Instance == null) return;
+            var gm = GameManager.Instance;
+            txtResources.text = $"КРЕДИТЫ: {gm.Credits} ¢   |   СПЛАВ: {gm.Alloy} т.   |   БАЗА: {gm.BaseHp:F0}%";
         }
     }
 }

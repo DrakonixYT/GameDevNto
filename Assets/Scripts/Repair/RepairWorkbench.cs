@@ -1,526 +1,310 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
 using HangarGame.Core;
 using HangarGame.Mechs;
-using HangarGame.Interaction;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
+using UnityEngine;
 
 namespace HangarGame.Repair
 {
     public class RepairWorkbench : MonoBehaviour
     {
         public static RepairWorkbench Instance { get; private set; }
+
+        [Header("Размещение на верстаке")]
+        [SerializeField] private Vector3 tableRestOffset = new Vector3(0f, 1.10f, 0f);
+        [SerializeField] private float normalizedPartExtent = 0.56f;
+        [SerializeField] private Vector3 initialEuler = new Vector3(0f, 0f, 0f);
+
+        [Header("Вращение")]
+        [SerializeField] private float rotationSpeed = 95f;
+        [SerializeField] private float mouseSensitivity = 0.4f;
+        [SerializeField] private float minPitch = -65f;
+        [SerializeField] private float maxPitch = 65f;
+
+        [Header("Мини-игра")]
+        [SerializeField] private WorkbenchMinigame minigame;
+
         public MechPart CurrentPart { get; private set; }
         public GameObject CurrentJaegerModule { get; private set; }
-        public string CurrentItemName => (CurrentPart != null && CurrentPart.Data != null) ? CurrentPart.Data.partName : (currentJaegerName ?? "Модуль");
         public bool HasItem => CurrentPart != null || CurrentJaegerModule != null;
         public bool IsJaegerModule => CurrentJaegerModule != null;
-        public string RepairStepInfo { get; private set; } = "";
+        public bool IsWorkComplete => minigame == null || minigame.IsComplete;
+        public string RepairStepInfo => minigame != null ? minigame.StatusText : "";
 
-        [Header("Workbench Placement")]
-        [SerializeField] private Vector3 tableRestOffset = new Vector3(0f, 0.85f, 0f);
-        [SerializeField] private Vector3 initialPartEuler = new Vector3(0f, 270f, 0f);
-
-        [Header("Service Hatch")]
-        [SerializeField] private Vector3 hatchLocalOffset = new Vector3(0f, 0f, -0.48f);
-        [SerializeField] private Vector3 hatchLocalRotation = new Vector3(0f, 180f, 0f);
-        [SerializeField] private Vector3 hatchSize = new Vector3(0.42f, 0.32f, 0.04f);
-
-        [Header("Bolts Config")]
-        [SerializeField] private Vector3 boltScale = new Vector3(0.08f, 0.025f, 0.08f);
-        [SerializeField] private float boltColliderRadius = 0.9f;
-        [SerializeField] private Vector3[] boltOffsets = new Vector3[]
+        public string CurrentItemName
         {
-            new Vector3(-0.16f, 0.12f, 0.035f),
-            new Vector3(0.16f, 0.12f, 0.035f),
-            new Vector3(-0.16f, -0.12f, 0.035f),
-            new Vector3(0.16f, -0.12f, 0.035f)
-        };
+            get
+            {
+                if (CurrentPart != null && CurrentPart.Data != null) return CurrentPart.Data.partName;
+                return !string.IsNullOrEmpty(currentJaegerName) ? currentJaegerName : "Модуль";
+            }
+        }
 
-        [Header("Wires Config")]
-        [SerializeField] private Vector3 pinScale = new Vector3(0.08f, 0.08f, 0.08f);
-        [SerializeField] private float pinColliderRadius = 0.55f;
-        [SerializeField] private Vector3[] leftPinOffsets = new Vector3[]
-        {
-            new Vector3(-0.13f, 0.09f, 0.035f),
-            new Vector3(-0.13f, 0.0f, 0.035f),
-            new Vector3(-0.13f, -0.09f, 0.035f)
-        };
-        [SerializeField] private Vector3[] rightPinOffsets = new Vector3[]
-        {
-            new Vector3(0.13f, -0.09f, 0.035f),
-            new Vector3(0.13f, 0.09f, 0.035f),
-            new Vector3(0.13f, 0.0f, 0.035f)
-        };
-        [SerializeField] private Color[] wireColors = new Color[]
-        {
-            new Color(1f, 0.25f, 0.25f),
-            new Color(0.2f, 0.9f, 1f),
-            new Color(1f, 0.88f, 0.15f)
-        };
-
-        [Header("Controls")]
-        [SerializeField] private float rotationSpeed = 90f;
-        [SerializeField] private float mouseSensitivity = 0.4f;
-        [SerializeField] private float minPitch = -70f;
-        [SerializeField] private float maxPitch = 70f;
-
-        private float targetYaw = 180f, targetPitch = 0f, curYaw = 180f, curPitch = 0f;
+        private Transform workPivot;
+        private Coroutine mountCoroutine;
+        private float targetYaw, targetPitch, curYaw, curPitch;
         private string currentJaegerName;
         private Action onJaegerDone;
-        private readonly List<GameObject> activeSubObjects = new List<GameObject>();
-        private GameObject serviceHatchObj = null;
 
-        private int boltsRemaining = 0;
-        private int wiresRemaining = 0;
+        private void Awake()
+        {
+            Instance = this;
+            EnsureMinigame();
+        }
 
-        private GameObject selectedPinObj = null;
-        private int selectedColorId = -1;
-        private int selectedSide = -1;
-        private Color selectedOriginalColor = Color.white;
+        private void EnsureMinigame()
+        {
+            if (minigame == null) minigame = GetComponent<WorkbenchMinigame>();
+            if (minigame == null) minigame = gameObject.AddComponent<WorkbenchMinigame>();
+        }
 
-        private readonly Dictionary<int, Vector3> leftPinPositions = new Dictionary<int, Vector3>();
-        private readonly Dictionary<int, Vector3> rightPinPositions = new Dictionary<int, Vector3>();
+        public void SetPlatePrefab(GameObject platePrefab)
+        {
+            EnsureMinigame();
+            minigame.SetPlatePrefab(platePrefab);
+        }
 
-        private void Awake() => Instance = this;
+        public void SetRestOffset(Vector3 offset) => tableRestOffset = offset;
 
         private void Update()
         {
             if (!HasItem) return;
 
-            bool esc = false, space = false;
-#if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null)
-            {
-                esc = Keyboard.current.escapeKey.wasPressedThisFrame;
-                space = Keyboard.current.spaceKey.wasPressedThisFrame;
-            }
-#else
-            esc = Input.GetKeyDown(KeyCode.Escape); space = Input.GetKeyDown(KeyCode.Space);
-#endif
-            if (esc) CancelWork();
-            else if (space && boltsRemaining <= 0 && wiresRemaining <= 0) FinishWork();
+            HandleKeyboardAndMouseInput();
 
-            float h = 0f, v = 0f;
+            curYaw = Mathf.Lerp(curYaw, targetYaw, Time.deltaTime * 12f);
+            curPitch = Mathf.Lerp(curPitch, targetPitch, Time.deltaTime * 12f);
+
+            if (workPivot != null)
+                workPivot.localRotation = Quaternion.Euler(curPitch, curYaw, 0f);
+        }
+
+        private void HandleKeyboardAndMouseInput()
+        {
+            bool esc = false;
+            bool space = false;
+            float h = 0f;
+            float v = 0f;
+
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null)
+            var kb = UnityEngine.InputSystem.Keyboard.current;
+            if (kb != null)
             {
-                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed || Keyboard.current.qKey.isPressed) h -= 1f;
-                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed || Keyboard.current.eKey.isPressed) h += 1f;
-                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) v += 1f;
-                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) v -= 1f;
+                esc = kb.escapeKey.wasPressedThisFrame;
+                space = kb.spaceKey.wasPressedThisFrame;
+                if (kb.aKey.isPressed || kb.leftArrowKey.isPressed || kb.qKey.isPressed) h -= 1f;
+                if (kb.dKey.isPressed || kb.rightArrowKey.isPressed || kb.eKey.isPressed) h += 1f;
+                if (kb.wKey.isPressed || kb.upArrowKey.isPressed) v += 1f;
+                if (kb.sKey.isPressed || kb.downArrowKey.isPressed) v -= 1f;
             }
-            if (Mouse.current != null && (Mouse.current.rightButton.isPressed || Mouse.current.middleButton.isPressed))
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            if (mouse != null && (mouse.rightButton.isPressed || mouse.middleButton.isPressed))
             {
-                Vector2 d = Mouse.current.delta.ReadValue();
-                targetYaw += d.x * mouseSensitivity; targetPitch = Mathf.Clamp(targetPitch - d.y * mouseSensitivity, minPitch, maxPitch);
+                Vector2 d = mouse.delta.ReadValue();
+                targetYaw += d.x * mouseSensitivity;
+                targetPitch = Mathf.Clamp(targetPitch - d.y * mouseSensitivity, minPitch, maxPitch);
             }
 #else
+            esc = Input.GetKeyDown(KeyCode.Escape);
+            space = Input.GetKeyDown(KeyCode.Space);
             if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.Q)) h -= 1f;
             if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.E)) h += 1f;
             if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) v += 1f;
             if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) v -= 1f;
             if (Input.GetMouseButton(1) || Input.GetMouseButton(2))
             {
-                targetYaw += Input.GetAxis("Mouse X") * (mouseSensitivity * 10f); targetPitch = Mathf.Clamp(targetPitch - Input.GetAxis("Mouse Y") * (mouseSensitivity * 10f), minPitch, maxPitch);
+                targetYaw += Input.GetAxis("Mouse X") * (mouseSensitivity * 10f);
+                targetPitch = Mathf.Clamp(targetPitch - Input.GetAxis("Mouse Y") * (mouseSensitivity * 10f), minPitch, maxPitch);
             }
 #endif
+
+            if (esc)
+            {
+                CancelWork();
+                return;
+            }
+
+            if (space && IsWorkComplete)
+            {
+                FinishWork();
+                return;
+            }
+
             targetYaw += h * rotationSpeed * Time.deltaTime;
             targetPitch = Mathf.Clamp(targetPitch - v * rotationSpeed * Time.deltaTime, minPitch, maxPitch);
-            curYaw = Mathf.Lerp(curYaw, targetYaw, Time.deltaTime * 12f);
-            curPitch = Mathf.Lerp(curPitch, targetPitch, Time.deltaTime * 12f);
-
-            Transform t = CurrentPart != null ? CurrentPart.transform : (CurrentJaegerModule != null ? CurrentJaegerModule.transform : null);
-            if (t != null) t.rotation = Quaternion.Euler(curPitch, curYaw, 0f);
         }
 
-        public void RotateYaw(float d) => targetYaw += d;
-        public void RotatePitch(float d) => targetPitch = Mathf.Clamp(targetPitch + d, minPitch, maxPitch);
-        public void ResetRotation() { targetYaw = initialPartEuler.y; targetPitch = initialPartEuler.x; }
+        public void RotateYaw(float delta) => targetYaw += delta;
+        public void RotatePitch(float delta) => targetPitch = Mathf.Clamp(targetPitch + delta, minPitch, maxPitch);
 
-        public void CycleModule()
+        public void ResetRotation()
         {
-            if (CurrentPart == null || CurrentPart.Data == null) return;
-            CurrentPart.Data = ModuleCatalog.GetNextModule(CurrentPart.Data);
-            CurrentPart.name = CurrentPart.Data.partName;
-            HangarAudioLight.Instance?.PlayBolt();
+            targetYaw = initialEuler.y;
+            targetPitch = initialEuler.x;
         }
 
-        public void ReceivePart(MechPart p)
+        public void ReceivePart(MechPart part)
         {
-            if (HasItem) return;
-            p.OnHover(false);
-            CurrentPart = p;
-            p.IsOnWorkbench = true;
+            if (HasItem || part == null || !part.IsRepairableSlot || !part.IsDamaged) return;
 
-            foreach (var col in p.GetComponentsInChildren<Collider>(true)) col.enabled = false;
+            part.OnHover(false);
+            CurrentPart = part;
+            part.IsOnWorkbench = true;
 
-            ResetRotation();
+            foreach (var col in part.GetComponentsInChildren<Collider>(true)) col.enabled = false;
+
+            PrepareWorkPivot();
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            Vector3 tablePos = transform.TransformPoint(tableRestOffset);
+
             if (Application.isPlaying)
-            {
-                StartCoroutine(SlideToWorkbench(p.transform, tablePos, Quaternion.Euler(initialPartEuler), StartBoltsPhase));
-            }
+                mountCoroutine = StartCoroutine(SlideAndMountRoutine(part.transform, false));
             else
-            {
-                p.transform.position = tablePos;
-                p.transform.rotation = Quaternion.Euler(initialPartEuler);
-                StartBoltsPhase();
-            }
+                MountTargetImmediate(part.transform, false);
         }
 
-        public void ReceiveJaegerModule(GameObject mod, string name, Action onDone)
+        public void ReceiveJaegerModule(GameObject moduleObj, string moduleName, Action onDone)
         {
-            if (HasItem) return;
-            CurrentJaegerModule = mod; currentJaegerName = name; onJaegerDone = onDone;
+            if (HasItem || moduleObj == null) return;
 
-            foreach (var col in mod.GetComponentsInChildren<Collider>(true)) col.enabled = false;
+            CurrentJaegerModule = moduleObj;
+            currentJaegerName = moduleName;
+            onJaegerDone = onDone;
 
-            ResetRotation();
+            foreach (var col in moduleObj.GetComponentsInChildren<Collider>(true)) col.enabled = false;
+
+            PrepareWorkPivot();
+            moduleObj.transform.position = workPivot.position + Vector3.up * 0.5f;
             GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
-            Vector3 tablePos = transform.TransformPoint(tableRestOffset);
-            mod.transform.position = tablePos + new Vector3(0f, 0.5f, 0f);
+
             if (Application.isPlaying)
-            {
-                StartCoroutine(SlideToWorkbench(mod.transform, tablePos, Quaternion.Euler(initialPartEuler), StartBoltsPhase));
-            }
+                mountCoroutine = StartCoroutine(SlideAndMountRoutine(moduleObj.transform, true));
             else
-            {
-                mod.transform.position = tablePos;
-                mod.transform.rotation = Quaternion.Euler(initialPartEuler);
-                StartBoltsPhase();
-            }
+                MountTargetImmediate(moduleObj.transform, true);
         }
 
-        private IEnumerator SlideToWorkbench(Transform t, Vector3 targetPos, Quaternion targetRot, Action onDone)
+        private void PrepareWorkPivot()
         {
-            Vector3 sP = t.position; Quaternion sR = t.rotation;
-            float el = 0f, d = 0.28f;
-            while (el < d && t != null)
+            CleanupWorkPivot();
+
+            GameObject pivotObj = new GameObject("Work_Pivot");
+            pivotObj.transform.SetParent(transform, false);
+            pivotObj.transform.localPosition = tableRestOffset;
+            pivotObj.transform.localRotation = Quaternion.Euler(initialEuler);
+            pivotObj.transform.localScale = Vector3.one;
+            workPivot = pivotObj.transform;
+
+            curYaw = targetYaw = initialEuler.y;
+            curPitch = targetPitch = initialEuler.x;
+        }
+
+        private IEnumerator SlideAndMountRoutine(Transform target, bool jaegerMode)
+        {
+            MountIntoPivot(target);
+
+            Vector3 finalLocalPos = target.localPosition;
+            Vector3 startLocalPos = finalLocalPos + workPivot.InverseTransformDirection(Vector3.up * 0.35f);
+            target.localPosition = startLocalPos;
+
+            float t = 0f;
+            const float dur = 0.25f;
+            while (t < dur && target != null)
             {
-                el += Time.deltaTime; float p = Mathf.SmoothStep(0f, 1f, el / d);
-                t.position = Vector3.Lerp(sP, targetPos, p); t.rotation = Quaternion.Slerp(sR, targetRot, p);
+                t += Time.deltaTime;
+                target.localPosition = Vector3.Lerp(startLocalPos, finalLocalPos, Mathf.SmoothStep(0f, 1f, t / dur));
                 yield return null;
             }
-            if (t != null) { t.position = targetPos; t.rotation = targetRot; }
-            onDone?.Invoke();
+
+            if (target != null) target.localPosition = finalLocalPos;
+            mountCoroutine = null;
+            if (workPivot == null) yield break;
+
+            Bounds localBounds = CalcPivotLocalBounds(workPivot);
+            minigame.Begin(workPivot, localBounds, Vector3.back, jaegerMode);
         }
 
-        private void StartBoltsPhase()
+        private void MountTargetImmediate(Transform target, bool jaegerMode)
         {
-            ClearSubObjects();
-            Transform root = CurrentPart != null ? CurrentPart.transform : (CurrentJaegerModule != null ? CurrentJaegerModule.transform : null);
-            if (root == null) return;
-
-            Vector3[] offsets = (boltOffsets != null && boltOffsets.Length > 0) ? boltOffsets : new Vector3[] {
-                new Vector3(-0.48f, 0.36f, 0.08f),
-                new Vector3(0.48f, 0.36f, 0.08f),
-                new Vector3(-0.48f, -0.36f, 0.08f),
-                new Vector3(0.48f, -0.36f, 0.08f)
-            };
-
-            boltsRemaining = offsets.Length;
-            RepairStepInfo = $"Шаг 1/2: Открутите {boltsRemaining} золотых болта на сервисной панели";
-
-            CreateServiceHatchBase(root);
-
-            for (int i = 0; i < offsets.Length; i++)
-            {
-                GameObject bolt = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                bolt.name = $"Bolt_{i}";
-                bolt.transform.SetParent(serviceHatchObj.transform, false);
-                bolt.transform.localPosition = offsets[i];
-                bolt.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                bolt.transform.localScale = boltScale;
-
-                var r = bolt.GetComponent<Renderer>();
-                r.material = CreateMaterial(new Color(1f, 0.85f, 0.1f), true);
-
-                GameObject washer = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-                washer.name = "Washer";
-                washer.transform.SetParent(bolt.transform, false);
-                washer.transform.localPosition = new Vector3(0f, -0.4f, 0f);
-                washer.transform.localScale = new Vector3(1.35f, 0.4f, 1.35f);
-                washer.GetComponent<Renderer>().material = CreateMaterial(new Color(0.25f, 0.28f, 0.32f), false);
-                var wCol = washer.GetComponent<Collider>();
-                if (wCol != null) SafeDestroy(wCol);
-
-                var capCol = bolt.GetComponent<Collider>();
-                if (capCol != null) SafeDestroy(capCol);
-                var sphCol = bolt.AddComponent<SphereCollider>();
-                sphCol.radius = boltColliderRadius;
-                sphCol.center = new Vector3(0f, 0.25f, 0f);
-
-                ClickableObject clk = bolt.AddComponent<ClickableObject>();
-                clk.promptText = "Крепёжный болт (Клик: открутить)";
-                clk.onClick = () => OnBoltUnscrewed(bolt);
-                activeSubObjects.Add(bolt);
-            }
+            MountIntoPivot(target);
+            Bounds localBounds = CalcPivotLocalBounds(workPivot);
+            minigame.Begin(workPivot, localBounds, Vector3.back, jaegerMode);
         }
 
-        private void CreateServiceHatchBase(Transform root)
+        private void MountIntoPivot(Transform target)
         {
-            serviceHatchObj = new GameObject("Service_Hatch");
-            serviceHatchObj.transform.SetParent(root, false);
+            target.SetParent(workPivot, true);
 
-            Vector3 inv = new Vector3(1f / Mathf.Max(0.1f, root.lossyScale.x), 1f / Mathf.Max(0.1f, root.lossyScale.y), 1f / Mathf.Max(0.1f, root.lossyScale.z));
-            serviceHatchObj.transform.localScale = inv;
-
-            Bounds b = new Bounds(root.position, Vector3.one * 0.2f);
-            var rends = root.GetComponentsInChildren<Renderer>(false);
-            if (rends.Length > 0)
+            if (CurrentPart != null)
             {
-                b = rends[0].bounds;
-                for (int i = 1; i < rends.Length; i++)
+                Vector3 camFwd = transform.forward;
+                Vector3 partFwd = target.up;
+                partFwd.y = 0f;
+                Vector3 desired = -camFwd;
+                desired.y = 0f;
+                if (partFwd.sqrMagnitude > 0.001f && desired.sqrMagnitude > 0.001f)
                 {
-                    var owner = rends[i].GetComponentInParent<MechPart>();
-                    if (owner == null || owner.transform == root || owner.transform.IsChildOf(root))
-                        b.Encapsulate(rends[i].bounds);
+                    Quaternion yawDelta = Quaternion.FromToRotation(partFwd.normalized, desired.normalized);
+                    target.rotation = yawDelta * target.rotation;
                 }
-            }
-
-            Vector3 camPos = transform.TransformPoint(new Vector3(0f, 1.45f, -1.15f));
-            Vector3 toCam = (camPos - b.center).normalized;
-            Vector3 worldHatchPos = b.center + toCam * Mathf.Clamp(b.extents.magnitude * 0.65f, 0.16f, 0.32f);
-            Quaternion worldHatchRot = Quaternion.LookRotation(toCam, Vector3.up);
-
-            serviceHatchObj.transform.position = worldHatchPos;
-            serviceHatchObj.transform.rotation = worldHatchRot;
-
-            GameObject plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            plate.name = "Hatch_Backing";
-            plate.transform.SetParent(serviceHatchObj.transform, false);
-            plate.transform.localPosition = Vector3.zero;
-            plate.transform.localScale = hatchSize;
-            var col = plate.GetComponent<Collider>();
-            if (col != null) SafeDestroy(col);
-
-            plate.GetComponent<Renderer>().material = CreateMaterial(new Color(0.15f, 0.17f, 0.20f), false);
-            activeSubObjects.Add(plate);
-            activeSubObjects.Add(serviceHatchObj);
-        }
-
-        private void OnBoltUnscrewed(GameObject bolt)
-        {
-            boltsRemaining--;
-            HangarAudioLight.Instance?.PlayBolt();
-            activeSubObjects.Remove(bolt);
-            SafeDestroy(bolt);
-
-            if (boltsRemaining <= 0)
-            {
-                HangarAudioLight.Instance?.PlaySuccess();
-                StartWiresPhase();
             }
             else
             {
-                RepairStepInfo = $"Шаг 1/2: Осталось открутить {boltsRemaining} болта";
-            }
-        }
-
-        private void StartWiresPhase()
-        {
-            for (int i = activeSubObjects.Count - 1; i >= 0; i--)
-            {
-                if (activeSubObjects[i] != null && activeSubObjects[i] != serviceHatchObj)
-                {
-                    SafeDestroy(activeSubObjects[i]);
-                    activeSubObjects.RemoveAt(i);
-                }
+                target.localRotation = Quaternion.Euler(0f, 180f, 0f);
             }
 
-            Transform root = CurrentPart != null ? CurrentPart.transform : (CurrentJaegerModule != null ? CurrentJaegerModule.transform : null);
-            if (root == null || serviceHatchObj == null) return;
-
-            Color[] colors = (wireColors != null && wireColors.Length > 0) ? wireColors : new Color[] {
-                new Color(1f, 0.25f, 0.25f),
-                new Color(0.2f, 0.9f, 1f),
-                new Color(1f, 0.88f, 0.15f)
-            };
-
-            int count = colors.Length;
-            wiresRemaining = count;
-            selectedPinObj = null;
-            selectedColorId = -1;
-            selectedSide = -1;
-            leftPinPositions.Clear();
-            rightPinPositions.Clear();
-
-            RepairStepInfo = $"Шаг 2/2: Соедините {count} пары клемм одинакового цвета";
-
-            for (int i = 0; i < count; i++)
+            Bounds b = CalcWorldBounds(target.gameObject);
+            if (b.size.sqrMagnitude > 0.0001f)
             {
-                int colorId = i;
-                Vector3 lPos = (leftPinOffsets != null && i < leftPinOffsets.Length) ? leftPinOffsets[i] : new Vector3(-0.38f, 0.26f - i * 0.26f, 0.08f);
-                Vector3 rPos = (rightPinOffsets != null && i < rightPinOffsets.Length) ? rightPinOffsets[i] : new Vector3(0.38f, -0.26f + i * 0.26f, 0.08f);
-
-                leftPinPositions[colorId] = lPos;
-                rightPinPositions[colorId] = rPos;
-
-                CreateWirePin(serviceHatchObj.transform, lPos, colors[i], colorId, 0);
-                CreateWirePin(serviceHatchObj.transform, rPos, colors[i], colorId, 1);
-            }
-        }
-
-        private void CreateWirePin(Transform parent, Vector3 localPos, Color c, int colorId, int side)
-        {
-            GameObject pin = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            pin.name = $"Pin_{colorId}_{side}";
-            pin.transform.SetParent(parent, false);
-            pin.transform.localPosition = localPos;
-            pin.transform.localScale = pinScale;
-
-            var r = pin.GetComponent<Renderer>();
-            r.material = CreateMaterial(c, true);
-
-            var col = pin.GetComponent<Collider>();
-            if (col != null) SafeDestroy(col);
-            var sphCol = pin.AddComponent<SphereCollider>();
-            sphCol.radius = pinColliderRadius;
-
-            string sideName = side == 0 ? "Входной" : "Выходной";
-            ClickableObject clk = pin.AddComponent<ClickableObject>();
-            clk.promptText = $"{sideName} контакт #{colorId + 1} (Клик: подключить)";
-            clk.onClick = () => OnPinClicked(pin, colorId, side, c);
-
-            activeSubObjects.Add(pin);
-        }
-
-        private void OnPinClicked(GameObject pin, int colorId, int side, Color origColor)
-        {
-            if (selectedPinObj == null)
-            {
-                selectedPinObj = pin;
-                selectedColorId = colorId;
-                selectedSide = side;
-                selectedOriginalColor = origColor;
-
-                var clk = pin.GetComponent<ClickableObject>();
-                if (clk != null) clk.disableHover = true;
-
-                pin.GetComponent<Renderer>().material = CreateMaterial(Color.white, true);
-                pin.transform.localScale = pinScale * 1.35f;
-                HangarAudioLight.Instance?.PlayClick();
-                RepairStepInfo = $"Выбран контакт #{colorId + 1}. Теперь кликните парный контакт того же цвета!";
+                float ratio = normalizedPartExtent / b.size.magnitude;
+                target.localScale *= ratio;
+                b = CalcWorldBounds(target.gameObject);
+                target.position += (workPivot.position - b.center);
             }
             else
             {
-                if (selectedPinObj == pin) return;
-
-                if (selectedSide != side)
-                {
-                    if (selectedColorId == colorId)
-                    {
-                        CreateWireBridge(colorId, origColor);
-
-                        var clk1 = selectedPinObj.GetComponent<ClickableObject>();
-                        if (clk1 != null) SafeDestroy(clk1);
-                        var clk2 = pin.GetComponent<ClickableObject>();
-                        if (clk2 != null) SafeDestroy(clk2);
-
-                        selectedPinObj.transform.localScale = pinScale;
-                        selectedPinObj.GetComponent<Renderer>().material = CreateMaterial(origColor, false);
-                        pin.GetComponent<Renderer>().material = CreateMaterial(origColor, false);
-
-                        selectedPinObj = null;
-                        selectedColorId = -1;
-                        selectedSide = -1;
-
-                        wiresRemaining--;
-                        HangarAudioLight.Instance?.PlayBolt();
-
-                        if (wiresRemaining <= 0)
-                        {
-                            HangarAudioLight.Instance?.PlaySuccess();
-                            RepairStepInfo = "Все цепи восстановлены! Нажмите [SPACE] для завершения.";
-                        }
-                        else
-                        {
-                            RepairStepInfo = $"Цепь замкнута! Осталось соединить: {wiresRemaining}";
-                        }
-                    }
-                    else
-                    {
-                        HangarAudioLight.Instance?.PlayClick();
-                        RepairStepInfo = "Короткое замыкание! Цвета не совпадают. Попробуйте снова.";
-                    }
-                }
-                else
-                {
-                    var oldClk = selectedPinObj.GetComponent<ClickableObject>();
-                    if (oldClk != null) oldClk.disableHover = false;
-
-                    selectedPinObj.GetComponent<Renderer>().material = CreateMaterial(selectedOriginalColor, true);
-                    selectedPinObj.transform.localScale = pinScale;
-
-                    selectedPinObj = pin;
-                    selectedColorId = colorId;
-                    selectedSide = side;
-                    selectedOriginalColor = origColor;
-
-                    var newClk = pin.GetComponent<ClickableObject>();
-                    if (newClk != null) newClk.disableHover = true;
-
-                    pin.GetComponent<Renderer>().material = CreateMaterial(Color.white, true);
-                    pin.transform.localScale = pinScale * 1.35f;
-                    HangarAudioLight.Instance?.PlayClick();
-                    RepairStepInfo = $"Переключено на контакт #{colorId + 1}. Найдите парный контакт того же цвета!";
-                }
+                target.localPosition = Vector3.zero;
             }
-        }
-
-        private void CreateWireBridge(int colorId, Color c)
-        {
-            if (serviceHatchObj == null || !leftPinPositions.ContainsKey(colorId) || !rightPinPositions.ContainsKey(colorId)) return;
-
-            Vector3 pL = leftPinPositions[colorId];
-            Vector3 pR = rightPinPositions[colorId];
-            Vector3 mid = (pL + pR) * 0.5f + new Vector3(0f, 0f, 0.02f);
-
-            GameObject wire = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            wire.name = $"Wire_Bridge_{colorId}";
-            wire.transform.SetParent(serviceHatchObj.transform, false);
-            wire.transform.localPosition = mid;
-            wire.transform.localRotation = Quaternion.LookRotation(pR - pL) * Quaternion.Euler(90f, 0f, 0f);
-
-            float dist = Vector3.Distance(pL, pR);
-            wire.transform.localScale = new Vector3(0.03f, dist * 0.5f, 0.03f);
-            wire.GetComponent<Renderer>().material = CreateMaterial(c, true);
-
-            var col = wire.GetComponent<Collider>();
-            if (col != null) SafeDestroy(col);
-
-            activeSubObjects.Add(wire);
         }
 
         public void FinishWork()
         {
-            ClearSubObjects();
+            if (mountCoroutine != null)
+            {
+                StopCoroutine(mountCoroutine);
+                mountCoroutine = null;
+            }
+            minigame?.Clear();
+
             if (CurrentJaegerModule != null)
             {
-                foreach (var col in CurrentJaegerModule.GetComponentsInChildren<Collider>()) col.enabled = true;
-                SafeDestroy(CurrentJaegerModule); CurrentJaegerModule = null;
-                onJaegerDone?.Invoke(); HangarAudioLight.Instance?.PlaySuccess();
-                GameManager.Instance?.SwitchView(RoomView.Hangar);
-            }
-            else if (CurrentPart != null)
-            {
-                foreach (var col in CurrentPart.GetComponentsInChildren<Collider>()) col.enabled = true;
+                GameObject doneMod = CurrentJaegerModule;
+                CurrentJaegerModule = null;
+                currentJaegerName = null;
+                doneMod.transform.SetParent(null, true);
+                CleanupWorkPivot();
+                DestroySafe(doneMod);
 
-                if (CurrentPart.Data != null)
-                    GameManager.Instance?.TrySpend(CurrentPart.Data.repairCredits, CurrentPart.Data.repairAlloy);
-                CurrentPart.IsOnWorkbench = false;
-                var mechUnit = CurrentPart.GetComponentInParent<MechUnit>();
-                CurrentPart.RepairFull();
-                CurrentPart.ReturnToSocket();
-                if (mechUnit != null) mechUnit.SyncHpFromParts();
+                var callback = onJaegerDone;
+                onJaegerDone = null;
+                callback?.Invoke();
+                HangarAudio.Instance?.PlaySuccess();
+                GameManager.Instance?.SwitchView(RoomView.Hangar);
+                return;
+            }
+
+            if (CurrentPart != null)
+            {
+                MechPart finishedPart = CurrentPart;
                 CurrentPart = null;
-                HangarAudioLight.Instance?.PlaySuccess();
+
+                if (finishedPart.Data != null)
+                    GameManager.Instance?.TrySpend(finishedPart.Data.repairCredits, finishedPart.Data.repairAlloy);
+
+                finishedPart.ReturnToSocket();
+                CleanupWorkPivot();
+                finishedPart.RepairFull();
+                finishedPart.GetComponentInParent<MechUnit>()?.SyncHpFromParts();
+
+                HangarAudio.Instance?.PlaySuccess();
                 HangarMechManager.Instance?.UpdatePodiumDisplay();
                 GameManager.Instance?.SwitchView(RoomView.Hangar);
             }
@@ -528,52 +312,66 @@ namespace HangarGame.Repair
 
         public void CancelWork()
         {
-            ClearSubObjects();
+            if (mountCoroutine != null)
+            {
+                StopCoroutine(mountCoroutine);
+                mountCoroutine = null;
+            }
+            minigame?.Clear();
+
             if (CurrentJaegerModule != null)
             {
-                foreach (var col in CurrentJaegerModule.GetComponentsInChildren<Collider>()) col.enabled = true;
-                SafeDestroy(CurrentJaegerModule); CurrentJaegerModule = null;
+                GameObject mod = CurrentJaegerModule;
+                CurrentJaegerModule = null;
+                currentJaegerName = null;
+                onJaegerDone = null;
+                mod.transform.SetParent(null, true);
+                CleanupWorkPivot();
+                DestroySafe(mod);
             }
+
             if (CurrentPart != null)
             {
-                foreach (var col in CurrentPart.GetComponentsInChildren<Collider>()) col.enabled = true;
-                CurrentPart.IsOnWorkbench = false;
-                CurrentPart.ReturnToSocket(); CurrentPart = null;
+                MechPart canceledPart = CurrentPart;
+                CurrentPart = null;
+                canceledPart.ReturnToSocket();
+                CleanupWorkPivot();
             }
+
             HangarMechManager.Instance?.UpdatePodiumDisplay();
             GameManager.Instance?.SwitchView(RoomView.Hangar);
         }
 
-        private void ClearSubObjects()
+        private void CleanupWorkPivot()
         {
-            foreach (var o in activeSubObjects) if (o != null) SafeDestroy(o);
-            activeSubObjects.Clear();
-            serviceHatchObj = null;
-            selectedPinObj = null;
-            selectedColorId = -1;
-            selectedSide = -1;
+            if (workPivot != null)
+            {
+                DestroySafe(workPivot.gameObject);
+                workPivot = null;
+            }
         }
 
-        private void SafeDestroy(UnityEngine.Object obj)
+        private void DestroySafe(UnityEngine.Object obj)
         {
             if (obj == null) return;
             if (Application.isPlaying) Destroy(obj);
             else DestroyImmediate(obj);
         }
 
-        private Material CreateMaterial(Color color, bool emissive = false)
+        private Bounds CalcWorldBounds(GameObject go)
         {
-            var shader = Shader.Find("Universal Render Pipeline/Lit")
-                      ?? Shader.Find("Standard")
-                      ?? Shader.Find("Unlit/Color");
-            var mat = new Material(shader);
-            mat.color = color;
-            if (emissive)
-            {
-                mat.EnableKeyword("_EMISSION");
-                mat.SetColor("_EmissionColor", color * 1.5f);
-            }
-            return mat;
+            var rends = go.GetComponentsInChildren<Renderer>(false);
+            if (rends.Length == 0) return new Bounds(go.transform.position, Vector3.zero);
+            Bounds b = rends[0].bounds;
+            for (int i = 1; i < rends.Length; i++) b.Encapsulate(rends[i].bounds);
+            return b;
+        }
+
+        private Bounds CalcPivotLocalBounds(Transform pivot)
+        {
+            Bounds world = CalcWorldBounds(pivot.gameObject);
+            Vector3 localCenter = pivot.InverseTransformPoint(world.center);
+            return new Bounds(localCenter, world.size);
         }
     }
 }

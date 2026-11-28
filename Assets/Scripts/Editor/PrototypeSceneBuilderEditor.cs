@@ -1,7 +1,7 @@
 #if UNITY_EDITOR
+using HangarGame.Prototype;
 using UnityEditor;
 using UnityEngine;
-using HangarGame.Prototype;
 
 namespace HangarGame.EditorTools
 {
@@ -12,8 +12,16 @@ namespace HangarGame.EditorTools
         {
             DrawDefaultInspector();
             GUILayout.Space(10);
+
+            GUI.backgroundColor = new Color(0.25f, 0.65f, 0.95f);
+            if (GUILayout.Button("Обновить текущую сцену (Сохраняя арт)", GUILayout.Height(38)))
+            {
+                HangarSceneGenerator.UpgradeCurrentScenePreserveArt();
+            }
+
+            GUILayout.Space(4);
             GUI.backgroundColor = new Color(0.2f, 0.8f, 0.4f);
-            if (GUILayout.Button("Сгенерировать сцену (Bake)", GUILayout.Height(45)))
+            if (GUILayout.Button("Сгенерировать сцену с нуля (Резервный сброс)", GUILayout.Height(36)))
             {
                 HangarSceneGenerator.BakeIntoCurrentScene();
             }

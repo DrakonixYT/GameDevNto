@@ -1,80 +1,151 @@
-using System;
-using UnityEngine;
-using HangarGame.Core;
+using System.Collections;
 using HangarGame.CameraControl;
+using HangarGame.Core;
+using UnityEngine;
 
 namespace HangarGame.Repair
 {
     public class JaegerProject : MonoBehaviour
     {
         public static JaegerProject Instance { get; private set; }
-        public int CurrentStage { get; private set; } = 0;
-        public int TotalStages => 4;
-        public bool IsComplete => CurrentStage >= TotalStages;
 
-        [SerializeField] private Transform[] stageVisualMarkers;
+        [Header("Этапы Егеря: Голова, Л.Рука, П.Рука, Щит, Копьё")]
+        [SerializeField] private Transform[] stageVisualParts = new Transform[5];
+        [SerializeField] private GameObject[] stageWorkbenchPrefabs = new GameObject[5];
         [SerializeField] private GameObject platePrefab;
 
-        private readonly string[] names = { "Термоядерный Реактор 'Гиперион'", "Титановый Силовой Экзоскелет", "Тяжелый Ионный Излучатель", "Нейро-Командный Шлем 'Апокалипсис'" };
-        private readonly int[] credits = { 150, 200, 250, 300 }, alloys = { 60, 100, 120, 150 };
+        [Header("Стоимость и названия")]
+        [SerializeField] private string[] stageNames =
+        {
+            "Голова Егеря (Нейро-визор)",
+            "Левая рука Егеря",
+            "Правая рука Егеря",
+            "Щит Егеря 'Цитадель'",
+            "Копьё Егеря 'Рассвет'"
+        };
+        [SerializeField] private int[] stageCredits = { 160, 210, 260, 330, 420 };
+        [SerializeField] private int[] stageAlloy = { 70, 95, 120, 150, 190 };
 
-        private void Awake() => Instance = this;
+        public int CurrentStage { get; private set; }
+        public int TotalStages => 5;
+        public bool IsComplete => CurrentStage >= TotalStages;
 
-        public void SetMarkers(Transform[] m) { stageVisualMarkers = m; UpdateMarkers(); }
-        public void SetPlatePrefab(GameObject p) => platePrefab = p;
+        private void Awake()
+        {
+            Instance = this;
+        }
 
-        public string GetNextStageInfo() => IsComplete ? "ПРОЕКТ 'ЕГЕРЬ': 100% (ПОСТРОЕН)" : $"ПРОЕКТ 'ЕГЕРЬ' ({CurrentStage}/4): {names[CurrentStage]} [{credits[CurrentStage]}¢, {alloys[CurrentStage]}т]";
+        private void Start()
+        {
+            RefreshVisualStages();
+            if (RepairWorkbench.Instance != null && platePrefab != null)
+                RepairWorkbench.Instance.SetPlatePrefab(platePrefab);
+        }
 
-        public bool CanStartNext() => !IsComplete && RepairWorkbench.Instance != null && !RepairWorkbench.Instance.HasItem && GameManager.Instance != null && GameManager.Instance.Credits >= credits[CurrentStage] && GameManager.Instance.Alloy >= alloys[CurrentStage];
+        public void Configure(Transform[] sceneParts, GameObject[] workbenchPrefabs, GameObject plate)
+        {
+            stageVisualParts = sceneParts;
+            stageWorkbenchPrefabs = workbenchPrefabs;
+            platePrefab = plate;
+            RefreshVisualStages();
+        }
+
+        public string GetNextStageInfo()
+        {
+            if (IsComplete)
+                return "ПРОЕКТ 'ЕГЕРЬ': 5/5 (ПОСТРОЕН)";
+
+            return $"ПРОЕКТ 'ЕГЕРЬ' ({CurrentStage}/{TotalStages}): {stageNames[CurrentStage]} [{stageCredits[CurrentStage]}¢, {stageAlloy[CurrentStage]}т]";
+        }
+
+        public bool CanStartNext()
+        {
+            return !IsComplete
+                && RepairWorkbench.Instance != null
+                && !RepairWorkbench.Instance.HasItem
+                && GameManager.Instance != null
+                && GameManager.Instance.CanAfford(stageCredits[CurrentStage], stageAlloy[CurrentStage]);
+        }
 
         public void StartNextStage()
         {
-            if (!CanStartNext() || !GameManager.Instance.TrySpend(credits[CurrentStage], alloys[CurrentStage])) return;
-            RepairWorkbench.Instance.ReceiveJaegerModule(CreateStageModel(CurrentStage), names[CurrentStage], OnStageCompleted);
+            if (!CanStartNext()) return;
+            if (!GameManager.Instance.TrySpend(stageCredits[CurrentStage], stageAlloy[CurrentStage])) return;
+
+            if (platePrefab != null)
+                RepairWorkbench.Instance?.SetPlatePrefab(platePrefab);
+
+            GameObject model = CreateWorkbenchModel(CurrentStage);
+            RepairWorkbench.Instance?.ReceiveJaegerModule(model, stageNames[CurrentStage], OnStageCompleted);
         }
 
         private void OnStageCompleted()
         {
-            CurrentStage++; UpdateMarkers();
-            HangarAudioLight.Instance?.PlayBolt(); RoomCamera.Instance?.Shake(0.35f, 0.15f);
+            int completedIndex = CurrentStage;
+            CurrentStage++;
+
+            if (stageVisualParts != null && completedIndex < stageVisualParts.Length && stageVisualParts[completedIndex] != null)
+            {
+                var part = stageVisualParts[completedIndex].gameObject;
+                part.SetActive(true);
+                if (Application.isPlaying) StartCoroutine(AnimateStageMount(part.transform));
+            }
+
+            HangarAudio.Instance?.PlayJaegerStage();
+            RoomCamera.Instance?.Shake(0.32f, 0.14f);
             GameManager.Instance?.SetJaegerProgress(CurrentStage / (float)TotalStages);
-            if (IsComplete) { HangarAudioLight.Instance?.PlayVictory(); GameManager.Instance?.TriggerVictory(); }
-        }
 
-        private void UpdateMarkers()
-        {
-            if (stageVisualMarkers == null) return;
-            for (int i = 0; i < stageVisualMarkers.Length; i++)
+            if (IsComplete)
             {
-                if (stageVisualMarkers[i] != null) stageVisualMarkers[i].gameObject.SetActive(i < CurrentStage);
+                HangarAudio.Instance?.PlayVictory();
+                GameManager.Instance?.TriggerVictory();
             }
         }
 
-        private GameObject CreateStageModel(int s)
+        private void RefreshVisualStages()
         {
-            GameObject m;
-            if (platePrefab != null)
+            if (stageVisualParts == null) return;
+            for (int i = 0; i < stageVisualParts.Length; i++)
             {
-                m = new GameObject($"Jaeger_Plate_Mod_{s + 1}");
-                GameObject sub = Instantiate(platePrefab, m.transform);
-                sub.name = "Model";
-                sub.transform.localPosition = new Vector3(5.19f, -1.46f, 0.40f);
-                sub.transform.localRotation = Quaternion.identity;
-                m.transform.localScale = Vector3.one * 0.7f;
-                Color col = s == 0 ? Color.cyan : (s == 1 ? new Color(0.2f, 0.5f, 0.9f) : (s == 2 ? new Color(0.95f, 0.45f, 0.1f) : new Color(1f, 0.85f, 0.2f)));
-                foreach (var r in m.GetComponentsInChildren<Renderer>())
-                {
-                    r.material.color = col;
-                }
+                if (stageVisualParts[i] != null)
+                    stageVisualParts[i].gameObject.SetActive(i < CurrentStage);
             }
-            else
+        }
+
+        private IEnumerator AnimateStageMount(Transform part)
+        {
+            Vector3 targetScale = part.localScale;
+            part.localScale = targetScale * 0.1f;
+
+            float t = 0f;
+            const float dur = 0.4f;
+            while (t < dur && part != null)
             {
-                m = new GameObject($"Jaeger_Mod_{s + 1}");
-                var c = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                c.transform.SetParent(m.transform, false);
-                c.transform.localScale = new Vector3(0.6f, 0.3f, 0.6f);
+                t += Time.deltaTime;
+                float k = Mathf.SmoothStep(0f, 1f, t / dur);
+                part.localScale = Vector3.Lerp(targetScale * 0.1f, targetScale, k);
+                yield return null;
             }
-            return m;
+            if (part != null) part.localScale = targetScale;
+        }
+
+        private GameObject CreateWorkbenchModel(int stageIndex)
+        {
+            GameObject prefab = (stageWorkbenchPrefabs != null && stageIndex < stageWorkbenchPrefabs.Length)
+                ? stageWorkbenchPrefabs[stageIndex]
+                : null;
+
+            if (prefab != null)
+            {
+                GameObject instance = Instantiate(prefab);
+                instance.name = $"Jaeger_Work_{stageIndex}";
+                return instance;
+            }
+
+            GameObject fallback = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            fallback.name = $"Jaeger_Work_{stageIndex}";
+            fallback.transform.localScale = new Vector3(0.45f, 0.35f, 0.45f);
+            return fallback;
         }
     }
 }
