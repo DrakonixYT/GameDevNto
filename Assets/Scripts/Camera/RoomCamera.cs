@@ -26,9 +26,9 @@ namespace HangarGame.CameraControl
         public ViewAnchor armoryView = new ViewAnchor { position = new Vector3(-14.38f, 1.47f, 1.72f), yaw = 30f };
 
         [Header("Верстак")]
-        public Vector3 wbCameraOffset = new Vector3(0f, 1.54f, -1.24f);
-        public float wbCameraPitch = 22f;
-        public float dispatchDistance = 1.32f;
+        public Vector3 wbCameraOffset = new Vector3(0f, 1.54f, -1.42f);
+        public float wbCameraPitch = 16.0f;
+        public float dispatchDistance = 1.56f;
 
         public bool IsArmoryFocused { get; private set; }
         public event Action<bool> OnArmoryFocusChanged;
@@ -142,9 +142,12 @@ namespace HangarGame.CameraControl
             }
             else
             {
-                pitch = IsArmoryFocused ? -ny * 3.5f : -ny * 6.5f;
-                yaw = currentYaw + (IsArmoryFocused ? nx * 5.0f : nx * 11f);
-                targetPos = view == RoomView.DispatchConsole
+                bool inDispatch = view == RoomView.DispatchConsole;
+                float pitchScale = IsArmoryFocused ? 2.5f : (inDispatch ? 2.2f : 5.0f);
+                float yawScale = IsArmoryFocused ? 3.0f : (inDispatch ? 3.2f : 9.0f);
+                pitch = -ny * pitchScale;
+                yaw = currentYaw + nx * yawScale;
+                targetPos = inDispatch
                     ? (IsArmoryFocused ? armoryView.position : dispatchView.position)
                     : hangarView.position;
             }

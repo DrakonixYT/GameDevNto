@@ -493,11 +493,11 @@ namespace HangarGame.Prototype
                 ? centerScreen.GetComponent<Renderer>().bounds
                 : new Bounds(screenCenter, new Vector3(1.16f, 0.72f, 0.1f));
 
-            float termScale = cb.size.x > 0.4f ? Mathf.Clamp((cb.size.x * 0.94f) / 1200f, 0.00072f, 0.00095f) : 0.0009f;
+            float termScale = cb.size.x > 0.4f ? Mathf.Clamp((cb.size.x * 0.95f) / 1280f, 0.00072f, 0.00095f) : 0.0009f;
             Font baseFont = UIBuilder.GetFont(18);
             Font hiFont = UIBuilder.GetFont(28);
 
-            BuildTerminalMonitor(consoleGroup, new Vector3(cb.center.x, cb.center.y, cb.min.z - 0.014f), termScale, cam, baseFont, gm);
+            BuildTerminalMonitor(consoleGroup, new Vector3(cb.center.x, cb.center.y, cb.min.z - 0.015f), termScale, cam, baseFont, gm);
             BuildStatusMonitor(consoleGroup, new Vector3(cb.min.x, cb.center.y, cb.center.z), cam, hiFont, gm);
             return BuildArmoryMonitor(consoleGroup, new Vector3(cb.max.x, cb.center.y, cb.center.z), cam, hiFont, gm);
         }
@@ -527,7 +527,7 @@ namespace HangarGame.Prototype
 
         private static void BuildTerminalMonitor(Transform parent, Vector3 pos, float scale, UnityEngine.Camera cam, Font font, GameManager gm)
         {
-            Canvas c = CreateWorldCanvas(parent, "Terminal_Canvas", pos, Quaternion.identity, scale, new Vector2(1200f, 680f), cam, 4);
+            Canvas c = CreateWorldCanvas(parent, "Terminal_Canvas", pos, Quaternion.identity, scale, new Vector2(1280f, 720f), cam, 4);
             var ui = ModelUtils.GetOrAdd<TerminalUI>(c.gameObject);
             ui.game = gm;
             ui.hangar = gm?.hangar;
@@ -536,21 +536,23 @@ namespace HangarGame.Prototype
 
             GameObject bg = UIBuilder.Panel(c.transform, "BG", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, UITheme.BgDark, UITheme.Border);
 
-            GameObject header = UIBuilder.Panel(bg.transform, "Header", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -30f), new Vector2(1168f, 48f), UITheme.BgHeader, UITheme.Border);
-            ui.txtRadarTitle = UIBuilder.Label(header.transform, "Txt_RadarTitle", "РАДАР ОБОРОНЫ   •   ПЕРИМЕТР ЧИСТ   •   БАЗА: 100%", new Vector2(0f, 0.5f), new Vector2(360f, 0f), new Vector2(680f, 36f), 19, UITheme.TextMain, font, FontStyle.Bold, TextAnchor.MiddleLeft);
-            ui.txtJaegerInfo = UIBuilder.Label(header.transform, "Txt_JaegerInfo", "Егерь 0/5", new Vector2(1f, 0.5f), new Vector2(-280f, 0f), new Vector2(160f, 32f), 17, UITheme.TextMuted, font, FontStyle.Bold, TextAnchor.MiddleRight);
-            ui.btnScanThreat = UIBuilder.Button(header.transform, "Btn_ScanThreat", "Вызвать волну", new Vector2(1f, 0.5f), new Vector2(-102f, 0f), new Vector2(180f, 34f), UITheme.AccentTeal, UITheme.Border, 16, font);
+            GameObject header = UIBuilder.Panel(bg.transform, "Header", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -34f), new Vector2(1236f, 54f), UITheme.BgHeader);
+            ui.txtRadarTitle = UIBuilder.Label(header.transform, "Txt_RadarTitle", "Радар чист   •   База: 100%", new Vector2(0f, 0.5f), new Vector2(290f, 0f), new Vector2(540f, 38f), 20, UITheme.TextMain, font, FontStyle.Bold, TextAnchor.MiddleLeft);
+            ui.txtJaegerInfo = UIBuilder.Label(header.transform, "Txt_JaegerInfo", "Егерь 0/5", new Vector2(1f, 0.5f), new Vector2(-505f, 0f), new Vector2(160f, 34f), 17, UITheme.AccentAmber, font, FontStyle.Bold, TextAnchor.MiddleRight);
+            ui.btnBuildJaeger = UIBuilder.Button(header.transform, "Btn_BuildJaeger", "Собрать Егеря", new Vector2(1f, 0.5f), new Vector2(-302f, 0f), new Vector2(220f, 38f), UITheme.AccentTeal, null, 16, font);
+            ui.txtBuildBtn = ui.btnBuildJaeger.GetComponentInChildren<Text>();
+            ui.btnScanThreat = UIBuilder.Button(header.transform, "Btn_ScanThreat", "Вызвать волну", new Vector2(1f, 0.5f), new Vector2(-96f, 0f), new Vector2(172f, 38f), UITheme.AccentGreen, null, 16, font);
 
-            GameObject radar = UIBuilder.Panel(bg.transform, "Radar_Screen", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 44f), new Vector2(1140f, 420f), UITheme.BgRecessed, UITheme.Border);
+            GameObject radar = UIBuilder.Panel(bg.transform, "Radar_Screen", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 42f), new Vector2(1200f, 430f), UITheme.BgRecessed);
             ui.radarArea = radar.GetComponent<RectTransform>();
             ui.radarClick = radar.AddComponent<RadarClickHandler>();
 
-            foreach (float x in new[] { -360f, -180f, 0f, 180f, 360f })
-                UIBuilder.AddLine(radar.transform, new Vector2(x, 0f), new Vector2(1.5f, 412f), UITheme.RadarGrid);
+            foreach (float x in new[] { -400f, -200f, 0f, 200f, 400f })
+                UIBuilder.AddLine(radar.transform, new Vector2(x, 0f), new Vector2(1.5f, 420f), UITheme.RadarGrid);
             foreach (float y in new[] { -110f, 0f, 110f })
-                UIBuilder.AddLine(radar.transform, new Vector2(0f, y), new Vector2(1132f, 1.5f), UITheme.RadarGrid);
+                UIBuilder.AddLine(radar.transform, new Vector2(0f, y), new Vector2(1190f, 1.5f), UITheme.RadarGrid);
 
-            UIBuilder.AddLine(radar.transform, new Vector2(0f, -178f), new Vector2(1120f, 2f), new Color(UITheme.AccentTeal.r, UITheme.AccentTeal.g, UITheme.AccentTeal.b, 0.75f));
+            UIBuilder.AddLine(radar.transform, new Vector2(0f, -182f), new Vector2(1176f, 2f), new Color(UITheme.AccentTeal.r, UITheme.AccentTeal.g, UITheme.AccentTeal.b, 0.75f));
 
             var markers = new GameObject("Marker_Container");
             markers.transform.SetParent(radar.transform, false);
@@ -560,16 +562,16 @@ namespace HangarGame.Prototype
             mRt.sizeDelta = Vector2.zero;
             ui.markerContainer = markers.transform;
 
-            float[] xOff = { -386f, 0f, 386f };
+            float[] xOff = { -404f, 0f, 404f };
             for (int i = 0; i < 3; i++)
             {
-                GameObject slot = UIBuilder.Panel(bg.transform, $"SlotRoot_{i}", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(xOff[i], 96f), new Vector2(368f, 112f), UITheme.BgCard, UITheme.Border);
-                Button mainBtn = UIBuilder.Button(slot.transform, $"Btn_MechSlot_{i}", $"Мех {i + 1}", new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(354f, 32f), UITheme.BgHeader, UITheme.Border, 15, font);
-                Image hpFill = UIBuilder.BarFill(slot.transform, "Bar_Hp", new Vector2(0.5f, 0.5f), new Vector2(-88f, 4f), new Vector2(168f, 10f), UITheme.BgRecessed, UITheme.AccentGreen);
-                Image enFill = UIBuilder.BarFill(slot.transform, "Bar_En", new Vector2(0.5f, 0.5f), new Vector2(88f, 4f), new Vector2(168f, 10f), UITheme.BgRecessed, UITheme.AccentTeal);
-                Text statsTxt = UIBuilder.Label(slot.transform, "Txt_Stats", "ХП 100%     ЭН 100%", new Vector2(0.5f, 0.5f), new Vector2(0f, -14f), new Vector2(350f, 20f), 13, UITheme.TextMuted, font);
-                Button shieldBtn = UIBuilder.Button(slot.transform, $"Btn_Shield_{i}", "Щит", new Vector2(0f, 0f), new Vector2(92f, 18f), new Vector2(166f, 26f), UITheme.AccentTeal, UITheme.Border, 14, font);
-                Button recallBtn = UIBuilder.Button(slot.transform, $"Btn_Recall_{i}", "На базу", new Vector2(1f, 0f), new Vector2(-92f, 18f), new Vector2(166f, 26f), UITheme.AccentRed, UITheme.Border, 14, font);
+                GameObject slot = UIBuilder.Panel(bg.transform, $"SlotRoot_{i}", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(xOff[i], 102f), new Vector2(384f, 114f), UITheme.BgCard);
+                Button mainBtn = UIBuilder.Button(slot.transform, $"Btn_MechSlot_{i}", $"Мех {i + 1}", new Vector2(0.5f, 1f), new Vector2(0f, -24f), new Vector2(372f, 40f), UITheme.BgHeader, null, 16, font);
+                Image hpFill = UIBuilder.BarFill(slot.transform, "Bar_Hp", new Vector2(0.5f, 1f), new Vector2(-94f, -52f), new Vector2(176f, 8f), UITheme.BgRecessed, UITheme.AccentGreen);
+                Image enFill = UIBuilder.BarFill(slot.transform, "Bar_En", new Vector2(0.5f, 1f), new Vector2(94f, -52f), new Vector2(176f, 8f), UITheme.BgRecessed, UITheme.AccentTeal);
+                Text statsTxt = UIBuilder.Label(slot.transform, "Txt_Stats", "ХП 100%     ЭН 100%", new Vector2(0.5f, 1f), new Vector2(0f, -70f), new Vector2(368f, 22f), 15, UITheme.TextMain, font);
+                Button shieldBtn = UIBuilder.Button(slot.transform, $"Btn_Shield_{i}", "Щит", new Vector2(0f, 0f), new Vector2(98f, 18f), new Vector2(176f, 26f), UITheme.AccentTeal, null, 14, font);
+                Button recallBtn = UIBuilder.Button(slot.transform, $"Btn_Recall_{i}", "На базу", new Vector2(1f, 0f), new Vector2(-98f, 18f), new Vector2(176f, 26f), UITheme.AccentRed, null, 14, font);
 
                 ui.slots[i] = new TerminalUI.MechSlotView
                 {
@@ -584,14 +586,14 @@ namespace HangarGame.Prototype
                 };
             }
 
-            ui.txtBattleLog = UIBuilder.Label(bg.transform, "Txt_BattleLog", "Радар чист.", new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(1140f, 26f), 15, UITheme.TextMuted, font);
+            ui.txtBattleLog = UIBuilder.Label(bg.transform, "Txt_BattleLog", "Радар чист.", new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(1200f, 28f), 16, UITheme.TextMuted, font);
         }
 
         private static void BuildStatusMonitor(Transform parent, Vector3 leftPivot, UnityEngine.Camera cam, Font hiFont, GameManager gm)
         {
             Quaternion rot = Quaternion.Euler(0f, -30f, 0f);
-            Vector3 worldPos = leftPivot + rot * new Vector3(-0.186f, 0.004f, -0.014f);
-            Canvas c = CreateWorldCanvas(parent, "Status_Canvas", worldPos, rot, 0.00052f, new Vector2(700f, 950f), cam, 5);
+            Vector3 worldPos = leftPivot + rot * new Vector3(-0.190f, 0.004f, -0.020f);
+            Canvas c = CreateWorldCanvas(parent, "Status_Canvas", worldPos, rot, 0.00057f, new Vector2(640f, 1060f), cam, 5);
 
             var ui = ModelUtils.GetOrAdd<StatusMonitorUI>(c.gameObject);
             ui.game = gm;
@@ -600,24 +602,24 @@ namespace HangarGame.Prototype
 
             GameObject bg = UIBuilder.Panel(c.transform, "BG", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, UITheme.BgDark, UITheme.Border);
 
-            GameObject header = UIBuilder.Panel(bg.transform, "Header", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(660f, 68f), UITheme.BgHeader, UITheme.Border);
-            UIBuilder.Label(header.transform, "Title", "СТАТУС БАЗЫ", new Vector2(0f, 0.5f), new Vector2(190f, 0f), new Vector2(340f, 44f), 30, UITheme.TextMain, hiFont, FontStyle.Bold, TextAnchor.MiddleLeft);
-            ui.txtHeaderStatus = UIBuilder.Label(header.transform, "Txt_Wave", "Спокойно", new Vector2(1f, 0.5f), new Vector2(-120f, 0f), new Vector2(210f, 38f), 22, UITheme.TextMuted, hiFont, FontStyle.Bold, TextAnchor.MiddleRight);
+            GameObject header = UIBuilder.Panel(bg.transform, "Header", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(604f, 66f), UITheme.BgHeader);
+            UIBuilder.Label(header.transform, "Title", "СТАТУС БАЗЫ", new Vector2(0f, 0.5f), new Vector2(180f, 0f), new Vector2(320f, 44f), 30, UITheme.TextMain, hiFont, FontStyle.Bold, TextAnchor.MiddleLeft);
+            ui.txtHeaderStatus = UIBuilder.Label(header.transform, "Txt_Wave", "Спокойно", new Vector2(1f, 0.5f), new Vector2(-115f, 0f), new Vector2(200f, 38f), 23, UITheme.TextMuted, hiFont, FontStyle.Bold, TextAnchor.MiddleRight);
 
-            GameObject baseCard = UIBuilder.Panel(bg.transform, "BaseCard", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -158f), new Vector2(660f, 142f), UITheme.BgCard, UITheme.Border);
-            UIBuilder.Label(baseCard.transform, "Lbl", "ЦЕЛОСТНОСТЬ ПЕРИМЕТРА", new Vector2(0f, 1f), new Vector2(210f, -24f), new Vector2(390f, 32f), 22, UITheme.TextMuted, hiFont, FontStyle.Bold, TextAnchor.MiddleLeft);
-            ui.txtBaseHp = UIBuilder.Label(baseCard.transform, "Txt_BaseHp", "100%", new Vector2(1f, 1f), new Vector2(-78f, -24f), new Vector2(120f, 34f), 28, UITheme.AccentGreen, hiFont, FontStyle.Bold, TextAnchor.MiddleRight);
-            ui.barBaseHp = UIBuilder.BarFill(baseCard.transform, "Bar_BaseHp", new Vector2(0.5f, 0.5f), new Vector2(0f, 6f), new Vector2(616f, 22f), UITheme.BgRecessed, UITheme.AccentGreen);
-            ui.txtResources = UIBuilder.Label(baseCard.transform, "Txt_Resources", "Кредиты: 220   •   Сплав: 95", new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(620f, 32f), 23, UITheme.AccentAmber, hiFont, FontStyle.Bold);
+            GameObject baseCard = UIBuilder.Panel(bg.transform, "BaseCard", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -162f), new Vector2(604f, 146f), UITheme.BgCard);
+            UIBuilder.Label(baseCard.transform, "Lbl", "ПЕРИМЕТР БАЗЫ", new Vector2(0f, 1f), new Vector2(195f, -26f), new Vector2(360f, 32f), 23, UITheme.TextMuted, hiFont, FontStyle.Bold, TextAnchor.MiddleLeft);
+            ui.txtBaseHp = UIBuilder.Label(baseCard.transform, "Txt_BaseHp", "100%", new Vector2(1f, 1f), new Vector2(-74f, -26f), new Vector2(116f, 36f), 29, UITheme.AccentGreen, hiFont, FontStyle.Bold, TextAnchor.MiddleRight);
+            ui.barBaseHp = UIBuilder.BarFill(baseCard.transform, "Bar_BaseHp", new Vector2(0.5f, 0.5f), new Vector2(0f, 2f), new Vector2(564f, 20f), UITheme.BgRecessed, UITheme.AccentGreen);
+            ui.txtResources = UIBuilder.Label(baseCard.transform, "Txt_Resources", "Кредиты: 220   •   Сплав: 95", new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(570f, 34f), 24, UITheme.AccentAmber, hiFont, FontStyle.Bold);
 
-            ui.txtJaegerHeader = UIBuilder.Label(bg.transform, "Txt_JaegerHeader", "ПРОЕКТ «ЕГЕРЬ»   0/5", new Vector2(0.5f, 1f), new Vector2(0f, -258f), new Vector2(650f, 40f), 26, UITheme.TextMain, hiFont, FontStyle.Bold);
+            ui.txtJaegerHeader = UIBuilder.Label(bg.transform, "Txt_JaegerHeader", "ПРОЕКТ «ЕГЕРЬ»   0/5", new Vector2(0.5f, 1f), new Vector2(0f, -268f), new Vector2(600f, 42f), 28, UITheme.TextMain, hiFont, FontStyle.Bold);
 
-            float[] yRows = { -330f, -424f, -518f, -612f, -706f };
+            float[] yRows = { -352f, -468f, -584f, -700f, -816f };
             for (int i = 0; i < 5; i++)
             {
-                GameObject row = UIBuilder.Panel(bg.transform, $"Stage_{i}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, yRows[i]), new Vector2(660f, 80f), UITheme.BgCard, UITheme.Border);
-                GameObject acc = UIBuilder.Panel(row.transform, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(10f, 62f), UITheme.Border);
-                Text lbl = UIBuilder.Label(row.transform, "Txt_Stage", $"{i + 1}. Этап", new Vector2(0.5f, 0.5f), new Vector2(12f, 0f), new Vector2(610f, 46f), 24, UITheme.TextMain, hiFont, FontStyle.Bold, TextAnchor.MiddleLeft);
+                GameObject row = UIBuilder.Panel(bg.transform, $"Stage_{i}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, yRows[i]), new Vector2(604f, 98f), UITheme.BgCard);
+                GameObject acc = UIBuilder.Panel(row.transform, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(10f, 74f), UITheme.Border);
+                Text lbl = UIBuilder.Label(row.transform, "Txt_Stage", $"{i + 1}. Этап", new Vector2(0.5f, 0.5f), new Vector2(14f, 0f), new Vector2(556f, 56f), 25, UITheme.TextMain, hiFont, FontStyle.Bold, TextAnchor.MiddleLeft);
 
                 ui.stages[i] = new StatusMonitorUI.StageRowView
                 {
@@ -627,15 +629,15 @@ namespace HangarGame.Prototype
                 };
             }
 
-            ui.btnBuildJaeger = UIBuilder.Button(bg.transform, "Btn_BuildJaeger", "СОБРАТЬ МОДУЛЬ", new Vector2(0.5f, 0f), new Vector2(0f, 68f), new Vector2(660f, 84f), UITheme.AccentTeal, UITheme.Border, 25, hiFont);
+            ui.btnBuildJaeger = UIBuilder.Button(bg.transform, "Btn_BuildJaeger", "СОБРАТЬ МОДУЛЬ", new Vector2(0.5f, 0f), new Vector2(0f, 76f), new Vector2(604f, 88f), UITheme.AccentTeal, null, 25, hiFont);
             ui.txtBuildBtn = ui.btnBuildJaeger.GetComponentInChildren<Text>();
         }
 
         private static ArmoryUI BuildArmoryMonitor(Transform consoleGroup, Vector3 rightPivot, UnityEngine.Camera cam, Font hiFont, GameManager gm)
         {
             Quaternion monRot = Quaternion.Euler(0f, 30f, 0f);
-            Vector3 worldPos = rightPivot + monRot * new Vector3(0.186f, 0.004f, -0.014f);
-            Canvas c = CreateWorldCanvas(consoleGroup, "Armory_Canvas", worldPos, monRot, 0.00052f, new Vector2(700f, 950f), cam, 5);
+            Vector3 worldPos = rightPivot + monRot * new Vector3(0.190f, 0.004f, -0.020f);
+            Canvas c = CreateWorldCanvas(consoleGroup, "Armory_Canvas", worldPos, monRot, 0.00057f, new Vector2(640f, 1060f), cam, 5);
 
             var ui = ModelUtils.GetOrAdd<ArmoryUI>(c.gameObject);
             ui.game = gm;
@@ -646,30 +648,30 @@ namespace HangarGame.Prototype
             GameObject bg = UIBuilder.Panel(c.transform, "BG", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, UITheme.BgDark, UITheme.Border);
             ui.panelRoot = bg;
 
-            UIBuilder.Label(bg.transform, "Txt_Title", "ОРУЖЕЙНАЯ", new Vector2(0f, 1f), new Vector2(215f, -42f), new Vector2(380f, 44f), 32, UITheme.TextMain, hiFont, FontStyle.Bold, TextAnchor.MiddleLeft);
-            ui.btnFocusMonitor = UIBuilder.Button(bg.transform, "Btn_FocusMonitor", "КРУПНЕЕ", new Vector2(1f, 1f), new Vector2(-116f, -42f), new Vector2(188f, 48f), UITheme.AccentTeal, UITheme.Border, 22, hiFont);
+            UIBuilder.Label(bg.transform, "Txt_Title", "ОРУЖЕЙНАЯ", new Vector2(0f, 1f), new Vector2(200f, -44f), new Vector2(360f, 46f), 34, UITheme.TextMain, hiFont, FontStyle.Bold, TextAnchor.MiddleLeft);
+            ui.btnFocusMonitor = UIBuilder.Button(bg.transform, "Btn_FocusMonitor", "КРУПНЕЕ", new Vector2(1f, 1f), new Vector2(-108f, -44f), new Vector2(180f, 50f), UITheme.AccentTeal, null, 23, hiFont);
             ui.txtFocusBtn = ui.btnFocusMonitor.GetComponentInChildren<Text>();
-            ui.txtResources = UIBuilder.Label(bg.transform, "Txt_ArmoryResources", "Кредиты: 220   •   Сплав: 95", new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(650f, 38f), 25, UITheme.AccentAmber, hiFont, FontStyle.Bold);
+            ui.txtResources = UIBuilder.Label(bg.transform, "Txt_ArmoryResources", "Кредиты: 220   •   Сплав: 95", new Vector2(0.5f, 1f), new Vector2(0f, -104f), new Vector2(600f, 40f), 26, UITheme.AccentAmber, hiFont, FontStyle.Bold);
 
-            GameObject pMech = UIBuilder.Panel(bg.transform, "Panel_MechSelect", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 412f), new Vector2(664f, 804f), Color.clear);
+            GameObject pMech = UIBuilder.Panel(bg.transform, "Panel_MechSelect", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 460f), new Vector2(608f, 896f), Color.clear);
             pMech.GetComponent<Image>().raycastTarget = false;
             ui.pageMechSelect = pMech;
-            UIBuilder.Label(pMech.transform, "Txt_Step1", "ВЫБЕРИТЕ РОБОТА", new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(640f, 36f), 25, UITheme.TextMuted, hiFont, FontStyle.Bold);
+            UIBuilder.Label(pMech.transform, "Txt_Step1", "Выберите робота", new Vector2(0.5f, 1f), new Vector2(0f, -28f), new Vector2(580f, 38f), 26, UITheme.TextMuted, hiFont, FontStyle.Bold);
 
-            float[] cardY = { -168f, -396f, -624f };
+            float[] cardY = { -184f, -448f, -712f };
             for (int i = 0; i < 3; i++)
             {
-                GameObject card = UIBuilder.Panel(pMech.transform, $"Btn_SelectMech_{i}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, cardY[i]), new Vector2(648f, 208f), UITheme.BgCard, UITheme.Border);
+                GameObject card = UIBuilder.Panel(pMech.transform, $"Btn_SelectMech_{i}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, cardY[i]), new Vector2(604f, 244f), UITheme.BgCard);
                 Button btn = card.AddComponent<Button>();
 
-                GameObject acc = UIBuilder.Panel(card.transform, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(12f, 184f), UITheme.AccentTeal);
+                GameObject acc = UIBuilder.Panel(card.transform, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(12f, 212f), UITheme.AccentTeal);
                 acc.GetComponent<Image>().raycastTarget = false;
 
-                Text info = UIBuilder.Label(card.transform, "Txt_Info", $"Робот {i + 1}", new Vector2(0.5f, 0.5f), new Vector2(16f, 14f), new Vector2(592f, 144f), 24, UITheme.TextMain, hiFont, FontStyle.Normal, TextAnchor.MiddleLeft);
+                Text info = UIBuilder.Label(card.transform, "Txt_Info", $"Робот {i + 1}", new Vector2(0.5f, 0.5f), new Vector2(16f, 14f), new Vector2(548f, 176f), 27, UITheme.TextMain, hiFont, FontStyle.Normal, TextAnchor.MiddleLeft);
                 info.supportRichText = true;
                 info.lineSpacing = 1.25f;
 
-                Image hpFill = UIBuilder.BarFill(card.transform, "Bar_Hp", new Vector2(0.5f, 0f), new Vector2(12f, 22f), new Vector2(596f, 12f), UITheme.BgRecessed, UITheme.AccentGreen);
+                Image hpFill = UIBuilder.BarFill(card.transform, "Bar_Hp", new Vector2(0.5f, 0f), new Vector2(12f, 22f), new Vector2(552f, 14f), UITheme.BgRecessed, UITheme.AccentGreen);
 
                 ui.mechCards[i] = new ArmoryUI.MechCardView
                 {
@@ -681,19 +683,19 @@ namespace HangarGame.Prototype
                 };
             }
 
-            GameObject pLoad = UIBuilder.Panel(bg.transform, "Panel_LoadoutMenu", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 412f), new Vector2(664f, 804f), Color.clear);
+            GameObject pLoad = UIBuilder.Panel(bg.transform, "Panel_LoadoutMenu", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 460f), new Vector2(608f, 896f), Color.clear);
             pLoad.GetComponent<Image>().raycastTarget = false;
             ui.pageLoadout = pLoad;
 
-            ui.btnBackToMechs = UIBuilder.Button(pLoad.transform, "Btn_BackToMechs", "◀ К СПИСКУ", new Vector2(0f, 1f), new Vector2(102f, -32f), new Vector2(190f, 52f), UITheme.BgHeader, UITheme.Border, 23, hiFont);
-            ui.txtSelectedMechTitle = UIBuilder.Label(pLoad.transform, "Txt_SelectedMech", "СТРАЖ-1", new Vector2(1f, 1f), new Vector2(-220f, -32f), new Vector2(420f, 52f), 28, UITheme.TextMain, hiFont, FontStyle.Bold, TextAnchor.MiddleRight);
+            ui.btnBackToMechs = UIBuilder.Button(pLoad.transform, "Btn_BackToMechs", "◄ К списку", new Vector2(0f, 1f), new Vector2(96f, -34f), new Vector2(186f, 54f), UITheme.BgHeader, null, 24, hiFont);
+            ui.txtSelectedMechTitle = UIBuilder.Label(pLoad.transform, "Txt_SelectedMech", "СТРАЖ-1", new Vector2(1f, 1f), new Vector2(-198f, -34f), new Vector2(380f, 54f), 30, UITheme.TextMain, hiFont, FontStyle.Bold, TextAnchor.MiddleRight);
 
-            GameObject sum = UIBuilder.Panel(pLoad.transform, "SummaryBox", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(648f, 54f), UITheme.BgRecessed, UITheme.Border);
+            GameObject sum = UIBuilder.Panel(pLoad.transform, "SummaryBox", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -102f), new Vector2(604f, 58f), UITheme.BgRecessed);
             sum.GetComponent<Image>().raycastTarget = false;
-            ui.txtLoadoutSummary = UIBuilder.Label(sum.transform, "Txt_LoadoutSummary", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(628f, 44f), 19, UITheme.TextMuted, hiFont);
+            ui.txtLoadoutSummary = UIBuilder.Label(sum.transform, "Txt_LoadoutSummary", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(584f, 46f), 21, UITheme.TextMuted, hiFont);
 
-            ui.btnTabWeapons = UIBuilder.Button(pLoad.transform, "Btn_TabWeapons", "ОРУЖИЕ", new Vector2(0.5f, 1f), new Vector2(-164f, -162f), new Vector2(316f, 54f), UITheme.AccentTeal, UITheme.Border, 25, hiFont);
-            ui.btnTabShields = UIBuilder.Button(pLoad.transform, "Btn_TabShields", "ЩИТЫ", new Vector2(0.5f, 1f), new Vector2(164f, -162f), new Vector2(316f, 54f), UITheme.BgCard, UITheme.Border, 25, hiFont);
+            ui.btnTabWeapons = UIBuilder.Button(pLoad.transform, "Btn_TabWeapons", "ОРУЖИЕ", new Vector2(0.5f, 1f), new Vector2(-154f, -172f), new Vector2(294f, 56f), UITheme.AccentTeal, null, 26, hiFont);
+            ui.btnTabShields = UIBuilder.Button(pLoad.transform, "Btn_TabShields", "ЩИТЫ", new Vector2(0.5f, 1f), new Vector2(154f, -172f), new Vector2(294f, 56f), UITheme.BgCard, null, 26, hiFont);
 
             var listObj = new GameObject("ItemsContainer");
             listObj.transform.SetParent(pLoad.transform, false);
@@ -701,11 +703,11 @@ namespace HangarGame.Prototype
             listRt.anchorMin = new Vector2(0.5f, 1f);
             listRt.anchorMax = new Vector2(0.5f, 1f);
             listRt.pivot = new Vector2(0.5f, 1f);
-            listRt.anchoredPosition = new Vector2(0f, -200f);
-            listRt.sizeDelta = new Vector2(648f, 550f);
+            listRt.anchoredPosition = new Vector2(0f, -214f);
+            listRt.sizeDelta = new Vector2(604f, 610f);
 
             var vl = listObj.AddComponent<VerticalLayoutGroup>();
-            vl.spacing = 12f;
+            vl.spacing = 16f;
             vl.childAlignment = TextAnchor.UpperCenter;
             vl.childControlWidth = false;
             vl.childControlHeight = false;
@@ -713,7 +715,7 @@ namespace HangarGame.Prototype
             vl.childForceExpandHeight = false;
             ui.itemsContainer = listObj.transform;
 
-            ui.txtFeedback = UIBuilder.Label(pLoad.transform, "Txt_ArmoryFeedback", "", new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(640f, 34f), 22, UITheme.TextMain, hiFont);
+            ui.txtFeedback = UIBuilder.Label(pLoad.transform, "Txt_ArmoryFeedback", "", new Vector2(0.5f, 0f), new Vector2(0f, 26f), new Vector2(600f, 36f), 23, UITheme.TextMain, hiFont, FontStyle.Bold);
             pLoad.SetActive(false);
 
             return ui;
@@ -747,35 +749,35 @@ namespace HangarGame.Prototype
 
             Font font = UIBuilder.GetFont(16);
 
-            hud.btnTurnLeft = UIBuilder.Button(cObj.transform, "Btn_Left", "◄ Пульт (Q)", new Vector2(0f, 0.5f), new Vector2(82f, 0f), new Vector2(138f, 50f), UITheme.BgHeader, UITheme.Border, 15, font);
-            hud.btnTurnRight = UIBuilder.Button(cObj.transform, "Btn_Right", "Пульт (E) ►", new Vector2(1f, 0.5f), new Vector2(-82f, 0f), new Vector2(138f, 50f), UITheme.BgHeader, UITheme.Border, 15, font);
+            hud.btnTurnLeft = UIBuilder.Button(cObj.transform, "Btn_Left", "◄ Пульт (Q)", new Vector2(0f, 0.5f), new Vector2(82f, 0f), new Vector2(138f, 50f), UITheme.BgHeader, null, 15, font);
+            hud.btnTurnRight = UIBuilder.Button(cObj.transform, "Btn_Right", "Пульт (E) ►", new Vector2(1f, 0.5f), new Vector2(-82f, 0f), new Vector2(138f, 50f), UITheme.BgHeader, null, 15, font);
 
-            GameObject top = UIBuilder.Panel(cObj.transform, "TopBar", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(860f, 40f), UITheme.BgHeader, UITheme.Border);
+            GameObject top = UIBuilder.Panel(cObj.transform, "TopBar", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(860f, 40f), UITheme.BgHeader);
             hud.txtResources = UIBuilder.Label(top.transform, "Txt_Res", "Кредиты: 220   |   Сплав: 95   |   База: 100%   |   Егерь: 0/5", new Vector2(0.5f, 0.5f), new Vector2(-70f, 0f), new Vector2(680f, 32f), 16, UITheme.TextMain, font, FontStyle.Bold);
             hud.txtRoomIndicator = UIBuilder.Label(top.transform, "Txt_Room", "Ангар", new Vector2(1f, 0.5f), new Vector2(-80f, 0f), new Vector2(130f, 32f), 15, UITheme.AccentTeal, font, FontStyle.Bold, TextAnchor.MiddleRight);
 
-            GameObject pnlMech = UIBuilder.Panel(cObj.transform, "MechSelectPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 70f), new Vector2(780f, 46f), UITheme.BgHeader, UITheme.Border);
+            GameObject pnlMech = UIBuilder.Panel(cObj.transform, "MechSelectPanel", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 70f), new Vector2(780f, 46f), UITheme.BgHeader);
             hud.mechSelectPanel = pnlMech;
-            hud.btnPrevMech = UIBuilder.Button(pnlMech.transform, "Btn_PrevMech", "◄", new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(62f, 34f), UITheme.BgCard, UITheme.Border, 16, font);
-            hud.btnNextMech = UIBuilder.Button(pnlMech.transform, "Btn_NextMech", "►", new Vector2(1f, 0.5f), new Vector2(-40f, 0f), new Vector2(62f, 34f), UITheme.BgCard, UITheme.Border, 16, font);
+            hud.btnPrevMech = UIBuilder.Button(pnlMech.transform, "Btn_PrevMech", "◄", new Vector2(0f, 0.5f), new Vector2(40f, 0f), new Vector2(62f, 34f), UITheme.BgCard, null, 16, font);
+            hud.btnNextMech = UIBuilder.Button(pnlMech.transform, "Btn_NextMech", "►", new Vector2(1f, 0.5f), new Vector2(-40f, 0f), new Vector2(62f, 34f), UITheme.BgCard, null, 16, font);
             hud.txtCurrentMech = UIBuilder.Label(pnlMech.transform, "Txt_CurrentMech", "Страж-1 [1/3]", new Vector2(0.5f, 0.5f), new Vector2(-70f, 0f), new Vector2(450f, 36f), 16, UITheme.TextMain, font, FontStyle.Bold);
-            hud.btnRechargeBattery = UIBuilder.Button(pnlMech.transform, "Btn_RechargeBattery", "Зарядить", new Vector2(1f, 0.5f), new Vector2(-156f, 0f), new Vector2(136f, 34f), UITheme.AccentTeal, UITheme.Border, 15, font);
+            hud.btnRechargeBattery = UIBuilder.Button(pnlMech.transform, "Btn_RechargeBattery", "Зарядить", new Vector2(1f, 0.5f), new Vector2(-156f, 0f), new Vector2(136f, 34f), UITheme.AccentTeal, null, 15, font);
 
             GameObject pBox = UIBuilder.Panel(cObj.transform, "PromptBox", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 22f), new Vector2(740f, 32f), new Color(UITheme.BgDark.r, UITheme.BgDark.g, UITheme.BgDark.b, 0.8f));
             pBox.GetComponent<Image>().raycastTarget = false;
             hud.txtHoverPrompt = UIBuilder.Label(pBox.transform, "Txt_Prompt", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(720f, 28f), 14, UITheme.TextMuted, font);
 
-            GameObject wb = UIBuilder.Panel(cObj.transform, "WorkbenchPanel", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -84f), new Vector2(680f, 60f), UITheme.BgHeader, UITheme.Border);
+            GameObject wb = UIBuilder.Panel(cObj.transform, "WorkbenchPanel", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -76f), new Vector2(640f, 54f), UITheme.BgHeader);
             hud.wbPanel = wb;
-            hud.txtWbTitle = UIBuilder.Label(wb.transform, "Txt_WbTitle", "Ремонт", new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(650f, 26f), 17, UITheme.AccentAmber, font, FontStyle.Bold);
-            hud.txtWbInfo = UIBuilder.Label(wb.transform, "Txt_WbInfo", "", new Vector2(0.5f, 1f), new Vector2(0f, -44f), new Vector2(650f, 22f), 14, UITheme.TextMain, font);
+            hud.txtWbTitle = UIBuilder.Label(wb.transform, "Txt_WbTitle", "Ремонт", new Vector2(0.5f, 1f), new Vector2(0f, -16f), new Vector2(610f, 24f), 17, UITheme.AccentAmber, font, FontStyle.Bold);
+            hud.txtWbInfo = UIBuilder.Label(wb.transform, "Txt_WbInfo", "", new Vector2(0.5f, 1f), new Vector2(0f, -39f), new Vector2(610f, 20f), 14, UITheme.TextMain, font);
             wb.SetActive(false);
 
             GameObject vic = UIBuilder.Panel(cObj.transform, "VictoryPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(620f, 260f), UITheme.BgDark, UITheme.Border);
             hud.victoryPanel = vic;
             hud.txtVicTitle = UIBuilder.Label(vic.transform, "Txt_Vic1", "Проект «Егерь» завершён", new Vector2(0.5f, 0.78f), Vector2.zero, new Vector2(580f, 44f), 26, UITheme.AccentAmber, font, FontStyle.Bold);
             hud.txtVicSub = UIBuilder.Label(vic.transform, "Txt_Vic2", "", new Vector2(0.5f, 0.52f), Vector2.zero, new Vector2(540f, 44f), 18, UITheme.TextMain, font);
-            hud.btnRestart = UIBuilder.Button(vic.transform, "Btn_Restart", "Начать заново", new Vector2(0.5f, 0f), new Vector2(0f, 44f), new Vector2(220f, 48f), UITheme.AccentGreen, UITheme.Border, 17, font);
+            hud.btnRestart = UIBuilder.Button(vic.transform, "Btn_Restart", "Начать заново", new Vector2(0.5f, 0f), new Vector2(0f, 44f), new Vector2(220f, 48f), UITheme.AccentGreen, null, 17, font);
             vic.SetActive(false);
 
             return hud;

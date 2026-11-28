@@ -274,8 +274,8 @@ namespace HangarGame.EditorTools
             wb.game = gm;
             wb.hangar = mgr;
             wb.platePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Eger/Plate.fbx");
-            wb.tableRestOffset = new Vector3(0f, 1.00f, -0.04f);
-            wb.normalizedPartExtent = 0.64f;
+            wb.tableRestOffset = new Vector3(0f, 0.94f, -0.02f);
+            wb.normalizedPartExtent = 0.86f;
             EditorUtility.SetDirty(wb);
 
             PrototypeSceneBuilder.BuildWorkbenchControlPanel3D(wbObj.transform, wb, gm);
@@ -363,8 +363,8 @@ namespace HangarGame.EditorTools
                 {
                     rCam.game = gm;
                     rCam.workbench = gm?.workbench;
-                    rCam.wbCameraOffset = new Vector3(0f, 1.54f, -1.24f);
-                    rCam.wbCameraPitch = 22f;
+                    rCam.wbCameraOffset = new Vector3(0f, 1.54f, -1.42f);
+                    rCam.wbCameraPitch = 16.0f;
 
                     if (c85 != null && c104 != null)
                     {
@@ -377,7 +377,7 @@ namespace HangarGame.EditorTools
 
                         var tCanvas = GameObject.Find("Terminal_Canvas");
                         Vector3 sPoint = tCanvas != null ? tCanvas.transform.position : c104.position + Vector3.up * 0.34f;
-                        rCam.dispatchDistance = 1.32f;
+                        rCam.dispatchDistance = 1.56f;
                         rCam.dispatchView = new ViewAnchor
                         {
                             position = new Vector3(sPoint.x, sPoint.y, sPoint.z - rCam.dispatchDistance),
@@ -390,7 +390,7 @@ namespace HangarGame.EditorTools
                         Transform aTr = armoryUi.transform;
                         rCam.armoryView = new ViewAnchor
                         {
-                            position = aTr.position - aTr.forward * 0.58f,
+                            position = aTr.position - aTr.forward * 0.68f,
                             yaw = aTr.eulerAngles.y
                         };
                     }

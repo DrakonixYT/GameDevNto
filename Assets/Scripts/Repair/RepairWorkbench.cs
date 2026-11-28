@@ -20,8 +20,8 @@ namespace HangarGame.Repair
         public HangarMechManager hangar;
 
         [Header("Размещение детали")]
-        public Vector3 tableRestOffset = new Vector3(0f, 1.00f, -0.04f);
-        public float normalizedPartExtent = 0.64f;
+        public Vector3 tableRestOffset = new Vector3(0f, 0.94f, -0.02f);
+        public float normalizedPartExtent = 0.86f;
         public Vector3 initialEuler;
         public GameObject platePrefab;
 
@@ -177,13 +177,28 @@ namespace HangarGame.Repair
             if (b.size.sqrMagnitude > 0.0001f)
             {
                 target.localScale *= normalizedPartExtent / b.size.magnitude;
+                if (CurrentPart == null && b.size.y > Mathf.Max(b.size.x, b.size.z) * 2.2f)
+                    target.localRotation = Quaternion.Euler(0f, 180f, -68f);
+
                 b = ModelUtils.CalcBounds(target.gameObject, false);
                 target.position += workPivot.position - b.center;
+
+                b = ModelUtils.CalcBounds(target.gameObject, false);
+                float minCenterY = GetTableTopY() + 0.025f + b.extents.y;
+                if (workPivot.position.y < minCenterY)
+                    workPivot.position = new Vector3(workPivot.position.x, minCenterY, workPivot.position.z);
             }
             else
             {
                 target.localPosition = Vector3.zero;
             }
+        }
+
+        private float GetTableTopY()
+        {
+            Transform top = transform.Find("Tabletop");
+            Renderer r = top != null ? top.GetComponent<Renderer>() : null;
+            return r != null ? r.bounds.max.y : transform.position.y + 0.81f;
         }
 
         private IEnumerator DropIntoPlaceRoutine(Transform target, bool isJaeger)

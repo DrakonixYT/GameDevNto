@@ -34,6 +34,8 @@ namespace HangarGame.UI
         public Text txtRadarTitle;
         public Text txtBattleLog;
         public Text txtJaegerInfo;
+        public Button btnBuildJaeger;
+        public Text txtBuildBtn;
         public Button btnScanThreat;
         public RectTransform radarArea;
         public RadarClickHandler radarClick;
@@ -62,6 +64,17 @@ namespace HangarGame.UI
             jaeger ??= game?.jaeger ?? FindAnyObjectByType<JaegerProject>();
 
             if (radarClick != null) radarClick.onRadarClick = OnRadarClicked;
+
+            if (btnBuildJaeger != null)
+            {
+                btnBuildJaeger.onClick.RemoveAllListeners();
+                btnBuildJaeger.onClick.AddListener(() =>
+                {
+                    game?.PlaySfx(Sfx.Click);
+                    jaeger?.StartNextStage();
+                    Refresh();
+                });
+            }
 
             if (btnScanThreat != null)
             {
@@ -104,6 +117,18 @@ namespace HangarGame.UI
 
         private void HookEvents(bool subscribe)
         {
+            if (game != null)
+            {
+                game.OnResourcesChanged -= OnGameDataChanged;
+                game.OnBaseHpChanged -= OnHpDataChanged;
+                game.OnJaegerProgressChanged -= OnProgressDataChanged;
+                if (subscribe)
+                {
+                    game.OnResourcesChanged += OnGameDataChanged;
+                    game.OnBaseHpChanged += OnHpDataChanged;
+                    game.OnJaegerProgressChanged += OnProgressDataChanged;
+                }
+            }
             if (dispatch != null)
             {
                 dispatch.OnRadarChanged -= Refresh;
@@ -111,6 +136,10 @@ namespace HangarGame.UI
             }
             if (subscribe) Refresh();
         }
+
+        private void OnGameDataChanged(int c, int a) => Refresh();
+        private void OnHpDataChanged(float hp, float max) => Refresh();
+        private void OnProgressDataChanged(float p) => Refresh();
 
         private void Update()
         {
@@ -213,6 +242,26 @@ namespace HangarGame.UI
             if (txtJaegerInfo != null && jaeger != null)
                 txtJaegerInfo.text = jaeger.IsComplete ? "Егерь 5/5" : $"Егерь {jaeger.CurrentStage}/{jaeger.TotalStages}";
 
+            if (btnBuildJaeger != null && jaeger != null)
+            {
+                bool canBuild = jaeger.CanStartNext();
+                btnBuildJaeger.interactable = canBuild;
+                var img = btnBuildJaeger.GetComponent<Image>();
+                if (img != null)
+                    img.color = jaeger.IsComplete ? UITheme.AccentGreen : (canBuild ? UITheme.AccentTeal : UITheme.BgCard);
+                if (txtBuildBtn != null)
+                {
+                    if (jaeger.IsComplete)
+                        txtBuildBtn.text = "Егерь готов";
+                    else
+                    {
+                        int s = jaeger.CurrentStage;
+                        txtBuildBtn.text = $"Собрать: {jaeger.GetStageName(s)}";
+                        txtBuildBtn.color = canBuild ? UITheme.TextMain : UITheme.TextMuted;
+                    }
+                }
+            }
+
             if (txtBattleLog != null)
                 txtBattleLog.text = dispatch.LastBattleLog;
 
@@ -265,18 +314,22 @@ namespace HangarGame.UI
 
                 if (slot.shieldBtn != null)
                 {
+                    slot.shieldBtn.gameObject.SetActive(m.isDeployed);
                     slot.shieldBtn.interactable = m.isDeployed;
                     var img = slot.shieldBtn.GetComponent<Image>();
-                    if (img != null) img.color = m.isShieldActive ? UITheme.AccentAmber : (m.isDeployed ? UITheme.AccentTeal : UITheme.BgRecessed);
+                    if (img != null) img.color = m.isShieldActive ? UITheme.AccentAmber : UITheme.AccentTeal;
                     var st = slot.shieldBtn.GetComponentInChildren<Text>();
                     if (st != null) st.text = m.isShieldActive ? "Щит: ВКЛ" : "Щит";
                 }
 
                 if (slot.recallBtn != null)
                 {
+                    slot.recallBtn.gameObject.SetActive(m.isDeployed);
                     slot.recallBtn.interactable = m.isDeployed && !m.isReturning;
                     var img = slot.recallBtn.GetComponent<Image>();
-                    if (img != null) img.color = (m.isDeployed && !m.isReturning) ? UITheme.AccentRed : UITheme.BgRecessed;
+                    if (img != null) img.color = !m.isReturning ? UITheme.AccentRed : UITheme.BgRecessed;
+                    var rt = slot.recallBtn.GetComponentInChildren<Text>();
+                    if (rt != null) rt.text = m.isReturning ? "Отходит" : "На базу";
                 }
             }
         }

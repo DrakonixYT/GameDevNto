@@ -60,11 +60,11 @@ namespace HangarGame.Repair
             Vector3 dir = camLocalDir.sqrMagnitude > 0.001f ? camLocalDir.normalized : Vector3.back;
             Bounds meshBounds = CalcMeshLocalBounds(modelPivot, localBounds);
 
-            panelW = Mathf.Clamp(meshBounds.size.x * 0.62f, 0.11f, 0.25f);
-            panelH = Mathf.Clamp(meshBounds.size.y * 0.50f, 0.10f, 0.19f);
+            panelW = Mathf.Clamp(meshBounds.size.x * 0.62f, 0.13f, 0.32f);
+            panelH = Mathf.Clamp(meshBounds.size.y * 0.50f, 0.12f, 0.24f);
             float minDim = Mathf.Min(panelW, panelH);
-            boltScale = Mathf.Clamp(minDim * 0.16f, 0.016f, 0.028f);
-            pinScale = Mathf.Clamp(minDim * 0.18f, 0.018f, 0.030f);
+            boltScale = Mathf.Clamp(minDim * 0.16f, 0.018f, 0.032f);
+            pinScale = Mathf.Clamp(minDim * 0.18f, 0.020f, 0.034f);
 
             float surfaceZ = SampleFrontSurfaceZ(modelPivot, meshBounds.center, dir, meshBounds);
 

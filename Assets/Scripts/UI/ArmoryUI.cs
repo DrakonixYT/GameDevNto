@@ -200,9 +200,9 @@ namespace HangarGame.UI
                 if (card.info != null)
                 {
                     card.info.text =
-                        $"<b>{m.mechName}</b>   ({state})\n" +
-                        $"ХП: {m.currentHp:F0}/{m.maxHp:F0}   •   Урон: {m.attackPower:F0}   •   Эн.: {m.currentEnergy:F0}%\n" +
-                        $"<color=#94ABBE>{wName}  /  {sName}</color>";
+                        $"<b>{m.mechName}</b>  •  {state}\n" +
+                        $"ХП {m.currentHp:F0}/{m.maxHp:F0}  •  Урон {m.attackPower:F0}  •  Эн {m.currentEnergy:F0}%\n" +
+                        $"<color=#94ABBE>{wName} / {sName}</color>";
                 }
 
                 if (card.hpFill != null)
@@ -248,7 +248,7 @@ namespace HangarGame.UI
 
             if (mech != null && mech.HasMissingOrDetachedParts())
             {
-                var hintBtn = UIBuilder.Button(itemsContainer, "Btn_GoHangarRepair", "Модуль повреждён — перейти в ангар (ремонт)", Vector2.one * 0.5f, Vector2.zero, new Vector2(648f, 68f), UITheme.AccentAmber, UITheme.Border, 22, cachedFont);
+                var hintBtn = UIBuilder.Button(itemsContainer, "Btn_GoHangarRepair", "Модуль повреждён — перейти в ангар", Vector2.one * 0.5f, Vector2.zero, new Vector2(596f, 64f), UITheme.AccentAmber, null, 22, cachedFont);
                 hintBtn.onClick.AddListener(() =>
                 {
                     game?.PlaySfx(Sfx.Click);
@@ -280,14 +280,14 @@ namespace HangarGame.UI
             bool mechBusy = mech != null && mech.isDeployed;
 
             Color bgCol = equipped ? UITheme.BgCardActive : UITheme.BgCard;
-            GameObject row = UIBuilder.Panel(itemsContainer, $"Item_{def.id}", Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(648f, 154f), bgCol, equipped ? UITheme.AccentTeal : UITheme.Border);
+            GameObject row = UIBuilder.Panel(itemsContainer, $"Item_{def.id}", Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(596f, 148f), bgCol);
             row.GetComponent<Image>().raycastTarget = false;
             spawnedRows.Add(row);
 
-            GameObject bar = UIBuilder.Panel(row.transform, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, 0f), new Vector2(10f, 134f), def.accentColor);
+            GameObject bar = UIBuilder.Panel(row.transform, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, 0f), new Vector2(8f, 128f), def.accentColor);
             bar.GetComponent<Image>().raycastTarget = false;
 
-            UIBuilder.Label(row.transform, "Name", def.displayName, new Vector2(0f, 0.5f), new Vector2(210f, 34f), new Vector2(375f, 44f), 28, UITheme.TextMain, cachedFont, FontStyle.Bold, TextAnchor.MiddleLeft);
+            UIBuilder.Label(row.transform, "Name", def.displayName, new Vector2(0f, 0.5f), new Vector2(198f, 32f), new Vector2(352f, 44f), 27, UITheme.TextMain, cachedFont, FontStyle.Bold, TextAnchor.MiddleLeft);
 
             string stats = "";
             if (def.bonusAttack > 0f) stats += $"+{def.bonusAttack:F0} урон  •  ";
@@ -295,7 +295,7 @@ namespace HangarGame.UI
             if (def.bonusMaxHp > 0f) stats += $"+{def.bonusMaxHp:F0} ХП  •  ";
             stats += def.damageType.ToRu();
 
-            UIBuilder.Label(row.transform, "Stats", stats, new Vector2(0f, 0.5f), new Vector2(210f, -24f), new Vector2(375f, 46f), 22, UITheme.TextMuted, cachedFont, FontStyle.Normal, TextAnchor.MiddleLeft);
+            UIBuilder.Label(row.transform, "Stats", stats, new Vector2(0f, 0.5f), new Vector2(198f, -24f), new Vector2(352f, 46f), 22, UITheme.TextMuted, cachedFont, FontStyle.Normal, TextAnchor.MiddleLeft);
 
             string btnLabel = equipped ? "Надето" : (owned ? "Надеть" : $"{def.costCredits} кр / {def.costAlloy} м");
             Color btnCol = equipped ? UITheme.AccentGreen
@@ -303,7 +303,7 @@ namespace HangarGame.UI
                 : (owned ? UITheme.AccentTeal
                 : (canAfford ? UITheme.AccentAmber : UITheme.BgRecessed)));
 
-            Button btn = UIBuilder.Button(row.transform, "Btn_Action", btnLabel, new Vector2(1f, 0.5f), new Vector2(-114f, 0f), new Vector2(204f, 68f), btnCol, UITheme.Border, 22, cachedFont);
+            Button btn = UIBuilder.Button(row.transform, "Btn_Action", btnLabel, new Vector2(1f, 0.5f), new Vector2(-106f, 0f), new Vector2(190f, 66f), btnCol, null, 22, cachedFont);
             btn.interactable = !equipped && !mechBusy && (owned || canAfford);
             btn.onClick.AddListener(() =>
             {
