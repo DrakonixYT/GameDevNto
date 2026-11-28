@@ -106,7 +106,7 @@ namespace HangarGame.CameraControl
                     if (armoryCanvas != null)
                     {
                         Vector3 screenOut = -armoryCanvas.transform.forward;
-                        armoryFocusPos = armoryCanvas.transform.position + screenOut * 0.72f;
+                        armoryFocusPos = armoryCanvas.transform.position + screenOut * 0.58f;
                         armoryFocusYaw = armoryCanvas.transform.eulerAngles.y;
                     }
                 }

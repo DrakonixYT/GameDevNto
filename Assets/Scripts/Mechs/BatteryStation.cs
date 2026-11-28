@@ -25,9 +25,9 @@ namespace HangarGame.Mechs
         public string GetPrompt()
         {
             var mech = HangarMechManager.Instance != null ? HangarMechManager.Instance.CurrentMech : null;
-            if (mech == null) return "[ЗАРЯДНАЯ СТАНЦИЯ] Нет активного робота на подиуме.";
-            if (mech.isDeployed) return $"[ЗАРЯДНАЯ СТАНЦИЯ] {mech.mechName} на задании.";
-            return $"[ЗАРЯДНАЯ СТАНЦИЯ] Батарея: {mech.currentEnergy:F0}%. Клик: зарядить до 100%";
+            if (mech == null) return "Нет робота на подиуме";
+            if (mech.isDeployed) return $"{mech.mechName} в бою";
+            return $"Батарея {mech.currentEnergy:F0}% — Клик: зарядить";
         }
 
         public void OnHover(bool isHovered)

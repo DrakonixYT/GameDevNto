@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using HangarGame.Armory;
 using HangarGame.CameraControl;
 using HangarGame.Core;
+using HangarGame.Dispatch;
 using HangarGame.Mechs;
 using UnityEngine;
 using UnityEngine.UI;
@@ -76,7 +77,7 @@ namespace HangarGame.UI
         private Font LoadUiFont()
         {
             if (cachedFont != null) return cachedFont;
-            cachedFont = Font.CreateDynamicFontFromOSFont("Arial", 15);
+            cachedFont = Font.CreateDynamicFontFromOSFont("Arial", 28);
             if (cachedFont == null) cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             return cachedFont;
         }
@@ -145,9 +146,7 @@ namespace HangarGame.UI
         private void Update()
         {
             if (txtFocusBtn != null && RoomCamera.Instance != null)
-            {
-                txtFocusBtn.text = RoomCamera.Instance.IsArmoryFocused ? "◀ РАДАР [Tab]" : "ПРИБЛИЗИТЬ";
-            }
+                txtFocusBtn.text = RoomCamera.Instance.IsArmoryFocused ? "◀ РАДАР" : "КРУПНЕЕ";
 
             if (Time.unscaledTime - lastStatusRefreshTime >= 0.4f)
             {
@@ -186,7 +185,7 @@ namespace HangarGame.UI
 
             if (pageMechSelect != null) pageMechSelect.SetActive(false);
             if (pageLoadout != null) pageLoadout.SetActive(true);
-            if (txtFeedback != null) txtFeedback.text = "Выберите модуль для установки";
+            if (txtFeedback != null) txtFeedback.text = "";
             Refresh();
         }
 
@@ -218,7 +217,7 @@ namespace HangarGame.UI
         {
             if (txtResources == null || GameManager.Instance == null) return;
             var gm = GameManager.Instance;
-            txtResources.text = $"КРЕДИТЫ: {gm.Credits} ¢   |   СПЛАВ: {gm.Alloy} т.";
+            txtResources.text = $"{gm.Credits} ¢   |   {gm.Alloy} т";
         }
 
         private void RefreshMechCards()
@@ -232,18 +231,16 @@ namespace HangarGame.UI
                 if (i >= mgr.Mechs.Count || mgr.Mechs[i] == null) continue;
                 var mech = mgr.Mechs[i];
 
+                string shortTitle = StripParens(mech.mechName).ToUpperInvariant();
                 string stateStr = mech.isDeployed ? "В БОЮ" : "В АНГАРЕ";
                 var rightDef = armory != null ? armory.FindWeapon(mech.equippedRightWeaponId) : null;
-                var leftDef = armory != null ? armory.FindWeapon(mech.equippedLeftWeaponId) : null;
-                string rName = rightDef != null ? ShortItemName(rightDef.displayName) : "Пушка Мк-1";
-                string lName = leftDef != null ? ShortItemName(leftDef.displayName) : "Щит";
+                string rName = rightDef != null ? rightDef.displayName : "Автопушка";
 
                 if (txtMechChoices[i] != null)
                 {
                     txtMechChoices[i].text =
-                        $"<b>{mech.mechName}</b>   [{stateStr}]\n" +
-                        $"HP: {mech.currentHp:F0}/{mech.maxHp:F0}  |  ATK: {mech.attackPower:F0}  |  DEF: {mech.TotalDefense:F0}\n" +
-                        $"П: {rName}  |  Л: {lName}   ▸";
+                        $"<size=30><b>{shortTitle}</b></size>  <color=#8FE8FF>[{stateStr}]</color>\n" +
+                        $"<size=23>HP {mech.currentHp:F0}/{mech.maxHp:F0}  |  АТК {mech.attackPower:F0}  |  {rName}</size>";
                 }
 
                 if (imgMechAccents != null && i < imgMechAccents.Length && imgMechAccents[i] != null)
@@ -270,19 +267,12 @@ namespace HangarGame.UI
                 : mgr.CurrentMech;
             if (mech == null) return;
 
+            string shortTitle = StripParens(mech.mechName).ToUpperInvariant();
             if (txtSelectedMechTitle != null)
-                txtSelectedMechTitle.text = mech.isDeployed ? $"{mech.mechName} [В БОЮ]" : mech.mechName;
+                txtSelectedMechTitle.text = mech.isDeployed ? $"{shortTitle} [БОЙ]" : shortTitle;
 
-            var leftW = armory.FindWeapon(mech.equippedLeftWeaponId);
-            var rightW = armory.FindWeapon(mech.equippedRightWeaponId);
             if (txtLoadoutSummary != null)
-            {
-                string lName = leftW != null ? ShortItemName(leftW.displayName) : "Базовый щит";
-                string rName = rightW != null ? ShortItemName(rightW.displayName) : "Автопушка";
-                txtLoadoutSummary.text =
-                    $"ATK: {mech.attackPower:F0}   DEF: {mech.TotalDefense:F0}   HP: {mech.currentHp:F0}/{mech.maxHp:F0}\n" +
-                    $"П: {rName}   |   Л: {lName}";
-            }
+                txtLoadoutSummary.text = $"АТК {mech.attackPower:F0}   |   ЗАЩ {mech.TotalDefense:F0}   |   HP {mech.currentHp:F0}/{mech.maxHp:F0}";
 
             UpdateTabVisuals();
             ClearRows();
@@ -322,7 +312,7 @@ namespace HangarGame.UI
             GameObject card = new GameObject($"Card_{def.id}");
             card.transform.SetParent(itemsContainer, false);
             var cardRect = card.AddComponent<RectTransform>();
-            cardRect.sizeDelta = new Vector2(396f, 94f);
+            cardRect.sizeDelta = new Vector2(640f, 162f);
 
             var bg = card.AddComponent<Image>();
             bool equipped = armory.IsEquipped(mech, def.id);
@@ -335,11 +325,11 @@ namespace HangarGame.UI
             tRect.anchorMin = new Vector2(0f, 1f);
             tRect.anchorMax = new Vector2(1f, 1f);
             tRect.pivot = new Vector2(0.5f, 1f);
-            tRect.anchoredPosition = new Vector2(0f, -6f);
-            tRect.sizeDelta = new Vector2(-16f, 24f);
+            tRect.anchoredPosition = new Vector2(0f, -12f);
+            tRect.sizeDelta = new Vector2(-28f, 38f);
             var tTxt = titleObj.AddComponent<Text>();
             tTxt.font = cachedFont;
-            tTxt.fontSize = 15;
+            tTxt.fontSize = 28;
             tTxt.fontStyle = FontStyle.Bold;
             tTxt.alignment = TextAnchor.MiddleLeft;
             tTxt.color = Color.white;
@@ -347,10 +337,10 @@ namespace HangarGame.UI
             tTxt.text = def.displayName;
 
             string stats = "";
-            if (def.bonusAttack > 0) stats += $"ATK +{def.bonusAttack:F0}   ";
-            if (def.bonusDefense > 0) stats += $"DEF +{def.bonusDefense:F0}   ";
-            if (def.bonusMaxHp > 0) stats += $"HP +{def.bonusMaxHp:F0}   ";
-            if (stats.Length == 0) stats = "Базовый модуль   ";
+            if (def.bonusAttack > 0) stats += $"+{def.bonusAttack:F0} АТК   ";
+            if (def.bonusDefense > 0) stats += $"+{def.bonusDefense:F0} ЗАЩ   ";
+            if (def.bonusMaxHp > 0) stats += $"+{def.bonusMaxHp:F0} HP   ";
+            if (stats.Length == 0) stats = "Стандарт   ";
 
             GameObject statObj = new GameObject("Stats");
             statObj.transform.SetParent(card.transform, false);
@@ -358,15 +348,15 @@ namespace HangarGame.UI
             sRect.anchorMin = new Vector2(0f, 1f);
             sRect.anchorMax = new Vector2(1f, 1f);
             sRect.pivot = new Vector2(0.5f, 1f);
-            sRect.anchoredPosition = new Vector2(0f, -30f);
-            sRect.sizeDelta = new Vector2(-16f, 20f);
+            sRect.anchoredPosition = new Vector2(0f, -52f);
+            sRect.sizeDelta = new Vector2(-28f, 32f);
             var sTxt = statObj.AddComponent<Text>();
             sTxt.font = cachedFont;
-            sTxt.fontSize = 13;
+            sTxt.fontSize = 22;
             sTxt.alignment = TextAnchor.MiddleLeft;
             sTxt.color = new Color(0.65f, 0.88f, 1f);
             sTxt.raycastTarget = false;
-            sTxt.text = $"{stats}[Тип: {def.damageType}]";
+            sTxt.text = $"{stats}|  {DispatchSystem.FormatDamageType(def.damageType)}";
 
             GameObject btnObj = new GameObject("ActionBtn");
             btnObj.transform.SetParent(card.transform, false);
@@ -374,8 +364,8 @@ namespace HangarGame.UI
             bRect.anchorMin = new Vector2(0.5f, 0f);
             bRect.anchorMax = new Vector2(0.5f, 0f);
             bRect.pivot = new Vector2(0.5f, 0f);
-            bRect.anchoredPosition = new Vector2(0f, 7f);
-            bRect.sizeDelta = new Vector2(376f, 32f);
+            bRect.anchoredPosition = new Vector2(0f, 14f);
+            bRect.sizeDelta = new Vector2(608f, 54f);
             var btnImg = btnObj.AddComponent<Image>();
             var btn = btnObj.AddComponent<Button>();
 
@@ -404,28 +394,25 @@ namespace HangarGame.UI
             btRect.sizeDelta = Vector2.zero;
             var bt = btnTxtObj.AddComponent<Text>();
             bt.font = cachedFont;
-            bt.fontSize = 14;
+            bt.fontSize = 24;
             bt.fontStyle = FontStyle.Bold;
             bt.alignment = TextAnchor.MiddleCenter;
             bt.color = Color.white;
             bt.raycastTarget = false;
             bt.text = equipped
-                ? "УСТАНОВЛЕНО НА РОБОТА"
+                ? "НАДЕТО"
                 : (mech.isDeployed
-                    ? "НЕДОСТУПНО (РОБОТ В БОЮ)"
-                    : (owned ? "ЭКИПИРОВАТЬ" : $"КУПИТЬ: {def.costCredits} ¢  /  {def.costAlloy} т."));
+                    ? "В БОЮ"
+                    : (owned ? "НАДЕТЬ" : $"{def.costCredits} ¢  /  {def.costAlloy} т"));
 
             string weaponId = def.id;
             string weaponName = def.displayName;
-            string mechTitle = mech.mechName;
             btn.onClick.AddListener(() =>
             {
                 bool ok = ArmoryManager.Instance != null && ArmoryManager.Instance.TryBuyOrEquip(weaponId);
                 if (txtFeedback != null)
                 {
-                    txtFeedback.text = ok
-                        ? $"Установлено: {weaponName}"
-                        : $"Невозможно установить на {mechTitle}";
+                    txtFeedback.text = ok ? $"Надето: {weaponName}" : "Не хватает ресурсов";
                     txtFeedback.color = ok ? new Color(0.45f, 1f, 0.65f) : new Color(1f, 0.45f, 0.4f);
                 }
                 if (!ok) RefreshLoadoutMenu();
@@ -434,15 +421,11 @@ namespace HangarGame.UI
             rowObjects.Add(card);
         }
 
-        private string ShortItemName(string full)
+        private string StripParens(string text)
         {
-            if (string.IsNullOrEmpty(full)) return "";
-            int q1 = full.IndexOf('\'');
-            int q2 = q1 >= 0 ? full.IndexOf('\'', q1 + 1) : -1;
-            if (q1 >= 0 && q2 > q1)
-                return full.Substring(q1 + 1, q2 - q1 - 1);
-            int sp = full.IndexOf(' ');
-            return sp > 0 ? full.Substring(0, sp) : full;
+            if (string.IsNullOrEmpty(text)) return "";
+            int idx = text.IndexOf('(');
+            return idx > 0 ? text.Substring(0, idx).Trim() : text;
         }
 
         private void ClearRows()

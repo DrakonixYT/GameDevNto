@@ -23,8 +23,13 @@ namespace HangarGame.Dispatch
         [SerializeField] private int breachAlloyPenalty = 25;
         [SerializeField] private float breachBaseDamage = 25f;
 
+        [Header("Дистанция боя на радаре")]
+        [SerializeField] private float combatEngageRange = 175f;
+        [SerializeField] private float holdToFightRange = 135f;
+        [SerializeField] private float enemyAggroRange = 195f;
+
         public List<EnemyDot> Enemies { get; } = new List<EnemyDot>();
-        public string LastBattleLog { get; private set; } = "База на боевом дежурстве. Радар чист.";
+        public string LastBattleLog { get; private set; } = "Радар чист.";
         public int SelectedMechId { get; set; } = -1;
         public bool IsDeployMode { get; set; }
         public Vector2 BasePosition => basePos;
@@ -65,11 +70,23 @@ namespace HangarGame.Dispatch
             UpdateMechsCombat();
         }
 
+        public static string FormatDamageType(DamageType type)
+        {
+            switch (type)
+            {
+                case DamageType.Physical: return "Физика";
+                case DamageType.Plasma: return "Плазма";
+                case DamageType.Thermal: return "Термо";
+                case DamageType.Corrosive: return "Кислота";
+                default: return type.ToString();
+            }
+        }
+
         public void SpawnEnemy()
         {
             enemyCounter++;
             int waveTier = Mathf.Min(4, (enemyCounter - 1) / 3);
-            string[] names = { "Кайдзю-Дрон", "Шипохвост", "Осадный Краб", "Био-Скорпион" };
+            string[] names = { "Дрон", "Шипохвост", "Краб", "Скорпион" };
             DamageType[] types = { DamageType.Physical, DamageType.Plasma, DamageType.Thermal, DamageType.Corrosive };
 
             DamageType atk = types[Random.Range(0, types.Length)];
@@ -92,7 +109,7 @@ namespace HangarGame.Dispatch
 
             Enemies.Add(enemy);
             HangarAlarmLight.Instance?.SetAlarm(true);
-            LastBattleLog = $"ВНИМАНИЕ! Радар засек {enemy.name} (Атк: {atk}, уязвим к {weak}).";
+            LastBattleLog = $"Радар: {enemy.name} (уязв: {FormatDamageType(weak)}).";
         }
 
         private void UpdateEnemies()
@@ -108,7 +125,7 @@ namespace HangarGame.Dispatch
                 }
 
                 Vector2 target = basePos;
-                MechUnit closest = GetClosestMech(enemy.position, 130f);
+                MechUnit closest = GetClosestMech(enemy.position, enemyAggroRange);
                 if (closest != null) target = closest.battlefieldPos;
 
                 enemy.position = Vector2.MoveTowards(enemy.position, target, enemy.speed * Time.deltaTime);
@@ -130,7 +147,7 @@ namespace HangarGame.Dispatch
             RoomCamera.Instance?.Shake(0.35f, 0.16f);
             HangarAudio.Instance?.PlayAlarm();
             float baseHp = GameManager.Instance != null ? GameManager.Instance.BaseHp : 0f;
-            LastBattleLog = $"ПРОРЫВ ПЕРИМЕТРА! {enemy.name} ударил по Цитадели (База: {baseHp:F0}%, -{lostC}¢, -{lostA}т)!";
+            LastBattleLog = $"Прорыв {enemy.name}: База {baseHp:F0}%, -{lostC}¢, -{lostA}т";
             if (Enemies.Count == 0) HangarAlarmLight.Instance?.SetAlarm(false);
         }
 
@@ -151,12 +168,18 @@ namespace HangarGame.Dispatch
                     if (!mech.isReturning)
                     {
                         RecallMech(mech.id);
-                        LastBattleLog = $"Разряд батареи {mech.mechName}! Экстренный возврат на базу.";
+                        LastBattleLog = $"{mech.mechName}: разряд батареи, возврат.";
                         HangarAudio.Instance?.PlayAlarm();
                     }
                 }
 
-                if (Vector2.Distance(mech.battlefieldPos, mech.targetPos) > 4f)
+                EnemyDot targetEnemy = GetClosestEnemy(mech.battlefieldPos, combatEngageRange);
+                bool holdToFight = !mech.isReturning
+                    && targetEnemy != null
+                    && Vector2.Distance(mech.battlefieldPos, targetEnemy.position) <= holdToFightRange
+                    && Vector2.Distance(mech.targetPos, targetEnemy.position) <= 185f;
+
+                if (!holdToFight && Vector2.Distance(mech.battlefieldPos, mech.targetPos) > 4f)
                     mech.battlefieldPos = Vector2.MoveTowards(mech.battlefieldPos, mech.targetPos, mech.moveSpeed * Time.deltaTime);
 
                 if (mech.isReturning && Vector2.Distance(mech.battlefieldPos, basePos) < 15f)
@@ -166,11 +189,10 @@ namespace HangarGame.Dispatch
                     mech.SyncPartsFromHp(mech.GetTotalHpPercent());
                     HangarMechManager.Instance?.UpdatePodiumDisplay();
                     HangarAudio.Instance?.PlayBolt();
-                    LastBattleLog = $"{mech.mechName} вернулся в ангар. Осмотрите сломанные модули.";
+                    LastBattleLog = $"{mech.mechName} в ангаре.";
                     continue;
                 }
 
-                EnemyDot targetEnemy = GetClosestEnemy(mech.battlefieldPos, 125f);
                 if (targetEnemy != null)
                 {
                     float atkMult = GetAttackMultiplier(mech, targetEnemy);
@@ -182,7 +204,7 @@ namespace HangarGame.Dispatch
                     if (mech.currentHp <= 6f && !mech.isReturning)
                     {
                         RecallMech(mech.id);
-                        LastBattleLog = $"Критический урон {mech.mechName}! Экстренная эвакуация в ангар.";
+                        LastBattleLog = $"{mech.mechName}: критический урон, отход.";
                         HangarAudio.Instance?.PlayAlarm();
                     }
                 }
@@ -208,7 +230,7 @@ namespace HangarGame.Dispatch
         private void OnEnemyDefeated(EnemyDot enemy)
         {
             GameManager.Instance?.AddResources(enemy.rewardCredits, enemy.rewardAlloy);
-            LastBattleLog = $"{enemy.name} уничтожен! Награда: +{enemy.rewardCredits}¢, +{enemy.rewardAlloy}т.";
+            LastBattleLog = $"{enemy.name} сбит (+{enemy.rewardCredits}¢, +{enemy.rewardAlloy}т).";
             HangarAudio.Instance?.PlaySuccess();
             if (Enemies.Count == 0) HangarAlarmLight.Instance?.SetAlarm(false);
         }
@@ -230,7 +252,7 @@ namespace HangarGame.Dispatch
             SelectedMechId = mechId;
             IsDeployMode = false;
             HangarAudio.Instance?.PlayDeploy();
-            LastBattleLog = $"{mech.mechName} высажен в сектор [{destination.x:F0}, {destination.y:F0}].";
+            LastBattleLog = $"{mech.mechName} высажен.";
             return true;
         }
 
@@ -242,7 +264,7 @@ namespace HangarGame.Dispatch
             mech.isReturning = true;
             mech.targetPos = basePos;
             HangarAudio.Instance?.PlayRecall();
-            LastBattleLog = $"{mech.mechName} отступает на базу для ремонта.";
+            LastBattleLog = $"{mech.mechName} отходит на базу.";
         }
 
         public void ToggleMechShield(int mechId)
@@ -253,8 +275,8 @@ namespace HangarGame.Dispatch
             mech.ToggleShield();
             HangarAudio.Instance?.PlayShield();
             LastBattleLog = mech.isShieldActive
-                ? $"{mech.mechName}: ЭНЕРГОЩИТ ВКЛЮЧЕН (-65% урона)."
-                : $"{mech.mechName}: энергощит выключен.";
+                ? $"{mech.mechName}: щит включен."
+                : $"{mech.mechName}: щит выключен.";
         }
 
         public void OrderMechMove(int mechId, Vector2 radarPos)
@@ -265,7 +287,7 @@ namespace HangarGame.Dispatch
             mech.isReturning = false;
             mech.targetPos = radarPos;
             HangarAudio.Instance?.PlayClick();
-            LastBattleLog = $"{mech.mechName}: передислокация в [{radarPos.x:F0}, {radarPos.y:F0}].";
+            LastBattleLog = $"{mech.mechName} меняет позицию.";
         }
 
         public EnemyDot GetClosestEnemy(Vector2 pos, float maxRange)

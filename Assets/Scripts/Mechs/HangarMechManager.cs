@@ -15,13 +15,10 @@ namespace HangarGame.Mechs
         [Header("Анимация смены больших мехов в ангаре")]
         [SerializeField] private List<Transform> bayMechs = new List<Transform>();
         [SerializeField] private Animator podiumAnimator;
-        [SerializeField] private float exitDuration = 0.24f;
-        [SerializeField] private float enterDuration = 0.38f;
-        [SerializeField] private float verticalLiftOffset = 0.85f;
-        [SerializeField] private float horizontalSlideOffset = 0.45f;
-        [SerializeField] private float bayVerticalLiftOffset = 3.6f;
-        [SerializeField] private float bayHorizontalSlideOffset = 1.8f;
-        [SerializeField] private float entryYawTwist = 18f;
+        [SerializeField] private float exitDuration = 1.0f;
+        [SerializeField] private float enterDuration = 1.0f;
+        [SerializeField] private float verticalLiftOffset = 0.9f;
+        [SerializeField] private float bayVerticalLiftOffset = 9.5f;
 
         [Header("Начальное состояние")]
         [SerializeField] private bool startFirstMechDamaged = true;
@@ -189,19 +186,14 @@ namespace HangarGame.Mechs
                     bayRestPoses[outgoing] = (outgoing.localPosition, outgoing.localRotation, outgoing.localScale);
                 var basePose = bayRestPoses[outgoing];
 
-                Vector3 outPos = basePose.pos + new Vector3(-dir * bayHorizontalSlideOffset, -bayVerticalLiftOffset, 0f);
-                Quaternion outRot = Quaternion.Euler(0f, -dir * entryYawTwist * 0.4f, 0f) * basePose.rot;
-                Vector3 outScale = basePose.scl * 0.85f;
-
+                Vector3 outPos = basePose.pos - Vector3.up * bayVerticalLiftOffset;
+                float durOut = Mathf.Max(0.05f, exitDuration);
                 float t = 0f;
-                while (t < exitDuration)
+                while (t < durOut)
                 {
                     t += Time.deltaTime;
-                    float k = t / Mathf.Max(0.01f, exitDuration);
-                    float ease = k * k;
-                    outgoing.localPosition = Vector3.Lerp(basePose.pos, outPos, ease);
-                    outgoing.localRotation = Quaternion.Slerp(basePose.rot, outRot, ease);
-                    outgoing.localScale = Vector3.Lerp(basePose.scl, outScale, ease);
+                    float k = Mathf.Clamp01(t / durOut);
+                    outgoing.localPosition = Vector3.Lerp(basePose.pos, outPos, k);
                     yield return null;
                 }
 
@@ -221,26 +213,19 @@ namespace HangarGame.Mechs
                     bayRestPoses[incoming] = (incoming.localPosition, incoming.localRotation, incoming.localScale);
                 var basePose = bayRestPoses[incoming];
 
-                Vector3 startPos = basePose.pos + new Vector3(dir * bayHorizontalSlideOffset, -bayVerticalLiftOffset, 0f);
-                Quaternion startRot = Quaternion.Euler(0f, dir * entryYawTwist, 0f) * basePose.rot;
-                Vector3 startScale = basePose.scl * 0.85f;
-
+                Vector3 startPos = basePose.pos - Vector3.up * bayVerticalLiftOffset;
                 incoming.localPosition = startPos;
-                incoming.localRotation = startRot;
-                incoming.localScale = startScale;
+                incoming.localRotation = basePose.rot;
+                incoming.localScale = basePose.scl;
                 incoming.gameObject.SetActive(true);
 
+                float durIn = Mathf.Max(0.05f, enterDuration);
                 float t = 0f;
-                while (t < enterDuration)
+                while (t < durIn)
                 {
                     t += Time.deltaTime;
-                    float k = Mathf.Clamp01(t / Mathf.Max(0.01f, enterDuration));
-                    float ease = 1f - Mathf.Pow(1f - k, 3f);
-                    float liftBounce = Mathf.Sin(k * Mathf.PI) * 0.22f;
-
-                    incoming.localPosition = Vector3.Lerp(startPos, basePose.pos, ease) + new Vector3(0f, liftBounce, 0f);
-                    incoming.localRotation = Quaternion.Slerp(startRot, basePose.rot, ease);
-                    incoming.localScale = Vector3.Lerp(startScale, basePose.scl, ease);
+                    float k = Mathf.Clamp01(t / durIn);
+                    incoming.localPosition = Vector3.Lerp(startPos, basePose.pos, k);
                     yield return null;
                 }
 
@@ -259,22 +244,15 @@ namespace HangarGame.Mechs
             {
                 outgoing.CaptureRestPose();
                 Vector3 basePos = outgoing.RestLocalPos;
-                Quaternion baseRot = outgoing.RestLocalRot;
-                Vector3 baseScale = outgoing.RestLocalScale;
+                Vector3 outPos = basePos - Vector3.up * verticalLiftOffset;
 
-                Vector3 outPos = basePos + new Vector3(-dir * horizontalSlideOffset, -verticalLiftOffset, 0f);
-                Quaternion outRot = Quaternion.Euler(0f, -dir * entryYawTwist * 0.5f, 0f) * baseRot;
-                Vector3 outScale = baseScale * 0.72f;
-
+                float durOut = Mathf.Max(0.05f, exitDuration);
                 float t = 0f;
-                while (t < exitDuration)
+                while (t < durOut)
                 {
                     t += Time.deltaTime;
-                    float k = t / Mathf.Max(0.01f, exitDuration);
-                    float ease = k * k;
-                    outgoing.transform.localPosition = Vector3.Lerp(basePos, outPos, ease);
-                    outgoing.transform.localRotation = Quaternion.Slerp(baseRot, outRot, ease);
-                    outgoing.transform.localScale = Vector3.Lerp(baseScale, outScale, ease);
+                    float k = Mathf.Clamp01(t / durOut);
+                    outgoing.transform.localPosition = Vector3.Lerp(basePos, outPos, k);
                     yield return null;
                 }
 
@@ -292,29 +270,20 @@ namespace HangarGame.Mechs
             {
                 incoming.CaptureRestPose();
                 Vector3 basePos = incoming.RestLocalPos;
-                Quaternion baseRot = incoming.RestLocalRot;
-                Vector3 baseScale = incoming.RestLocalScale;
-
-                Vector3 startPos = basePos + new Vector3(dir * horizontalSlideOffset, -verticalLiftOffset, 0f);
-                Quaternion startRot = Quaternion.Euler(0f, dir * entryYawTwist, 0f) * baseRot;
-                Vector3 startScale = baseScale * 0.75f;
+                Vector3 startPos = basePos - Vector3.up * verticalLiftOffset;
 
                 incoming.transform.localPosition = startPos;
-                incoming.transform.localRotation = startRot;
-                incoming.transform.localScale = startScale;
+                incoming.transform.localRotation = incoming.RestLocalRot;
+                incoming.transform.localScale = incoming.RestLocalScale;
                 incoming.gameObject.SetActive(true);
 
+                float durIn = Mathf.Max(0.05f, enterDuration);
                 float t = 0f;
-                while (t < enterDuration)
+                while (t < durIn)
                 {
                     t += Time.deltaTime;
-                    float k = Mathf.Clamp01(t / Mathf.Max(0.01f, enterDuration));
-                    float ease = 1f - Mathf.Pow(1f - k, 3f);
-                    float liftBounce = Mathf.Sin(k * Mathf.PI) * 0.06f;
-
-                    incoming.transform.localPosition = Vector3.Lerp(startPos, basePos, ease) + new Vector3(0f, liftBounce, 0f);
-                    incoming.transform.localRotation = Quaternion.Slerp(startRot, baseRot, ease);
-                    incoming.transform.localScale = Vector3.Lerp(startScale, baseScale, ease);
+                    float k = Mathf.Clamp01(t / durIn);
+                    incoming.transform.localPosition = Vector3.Lerp(startPos, basePos, k);
                     yield return null;
                 }
 

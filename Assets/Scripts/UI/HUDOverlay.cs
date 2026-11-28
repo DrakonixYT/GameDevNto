@@ -128,11 +128,11 @@ namespace HangarGame.UI
             var t2 = victoryPanel.transform.Find("Txt_Vic2")?.GetComponent<Text>();
             if (t1 != null)
             {
-                t1.text = "ПОБЕДА! ПРОЕКТ 'ЕГЕРЬ' ЗАВЕРШЁН!";
+                t1.text = "Победа!";
                 t1.color = Color.yellow;
             }
             if (t2 != null)
-                t2.text = "Егерь собран и готов защищать цитадель!";
+                t2.text = "Егерь собран.";
             victoryPanel.SetActive(true);
         }
 
@@ -143,11 +143,11 @@ namespace HangarGame.UI
             var t2 = victoryPanel.transform.Find("Txt_Vic2")?.GetComponent<Text>();
             if (t1 != null)
             {
-                t1.text = "ПОРАЖЕНИЕ! ЦИТАДЕЛЬ РАЗРУШЕНА";
+                t1.text = "База потеряна";
                 t1.color = new Color(1f, 0.3f, 0.25f);
             }
             if (t2 != null)
-                t2.text = "Кайдзю прорвали периметр ангара. Запустите смену заново.";
+                t2.text = "Периметр прорван.";
             victoryPanel.SetActive(true);
         }
 
@@ -193,13 +193,13 @@ namespace HangarGame.UI
         {
             if (txtRoomIndicator == null) return;
             if (isHangar)
-                txtRoomIndicator.text = "СЕКТОР: АНГАР [Q/E - Рубка и Арсенал]";
+                txtRoomIndicator.text = "Ангар  [Q/E — пульт]";
             else if (isDispatch)
                 txtRoomIndicator.text = (RoomCamera.Instance != null && RoomCamera.Instance.IsArmoryFocused)
-                    ? "АРСЕНАЛ МЕХОВ [Tab - К радару | Q/E - Ангар]"
-                    : "СЕКТОР: РУБКА [Q/E - Ангар | Справа: Арсенал (Tab)]";
+                    ? "Арсенал  [Tab — радар | Q/E — ангар]"
+                    : "Пульт  [Q/E — ангар | Tab — арсенал]";
             else
-                txtRoomIndicator.text = "РЕЖИМ: ВЕРСТАК ТО (3D кнопки на столе)";
+                txtRoomIndicator.text = "Верстак  [3D кнопки на столе]";
         }
 
         private void UpdateHangarControls()
@@ -226,23 +226,23 @@ namespace HangarGame.UI
 
             if (txtCurrentMech != null)
             {
-                string status = cur.isDeployed ? "В БОЮ" : "В АНГАРЕ";
-                txtCurrentMech.text = $"◀ [{HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}] {cur.mechName} | {status} | {cur.currentHp:F0}/{cur.maxHp:F0} HP | {cur.currentEnergy:F0}% ▶";
+                string status = cur.isDeployed ? "В бою" : "Ангар";
+                txtCurrentMech.text = $"{cur.mechName} ({HangarMechManager.Instance.CurrentIndex + 1}/{HangarMechManager.Instance.Mechs.Count}) | {status} | {cur.currentHp:F0}/{cur.maxHp:F0} HP | {cur.currentEnergy:F0}%";
             }
 
             if (btnRechargeBattery != null)
             {
                 btnRechargeBattery.interactable = !cur.isDeployed && cur.currentEnergy < 99f;
                 var bTxt = btnRechargeBattery.GetComponentInChildren<Text>();
-                if (bTxt != null) bTxt.text = cur.currentEnergy >= 99f ? "БАТАРЕЯ 100%" : "ЗАРЯДИТЬ БАТАРЕЮ";
+                if (bTxt != null) bTxt.text = cur.currentEnergy >= 99f ? "Батарея 100%" : "Зарядить";
             }
         }
 
         private void UpdateWorkbenchInfo()
         {
             if (RepairWorkbench.Instance == null) return;
-            string itemName = RepairWorkbench.Instance.CurrentItemName ?? "Модуль";
-            if (txtWbTitle != null) txtWbTitle.text = $"ВЕРСТАК: {itemName}";
+            string itemName = RepairWorkbench.Instance.CurrentItemName ?? "Деталь";
+            if (txtWbTitle != null) txtWbTitle.text = itemName;
             if (txtWbInfo != null) txtWbInfo.text = RepairWorkbench.Instance.RepairStepInfo;
         }
 
@@ -253,7 +253,7 @@ namespace HangarGame.UI
         {
             if (txtResources == null || GameManager.Instance == null) return;
             var gm = GameManager.Instance;
-            txtResources.text = $"КРЕДИТЫ: {gm.Credits} ¢   |   СПЛАВ: {gm.Alloy} т.   |   БАЗА: {gm.BaseHp:F0}%";
+            txtResources.text = $"{gm.Credits} ¢   |   {gm.Alloy} т   |   База: {gm.BaseHp:F0}%";
         }
     }
 }

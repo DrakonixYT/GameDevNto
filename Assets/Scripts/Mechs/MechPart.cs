@@ -454,12 +454,12 @@ namespace HangarGame.Mechs
             int hpPct = Mathf.RoundToInt(DurabilityPercent * 100f);
 
             if (!IsDamaged)
-                return $"[{title}] {hpPct}% — Исправен (ремонт не нужен)";
+                return $"{title} — {hpPct}%";
 
             if (data != null && data.repairCredits > 0)
-                return $"[{title}] {hpPct}% — Клик: на верстак ({data.repairCredits}¢, {data.repairAlloy}т)";
+                return $"{title} ({hpPct}%) — Чинить: {data.repairCredits}¢, {data.repairAlloy}т";
 
-            return $"[{title}] {hpPct}% — Клик: снять на верстак";
+            return $"{title} ({hpPct}%) — Чинить";
         }
 
         public void OnHover(bool isHovered)

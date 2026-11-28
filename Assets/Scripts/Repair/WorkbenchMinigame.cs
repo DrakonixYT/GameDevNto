@@ -11,13 +11,6 @@ namespace HangarGame.Repair
         [Header("Префаб платы для Егеря")]
         [SerializeField] private GameObject platePrefab;
 
-        [Header("Размеры сервисной панели")]
-        [SerializeField] private Vector3 panelSize = new Vector3(0.36f, 0.26f, 0.018f);
-        [SerializeField] private Vector3 boltScale = new Vector3(0.036f, 0.022f, 0.036f);
-        [SerializeField] private float boltColliderRadius = 0.7f;
-        [SerializeField] private Vector3 pinScale = new Vector3(0.036f, 0.036f, 0.036f);
-        [SerializeField] private float pinColliderRadius = 0.7f;
-
         private readonly Color[] channelColors =
         {
             new Color(0.95f, 0.25f, 0.25f),
@@ -30,11 +23,17 @@ namespace HangarGame.Repair
         private readonly Dictionary<int, Vector3> leftPins = new Dictionary<int, Vector3>();
         private readonly Dictionary<int, Vector3> rightPins = new Dictionary<int, Vector3>();
 
+        private Transform pivotRef;
         private GameObject hatchRoot;
         private GameObject coverPlate;
         private bool isJaegerMode;
         private int boltsRemaining;
         private int stepsRemaining;
+
+        private float panelWidth = 0.16f;
+        private float panelHeight = 0.13f;
+        private float boltScaleFactor = 0.022f;
+        private float pinRadiusScale = 0.022f;
 
         private GameObject selectedObject;
         private int selectedId = -1;
@@ -52,72 +51,180 @@ namespace HangarGame.Repair
             Clear();
             if (modelPivot == null) return;
 
+            pivotRef = modelPivot;
             isJaegerMode = jaegerPlatesMode;
+
+            Vector3 dir = camLocalDir.sqrMagnitude > 0.001f ? camLocalDir.normalized : Vector3.back;
+            Bounds meshBounds = CalcMeshLocalBounds(modelPivot, localModelBounds);
+
+            panelWidth = Mathf.Clamp(meshBounds.size.x * 0.62f, 0.11f, 0.25f);
+            panelHeight = Mathf.Clamp(meshBounds.size.y * 0.50f, 0.10f, 0.19f);
+            float minDim = Mathf.Min(panelWidth, panelHeight);
+            boltScaleFactor = Mathf.Clamp(minDim * 0.16f, 0.016f, 0.028f);
+            pinRadiusScale = Mathf.Clamp(minDim * 0.18f, 0.018f, 0.030f);
+
+            float surfaceDepth = SampleFrontSurfaceZ(modelPivot, meshBounds.center, dir, meshBounds);
 
             hatchRoot = new GameObject("Service_Bay");
             hatchRoot.transform.SetParent(modelPivot, false);
-
-            Vector3 dir = camLocalDir.sqrMagnitude > 0.001f ? camLocalDir.normalized : Vector3.back;
-            float surfaceDist = Mathf.Clamp(localModelBounds.extents.magnitude * 0.56f, 0.16f, 0.28f);
-            hatchRoot.transform.localPosition = dir * surfaceDist;
+            hatchRoot.transform.localPosition = new Vector3(meshBounds.center.x, meshBounds.center.y, surfaceDepth) + dir * 0.008f;
             hatchRoot.transform.localRotation = Quaternion.LookRotation(dir, Vector3.up);
             hatchRoot.transform.localScale = Vector3.one;
             spawnedObjects.Add(hatchRoot);
 
-            BuildBackingFrame();
+            BuildCompactArmorHatch();
             StartBoltsPhase();
         }
 
-        private void BuildBackingFrame()
+        private Bounds CalcMeshLocalBounds(Transform modelPivot, Bounds fallback)
+        {
+            bool hasAny = false;
+            Bounds result = new Bounds(fallback.center, Vector3.zero);
+            var filters = modelPivot.GetComponentsInChildren<MeshFilter>(false);
+            for (int i = 0; i < filters.Length; i++)
+            {
+                var r = filters[i].GetComponent<Renderer>();
+                if (r == null || !r.enabled || filters[i].sharedMesh == null) continue;
+                var verts = filters[i].sharedMesh.vertices;
+                for (int v = 0; v < verts.Length; v++)
+                {
+                    Vector3 lp = modelPivot.InverseTransformPoint(filters[i].transform.TransformPoint(verts[v]));
+                    if (!hasAny)
+                    {
+                        result = new Bounds(lp, Vector3.zero);
+                        hasAny = true;
+                    }
+                    else
+                    {
+                        result.Encapsulate(lp);
+                    }
+                }
+            }
+            return hasAny && result.size.sqrMagnitude > 0.0001f ? result : fallback;
+        }
+
+        private float SampleFrontSurfaceZ(Transform modelPivot, Vector3 localCenter, Vector3 dir, Bounds meshBounds)
+        {
+            float bestZ = meshBounds.center.z - meshBounds.extents.z * 0.55f;
+            float bestFront = float.PositiveInfinity;
+            float maxOffsetSq = Mathf.Pow(Mathf.Max(panelWidth, panelHeight) * 0.45f, 2f);
+
+            var filters = modelPivot.GetComponentsInChildren<MeshFilter>(false);
+            for (int i = 0; i < filters.Length; i++)
+            {
+                var r = filters[i].GetComponent<Renderer>();
+                if (r == null || !r.enabled || filters[i].sharedMesh == null) continue;
+                var verts = filters[i].sharedMesh.vertices;
+                int step = verts.Length > 800 ? verts.Length / 400 : 1;
+                for (int v = 0; v < verts.Length; v += step)
+                {
+                    Vector3 lp = modelPivot.InverseTransformPoint(filters[i].transform.TransformPoint(verts[v]));
+                    float dx = lp.x - localCenter.x;
+                    float dy = lp.y - localCenter.y;
+                    if (dx * dx + dy * dy > maxOffsetSq) continue;
+                    if (lp.z < bestFront)
+                    {
+                        bestFront = lp.z;
+                        bestZ = lp.z;
+                    }
+                }
+            }
+
+            if (bestFront < float.PositiveInfinity)
+                return Mathf.Clamp(bestZ, meshBounds.min.z - 0.01f, meshBounds.center.z);
+
+            return dir.z < 0f ? (meshBounds.center.z - meshBounds.extents.z * 0.5f) : (meshBounds.center.z + meshBounds.extents.z * 0.5f);
+        }
+
+        private float SnapPointToMeshDepth(Vector2 xyLocal)
+        {
+            if (pivotRef == null || hatchRoot == null) return 0.004f;
+            Vector3 probePivot = hatchRoot.transform.TransformPoint(new Vector3(xyLocal.x, xyLocal.y, 0f));
+            Vector3 probeLocal = pivotRef.InverseTransformPoint(probePivot);
+
+            float closestZ = 0f;
+            float bestDistSq = float.PositiveInfinity;
+
+            var filters = pivotRef.GetComponentsInChildren<MeshFilter>(false);
+            for (int i = 0; i < filters.Length; i++)
+            {
+                if (filters[i].transform.IsChildOf(hatchRoot.transform)) continue;
+                var r = filters[i].GetComponent<Renderer>();
+                if (r == null || !r.enabled || filters[i].sharedMesh == null) continue;
+                var verts = filters[i].sharedMesh.vertices;
+                int step = verts.Length > 600 ? verts.Length / 300 : 1;
+                for (int v = 0; v < verts.Length; v += step)
+                {
+                    Vector3 lp = pivotRef.InverseTransformPoint(filters[i].transform.TransformPoint(verts[v]));
+                    float dx = lp.x - probeLocal.x;
+                    float dy = lp.y - probeLocal.y;
+                    float dSq = dx * dx + dy * dy;
+                    if (dSq < bestDistSq)
+                    {
+                        bestDistSq = dSq;
+                        closestZ = lp.z - probeLocal.z;
+                    }
+                }
+            }
+
+            if (bestDistSq > 0.015f) return 0f;
+            return Mathf.Clamp(closestZ, -0.04f, 0.025f);
+        }
+
+        private void BuildCompactArmorHatch()
         {
             coverPlate = GameObject.CreatePrimitive(PrimitiveType.Cube);
             coverPlate.name = "Service_Cover";
             coverPlate.transform.SetParent(hatchRoot.transform, false);
-            coverPlate.transform.localPosition = Vector3.zero;
-            coverPlate.transform.localScale = panelSize;
+            coverPlate.transform.localPosition = new Vector3(0f, 0f, -0.003f);
+            coverPlate.transform.localScale = new Vector3(panelWidth, panelHeight, 0.008f);
             SafeDestroy(coverPlate.GetComponent<Collider>());
-            coverPlate.GetComponent<Renderer>().material = CreateMat(new Color(0.14f, 0.16f, 0.2f), false);
+            coverPlate.GetComponent<Renderer>().material = CreateMat(new Color(0.18f, 0.21f, 0.26f), false);
             spawnedObjects.Add(coverPlate);
         }
 
         private void StartBoltsPhase()
         {
-            Vector3[] corners =
+            float bx = panelWidth * 0.37f;
+            float by = panelHeight * 0.35f;
+            Vector2[] corners2D =
             {
-                new Vector3(-0.13f,  0.085f, 0.016f),
-                new Vector3( 0.13f,  0.085f, 0.016f),
-                new Vector3(-0.13f, -0.085f, 0.016f),
-                new Vector3( 0.13f, -0.085f, 0.016f)
+                new Vector2(-bx,  by),
+                new Vector2( bx,  by),
+                new Vector2(-bx, -by),
+                new Vector2( bx, -by)
             };
 
-            boltsRemaining = corners.Length;
+            boltsRemaining = corners2D.Length;
             stepsRemaining = isJaegerMode ? 4 : 3;
-            StatusText = $"Шаг 1/2: Открутите {boltsRemaining} крепежных болта";
+            StatusText = $"Болты: {boltsRemaining}";
 
-            for (int i = 0; i < corners.Length; i++)
+            for (int i = 0; i < corners2D.Length; i++)
             {
+                Vector3 boltPos = new Vector3(corners2D[i].x, corners2D[i].y, 0.008f);
+
                 GameObject bolt = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 bolt.name = $"Bolt_{i}";
                 bolt.transform.SetParent(hatchRoot.transform, false);
-                bolt.transform.localPosition = corners[i];
+                bolt.transform.localPosition = boltPos;
                 bolt.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                bolt.transform.localScale = boltScale;
-                bolt.GetComponent<Renderer>().material = CreateMat(new Color(0.95f, 0.78f, 0.15f), true, 0.35f);
+                bolt.transform.localScale = new Vector3(boltScaleFactor, 0.012f, boltScaleFactor);
+                bolt.GetComponent<Renderer>().material = CreateMat(new Color(0.92f, 0.72f, 0.16f), true, 0.3f);
 
                 GameObject washer = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 washer.name = "Washer";
                 washer.transform.SetParent(bolt.transform, false);
-                washer.transform.localPosition = new Vector3(0f, -0.45f, 0f);
-                washer.transform.localScale = new Vector3(1.4f, 0.35f, 1.4f);
-                washer.GetComponent<Renderer>().material = CreateMat(new Color(0.25f, 0.28f, 0.32f), false);
+                washer.transform.localPosition = new Vector3(0f, -0.4f, 0f);
+                washer.transform.localScale = new Vector3(1.45f, 0.35f, 1.45f);
+                washer.GetComponent<Renderer>().material = CreateMat(new Color(0.24f, 0.27f, 0.32f), false);
                 SafeDestroy(washer.GetComponent<Collider>());
 
                 SafeDestroy(bolt.GetComponent<Collider>());
                 var col = bolt.AddComponent<SphereCollider>();
-                col.radius = boltColliderRadius;
+                col.radius = 0.85f;
 
                 var clk = bolt.AddComponent<ClickableObject>();
-                clk.promptText = "Крепежный болт (Клик: открутить)";
+                clk.promptText = "Болт — открутить";
                 clk.onClick = () => UnscrewBolt(bolt, clk);
                 spawnedObjects.Add(bolt);
             }
@@ -148,7 +255,7 @@ namespace HangarGame.Repair
             }
             else
             {
-                StatusText = $"Шаг 1/2: Осталось открутить {boltsRemaining} болта";
+                StatusText = $"Болты: {boltsRemaining}";
             }
         }
 
@@ -156,16 +263,16 @@ namespace HangarGame.Repair
         {
             Vector3 startPos = bolt.transform.localPosition;
             Quaternion startRot = bolt.transform.localRotation;
-            Vector3 endPos = startPos + new Vector3(0f, 0f, 0.08f);
+            Vector3 endPos = startPos + new Vector3(0f, 0f, 0.06f);
 
             float t = 0f;
-            const float dur = 0.2f;
+            const float dur = 0.18f;
             while (t < dur && bolt != null)
             {
                 t += Time.deltaTime;
                 float k = t / dur;
                 bolt.transform.localPosition = Vector3.Lerp(startPos, endPos, k);
-                bolt.transform.localRotation = startRot * Quaternion.Euler(0f, k * 540f, 0f);
+                bolt.transform.localRotation = startRot * Quaternion.Euler(0f, k * 480f, 0f);
                 yield return null;
             }
 
@@ -175,16 +282,13 @@ namespace HangarGame.Repair
 
         private IEnumerator OpenCoverAndBeginStep2()
         {
-            yield return new WaitForSeconds(0.14f);
+            yield return new WaitForSeconds(0.12f);
 
             if (coverPlate != null)
             {
-                Vector3 startPos = coverPlate.transform.localPosition;
-                Vector3 endPos = startPos + new Vector3(0f, -0.04f, -0.01f);
-                Color darkInterior = new Color(0.06f, 0.08f, 0.11f);
-                coverPlate.GetComponent<Renderer>().material = CreateMat(darkInterior, false);
-                coverPlate.transform.localPosition = endPos;
-                coverPlate.transform.localScale = new Vector3(panelSize.x, panelSize.y, 0.008f);
+                spawnedObjects.Remove(coverPlate);
+                SafeDestroy(coverPlate);
+                coverPlate = null;
             }
 
             BeginStep2Immediate();
@@ -192,6 +296,13 @@ namespace HangarGame.Repair
 
         private void BeginStep2Immediate()
         {
+            if (coverPlate != null)
+            {
+                spawnedObjects.Remove(coverPlate);
+                SafeDestroy(coverPlate);
+                coverPlate = null;
+            }
+
             selectedObject = null;
             selectedId = -1;
             selectedSide = -1;
@@ -207,17 +318,23 @@ namespace HangarGame.Repair
             leftPins.Clear();
             rightPins.Clear();
             stepsRemaining = 3;
-            StatusText = "Шаг 2/2: Соедините 3 пары контактов одного цвета";
+            StatusText = "Провода: 3";
+
+            float xSpan = panelWidth * 0.34f;
+            float yStep = panelHeight * 0.34f;
 
             for (int i = 0; i < 3; i++)
             {
                 int colorId = i;
-                float yL = 0.075f - i * 0.075f;
+                float yL = yStep - i * yStep;
                 int shuffledRightIdx = (i + 1) % 3;
-                float yR = 0.075f - shuffledRightIdx * 0.075f;
+                float yR = yStep - shuffledRightIdx * yStep;
 
-                Vector3 lPos = new Vector3(-0.115f, yL, 0.02f);
-                Vector3 rPos = new Vector3( 0.115f, yR, 0.02f);
+                float zL = SnapPointToMeshDepth(new Vector2(-xSpan, yL)) + 0.01f;
+                float zR = SnapPointToMeshDepth(new Vector2(xSpan, yR)) + 0.01f;
+
+                Vector3 lPos = new Vector3(-xSpan, yL, zL);
+                Vector3 rPos = new Vector3(xSpan, yR, zR);
 
                 leftPins[colorId] = lPos;
                 rightPins[colorId] = rPos;
@@ -233,16 +350,15 @@ namespace HangarGame.Repair
             pin.name = $"Pin_{colorId}_{side}";
             pin.transform.SetParent(hatchRoot.transform, false);
             pin.transform.localPosition = localPos;
-            pin.transform.localScale = pinScale;
-            pin.GetComponent<Renderer>().material = CreateMat(c, true, 1.2f);
+            pin.transform.localScale = Vector3.one * pinRadiusScale;
+            pin.GetComponent<Renderer>().material = CreateMat(c, true, 1.0f);
 
             SafeDestroy(pin.GetComponent<Collider>());
             var col = pin.AddComponent<SphereCollider>();
-            col.radius = pinColliderRadius;
+            col.radius = 0.85f;
 
-            string sideName = side == 0 ? "Входной" : "Выходной";
             var clk = pin.AddComponent<ClickableObject>();
-            clk.promptText = $"{sideName} контакт #{colorId + 1} (Клик: соединить)";
+            clk.promptText = $"Контакт #{colorId + 1}";
             clk.onClick = () => OnPinClicked(pin, colorId, side, c);
             spawnedObjects.Add(pin);
         }
@@ -252,7 +368,7 @@ namespace HangarGame.Repair
             if (selectedObject == null)
             {
                 SelectPin(pin, colorId, side, origColor);
-                StatusText = $"Выбран контакт #{colorId + 1}. Найдите парный контакт такого же цвета.";
+                StatusText = $"Контакт #{colorId + 1} — выберите пару";
                 return;
             }
 
@@ -262,18 +378,17 @@ namespace HangarGame.Repair
             {
                 var prevClk = selectedObject.GetComponent<ClickableObject>();
                 if (prevClk != null) prevClk.disableHover = false;
-                selectedObject.GetComponent<Renderer>().material = CreateMat(selectedOrigColor, true, 1.2f);
-                selectedObject.transform.localScale = pinScale;
+                selectedObject.GetComponent<Renderer>().material = CreateMat(selectedOrigColor, true, 1.0f);
+                selectedObject.transform.localScale = Vector3.one * pinRadiusScale;
 
                 SelectPin(pin, colorId, side, origColor);
-                StatusText = $"Переключено на контакт #{colorId + 1}.";
                 return;
             }
 
             if (selectedId != colorId)
             {
                 HangarAudio.Instance?.PlayError();
-                StatusText = "Короткое замыкание! Цвета контактов не совпадают.";
+                StatusText = "Неверный контакт";
                 return;
             }
 
@@ -292,7 +407,7 @@ namespace HangarGame.Repair
                 clk2.isInteractable = false;
             }
 
-            selectedObject.transform.localScale = pinScale;
+            selectedObject.transform.localScale = Vector3.one * pinRadiusScale;
             selectedObject.GetComponent<Renderer>().material = CreateMat(origColor, false);
             pin.GetComponent<Renderer>().material = CreateMat(origColor, false);
 
@@ -303,15 +418,10 @@ namespace HangarGame.Repair
             stepsRemaining--;
             HangarAudio.Instance?.PlayWire();
 
-            if (stepsRemaining <= 0)
-            {
-                HangarAudio.Instance?.PlaySuccess();
-                StatusText = "Цепи восстановлены! Нажмите ГОТОВО (3D кнопка) или [SPACE].";
-            }
-            else
-            {
-                StatusText = $"Цепь соединена! Осталось подключить: {stepsRemaining}";
-            }
+            StatusText = stepsRemaining <= 0
+                ? "Готово — жмите ГОТОВО или Пробел"
+                : $"Провода: {stepsRemaining}";
+            if (stepsRemaining <= 0) HangarAudio.Instance?.PlaySuccess();
         }
 
         private void SelectPin(GameObject pin, int colorId, int side, Color origColor)
@@ -324,8 +434,8 @@ namespace HangarGame.Repair
             var clk = pin.GetComponent<ClickableObject>();
             if (clk != null) clk.disableHover = true;
 
-            pin.GetComponent<Renderer>().material = CreateMat(Color.white, true, 1.6f);
-            pin.transform.localScale = pinScale * 1.32f;
+            pin.GetComponent<Renderer>().material = CreateMat(Color.white, true, 1.4f);
+            pin.transform.localScale = Vector3.one * (pinRadiusScale * 1.3f);
             HangarAudio.Instance?.PlayClick();
         }
 
@@ -333,7 +443,7 @@ namespace HangarGame.Repair
         {
             Vector3 pL = leftPins[colorId];
             Vector3 pR = rightPins[colorId];
-            Vector3 mid = (pL + pR) * 0.5f + new Vector3(0f, 0f, 0.01f);
+            Vector3 mid = (pL + pR) * 0.5f + new Vector3(0f, 0f, 0.008f);
 
             GameObject wire = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             wire.name = $"Wire_Bridge_{colorId}";
@@ -342,8 +452,8 @@ namespace HangarGame.Repair
             wire.transform.localRotation = Quaternion.LookRotation(pR - pL) * Quaternion.Euler(90f, 0f, 0f);
 
             float dist = Vector3.Distance(pL, pR);
-            wire.transform.localScale = new Vector3(0.016f, dist * 0.5f, 0.016f);
-            wire.GetComponent<Renderer>().material = CreateMat(c, true, 1.3f);
+            wire.transform.localScale = new Vector3(pinRadiusScale * 0.48f, dist * 0.5f, pinRadiusScale * 0.48f);
+            wire.GetComponent<Renderer>().material = CreateMat(c, true, 1.0f);
             SafeDestroy(wire.GetComponent<Collider>());
             spawnedObjects.Add(wire);
         }
@@ -351,14 +461,16 @@ namespace HangarGame.Repair
         private void StartPlatesPhase()
         {
             stepsRemaining = 4;
-            StatusText = "Шаг 2/2: Выберите и вставьте 4 платы в разъемы своего цвета";
+            StatusText = "Платы: 4";
 
+            float sx = panelWidth * 0.28f;
+            float sy = panelHeight * 0.22f;
             Vector3[] slotCoords =
             {
-                new Vector3(-0.095f,  0.048f, 0.012f),
-                new Vector3( 0.095f,  0.048f, 0.012f),
-                new Vector3(-0.095f, -0.025f, 0.012f),
-                new Vector3( 0.095f, -0.025f, 0.012f)
+                new Vector3(-sx,  sy, SnapPointToMeshDepth(new Vector2(-sx,  sy)) + 0.008f),
+                new Vector3( sx,  sy, SnapPointToMeshDepth(new Vector2( sx,  sy)) + 0.008f),
+                new Vector3(-sx, -sy * 0.4f, SnapPointToMeshDepth(new Vector2(-sx, -sy * 0.4f)) + 0.008f),
+                new Vector3( sx, -sy * 0.4f, SnapPointToMeshDepth(new Vector2( sx, -sy * 0.4f)) + 0.008f)
             };
 
             int[] plateOrder = { 2, 0, 3, 1 };
@@ -372,28 +484,30 @@ namespace HangarGame.Repair
                 slotObj.name = $"Plate_Slot_{i}";
                 slotObj.transform.SetParent(hatchRoot.transform, false);
                 slotObj.transform.localPosition = slotCoords[i];
-                slotObj.transform.localScale = new Vector3(0.095f, 0.055f, 0.012f);
-                slotObj.GetComponent<Renderer>().material = CreateMat(slotCol * 0.65f, true, 0.6f);
+                slotObj.transform.localScale = new Vector3(panelWidth * 0.34f, panelHeight * 0.26f, 0.01f);
+                slotObj.GetComponent<Renderer>().material = CreateMat(slotCol * 0.65f, true, 0.5f);
 
                 var slotClk = slotObj.AddComponent<ClickableObject>();
-                slotClk.promptText = $"Слот #{i + 1} — Клик: вставить выбранную плату";
-                Vector3 targetSlotPos = slotCoords[i] + new Vector3(0f, 0f, 0.016f);
+                slotClk.promptText = $"Разъем #{i + 1}";
+                Vector3 targetSlotPos = slotCoords[i] + new Vector3(0f, 0f, 0.012f);
                 slotClk.onClick = () => OnPlateSlotClicked(slotObj, slotClk, slotColorId, targetSlotPos, slotCol);
                 spawnedObjects.Add(slotObj);
             }
 
+            float traySpacing = Mathf.Max(0.055f, panelWidth * 0.30f);
+            float trayY = -panelHeight * 0.58f;
             for (int i = 0; i < 4; i++)
             {
                 int plateColorId = plateOrder[i];
                 Color pCol = channelColors[plateColorId];
-                Vector3 trayPos = new Vector3(-0.12f + i * 0.08f, -0.115f, 0.028f);
+                Vector3 trayPos = new Vector3((i - 1.5f) * traySpacing, trayY, 0.016f);
 
                 GameObject plateObj = CreatePlateVisual(plateColorId, pCol);
                 plateObj.transform.SetParent(hatchRoot.transform, false);
                 plateObj.transform.localPosition = trayPos;
 
                 var clk = plateObj.AddComponent<ClickableObject>();
-                clk.promptText = $"Плата #{plateColorId + 1} (Клик: выбрать для установки)";
+                clk.promptText = $"Плата #{plateColorId + 1}";
                 clk.onClick = () => OnPlateSelected(plateObj, plateColorId, pCol, trayPos);
                 spawnedObjects.Add(plateObj);
             }
@@ -423,7 +537,7 @@ namespace HangarGame.Repair
                     Bounds b = primary.bounds;
                     if (b.size.sqrMagnitude > 0.0000001f)
                     {
-                        float normScale = 0.09f / b.size.magnitude;
+                        float normScale = Mathf.Clamp(panelWidth * 0.30f, 0.048f, 0.08f) / b.size.magnitude;
                         mesh.transform.localScale *= normScale;
                         b = primary.bounds;
                         mesh.transform.position += orientPivot.transform.position - b.center;
@@ -434,20 +548,20 @@ namespace HangarGame.Repair
 
                 foreach (var r in mesh.GetComponentsInChildren<Renderer>(true))
                 {
-                    if (r.enabled) r.material = CreateMat(c, true, 0.85f);
+                    if (r.enabled) r.material = CreateMat(c, true, 0.75f);
                 }
             }
             else
             {
                 GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 box.transform.SetParent(holder.transform, false);
-                box.transform.localScale = new Vector3(0.068f, 0.045f, 0.014f);
+                box.transform.localScale = new Vector3(0.055f, 0.036f, 0.012f);
                 SafeDestroy(box.GetComponent<Collider>());
-                box.GetComponent<Renderer>().material = CreateMat(c, true, 0.8f);
+                box.GetComponent<Renderer>().material = CreateMat(c, true, 0.7f);
             }
 
             var col = holder.AddComponent<BoxCollider>();
-            col.size = new Vector3(0.08f, 0.055f, 0.03f);
+            col.size = new Vector3(0.065f, 0.048f, 0.028f);
             return holder;
         }
 
@@ -468,9 +582,9 @@ namespace HangarGame.Repair
 
             var clk = plateObj.GetComponent<ClickableObject>();
             if (clk != null) clk.disableHover = true;
-            plateObj.transform.localPosition = restTrayPos + new Vector3(0f, 0f, 0.025f);
+            plateObj.transform.localPosition = restTrayPos + new Vector3(0f, 0f, 0.02f);
             HangarAudio.Instance?.PlayClick();
-            StatusText = $"Выбрана плата #{colorId + 1}. Кликните по разъему того же цвета.";
+            StatusText = $"Плата #{colorId + 1} — выберите разъем";
         }
 
         private void OnPlateSlotClicked(GameObject slotObj, ClickableObject slotClk, int slotColorId, Vector3 targetPos, Color slotColor)
@@ -478,14 +592,14 @@ namespace HangarGame.Repair
             if (selectedObject == null)
             {
                 HangarAudio.Instance?.PlayClick();
-                StatusText = "Сначала выберите нужную плату снизу.";
+                StatusText = "Сначала выберите плату";
                 return;
             }
 
             if (selectedId != slotColorId)
             {
                 HangarAudio.Instance?.PlayError();
-                StatusText = "Цвет платы не совпадает с разъемом! Подберите правильную плату.";
+                StatusText = "Неверный разъем";
                 return;
             }
 
@@ -502,7 +616,7 @@ namespace HangarGame.Repair
             selectedObject = null;
             selectedId = -1;
 
-            slotObj.GetComponent<Renderer>().material = CreateMat(slotColor, true, 1.4f);
+            slotObj.GetComponent<Renderer>().material = CreateMat(slotColor, true, 1.1f);
 
             if (Application.isPlaying)
                 StartCoroutine(AnimatePlateInsert(insertedPlate, targetPos));
@@ -512,15 +626,10 @@ namespace HangarGame.Repair
             stepsRemaining--;
             HangarAudio.Instance?.PlayPlate();
 
-            if (stepsRemaining <= 0)
-            {
-                HangarAudio.Instance?.PlaySuccess();
-                StatusText = "Все 4 платы установлены! Нажмите ГОТОВО (3D кнопка) или [SPACE].";
-            }
-            else
-            {
-                StatusText = $"Плата установлена! Осталось вставить плат: {stepsRemaining}";
-            }
+            StatusText = stepsRemaining <= 0
+                ? "Готово — жмите ГОТОВО или Пробел"
+                : $"Платы: {stepsRemaining}";
+            if (stepsRemaining <= 0) HangarAudio.Instance?.PlaySuccess();
         }
 
         private IEnumerator AnimatePlateInsert(GameObject plate, Vector3 endPos)
@@ -547,6 +656,7 @@ namespace HangarGame.Repair
             spawnedObjects.Clear();
             leftPins.Clear();
             rightPins.Clear();
+            pivotRef = null;
             hatchRoot = null;
             coverPlate = null;
             selectedObject = null;
@@ -582,7 +692,7 @@ namespace HangarGame.Repair
             else DestroyImmediate(obj);
         }
 
-        private Material CreateMat(Color c, bool emissive, float emissionMult = 1.2f)
+        private Material CreateMat(Color c, bool emissive, float emissionMult = 1.0f)
         {
             Shader shader = Shader.Find("Universal Render Pipeline/Lit");
             if (shader == null) shader = Shader.Find("Standard");

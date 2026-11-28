@@ -114,11 +114,11 @@ namespace HangarGame.UI
             if (markerContainer == null) return;
             Font font = LoadTerminalFont();
 
-            baseMarkerObj = CreateMarkerBox("Radar_BaseMarker", new Vector2(200f, 32f), new Vector2(0f, -240f),
-                new Color(0.1f, 0.45f, 0.2f, 0.85f), font, Color.white, 12, "БАЗА АНГАР (ВЫХОД)");
+            baseMarkerObj = CreateMarkerBox("Radar_BaseMarker", new Vector2(180f, 32f), new Vector2(0f, -240f),
+                new Color(0.1f, 0.45f, 0.2f, 0.85f), font, Color.white, 13, "База (100%)");
 
-            orderTargetMarkerObj = CreateMarkerBox("Radar_TargetMarker", new Vector2(130f, 26f), Vector2.zero,
-                new Color(1f, 0.85f, 0.1f, 0.85f), font, Color.black, 11, "◎ ЦЕЛЬ ПРИКАЗА");
+            orderTargetMarkerObj = CreateMarkerBox("Radar_TargetMarker", new Vector2(100f, 24f), Vector2.zero,
+                new Color(1f, 0.85f, 0.1f, 0.85f), font, Color.black, 11, "Цель");
             orderTargetMarkerObj.SetActive(false);
         }
 
@@ -167,12 +167,12 @@ namespace HangarGame.UI
                 int enemyCount = dispatch.Enemies.Count;
                 if (enemyCount > 0)
                 {
-                    txtRadarTitle.text = $"БОЕВАЯ ТРЕВОГА: В СЕКТОРЕ {enemyCount} ВРАГОВ! | БАЗА: {baseHp:F0}%";
+                    txtRadarTitle.text = $"Тревога: врагов {enemyCount}  |  База {baseHp:F0}%";
                     txtRadarTitle.color = Color.red;
                 }
                 else
                 {
-                    txtRadarTitle.text = $"СЕКТОР-7: РАДАР СКАНИРУЕТ ПЕРИМЕТР | БАЗА: {baseHp:F0}%";
+                    txtRadarTitle.text = $"Радар чист  |  База {baseHp:F0}%";
                     txtRadarTitle.color = Color.cyan;
                 }
             }
@@ -180,7 +180,7 @@ namespace HangarGame.UI
             if (baseMarkerObj != null)
             {
                 var bTxt = baseMarkerObj.GetComponentInChildren<Text>();
-                if (bTxt != null) bTxt.text = $"БАЗА АНГАР ({baseHp:F0}%)";
+                if (bTxt != null) bTxt.text = $"База ({baseHp:F0}%)";
                 var bImg = baseMarkerObj.GetComponent<Image>();
                 if (bImg != null)
                 {
@@ -254,9 +254,9 @@ namespace HangarGame.UI
 
                     if (txt != null)
                     {
-                        string mode = mech.isReturning ? "ОТХОДИТ НА БАЗУ" : (isSelected ? "▶ ВЫБРАН (КЛИКНИТЕ РАДАР)" : "В БОЮ (КЛИК ДЛЯ ВЫБОРА)");
-                        string shieldInfo = mech.isShieldActive ? " [ЩИТ]" : "";
-                        txt.text = $"[ {mech.mechName} ]{shieldInfo}\n{mech.currentHp:F0}/{mech.maxHp:F0} HP   {mech.currentEnergy:F0}%\n{mode}";
+                        string mode = mech.isReturning ? "Отходит" : (isSelected ? "Выбран — клик на радар" : "В бою");
+                        string shieldInfo = mech.isShieldActive ? " [Щит]" : "";
+                        txt.text = $"{mech.mechName}{shieldInfo} | {mech.currentHp:F0}/{mech.maxHp:F0} HP | {mech.currentEnergy:F0}%\n{mode}";
                     }
                     if (btn != null) btn.interactable = true;
 
@@ -266,14 +266,14 @@ namespace HangarGame.UI
                         var sImg = bShield.GetComponent<Image>();
                         if (sImg != null) sImg.color = mech.isShieldActive ? new Color(0.15f, 0.75f, 0.95f) : new Color(0.25f, 0.35f, 0.45f);
                         var sTxt = bShield.GetComponentInChildren<Text>();
-                        if (sTxt != null) sTxt.text = mech.isShieldActive ? "ЩИТ: ВКЛ" : "ЩИТ: ВЫКЛ";
+                        if (sTxt != null) sTxt.text = mech.isShieldActive ? "Щит: вкл" : "Щит: выкл";
                     }
 
                     if (bRecall != null)
                     {
                         bRecall.gameObject.SetActive(true);
                         var rTxt = bRecall.GetComponentInChildren<Text>();
-                        if (rTxt != null) rTxt.text = mech.isReturning ? "ИДЕТ НА БАЗУ" : "НА БАЗУ";
+                        if (rTxt != null) rTxt.text = mech.isReturning ? "Возврат" : "На базу";
                     }
                 }
                 else
@@ -284,21 +284,21 @@ namespace HangarGame.UI
                     if (isDeployReady)
                     {
                         if (img != null) img.color = Color.Lerp(Color.yellow, Color.cyan, Mathf.PingPong(Time.time * 4f, 1f));
-                        if (txt != null) txt.text = $"[ ВЫСАДКА: {mech.mechName} ]\nКЛИКНИТЕ В СЕКТОР РАДАРА\n{mech.currentHp:F0}/{mech.maxHp:F0} HP   {mech.currentEnergy:F0}%";
+                        if (txt != null) txt.text = $"{mech.mechName} — Высадка\nКлик на радар";
                         if (btn != null) btn.interactable = true;
                     }
                     else if (mech.CanDeploy())
                     {
                         if (img != null) img.color = new Color(0.12f, 0.45f, 0.35f, 0.9f);
-                        if (txt != null) txt.text = $"[ {mech.mechName} ]\n{mech.currentHp:F0}/{mech.maxHp:F0} HP   {mech.currentEnergy:F0}%\nКЛИК: ВЫСАДИТЬ В БОЙ";
+                        if (txt != null) txt.text = $"{mech.mechName} | {mech.currentHp:F0}/{mech.maxHp:F0} HP | {mech.currentEnergy:F0}%\nВысадить";
                         if (btn != null) btn.interactable = true;
                     }
                     else
                     {
                         if (img != null) img.color = new Color(0.3f, 0.15f, 0.15f, 0.75f);
-                        string reason = mech.GetTotalHpPercent() <= 0.10f ? "ТРЕБУЕТСЯ РЕМОНТ (ХП < 10%)"
-                                      : (mech.currentEnergy <= 10f ? "НУЖНА ЗАРЯДКА В АНГАРЕ" : "РАЗОБРАН НА ВЕРСТАКЕ");
-                        if (txt != null) txt.text = $"[ {mech.mechName} ]\n{mech.currentHp:F0}/{mech.maxHp:F0} HP   {mech.currentEnergy:F0}%\n{reason}";
+                        string reason = mech.GetTotalHpPercent() <= 0.10f ? "Нужен ремонт"
+                                      : (mech.currentEnergy <= 10f ? "Нужна зарядка" : "На верстаке");
+                        if (txt != null) txt.text = $"{mech.mechName} | {mech.currentHp:F0}/{mech.maxHp:F0} HP | {mech.currentEnergy:F0}%\n{reason}";
                         if (btn != null) btn.interactable = false;
                     }
                 }
@@ -447,7 +447,7 @@ namespace HangarGame.UI
                 var img = m.GetComponent<Image>();
                 if (img != null) img.color = Color.red;
                 var txt = m.GetComponentInChildren<Text>();
-                if (txt != null) txt.text = $"● {enemy.name}\n[{enemy.hp:F0} HP | УЯЗ: {enemy.weakAgainst}]";
+                if (txt != null) txt.text = $"{enemy.name}\n{enemy.hp:F0} HP | {DispatchSystem.FormatDamageType(enemy.weakAgainst)}";
             }
 
             foreach (var mech in mechMgr.Mechs)
@@ -460,9 +460,9 @@ namespace HangarGame.UI
                 var img = m.GetComponent<Image>();
                 if (img != null) img.color = isSel ? Color.yellow : mech.themeColor;
                 var txt = m.GetComponentInChildren<Text>();
-                string status = mech.isReturning ? "ОТХОД" : (mech.isShieldActive ? "ЩИТ" : "БОЙ");
-                string selTag = isSel ? "▶ [ВЫБРАН] " : "";
-                if (txt != null) txt.text = $"{selTag}▲ {mech.mechName} [{status}]\n{mech.currentHp:F0}/{mech.maxHp:F0} HP  {mech.currentEnergy:F0}%";
+                string status = mech.isReturning ? "Отход" : (mech.isShieldActive ? "Щит" : "Бой");
+                string selTag = isSel ? "* " : "";
+                if (txt != null) txt.text = $"{selTag}{mech.mechName} [{status}]\n{mech.currentHp:F0}/{mech.maxHp:F0} HP  {mech.currentEnergy:F0}%";
             }
 
             for (int i = idx; i < activeMarkers.Count; i++)

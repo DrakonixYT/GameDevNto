@@ -112,6 +112,9 @@ namespace HangarGame.EditorTools
                 soDisp.FindProperty("breachCreditsPenalty").intValue = 50;
                 soDisp.FindProperty("breachAlloyPenalty").intValue = 25;
                 soDisp.FindProperty("breachBaseDamage").floatValue = 25f;
+                soDisp.FindProperty("combatEngageRange").floatValue = 175f;
+                soDisp.FindProperty("holdToFightRange").floatValue = 135f;
+                soDisp.FindProperty("enemyAggroRange").floatValue = 195f;
                 soDisp.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(disp);
             }
@@ -232,6 +235,10 @@ namespace HangarGame.EditorTools
             var soMgr = new SerializedObject(mechMgr);
             soMgr.FindProperty("startFirstMechDamaged").boolValue = true;
             soMgr.FindProperty("firstMechStartHpRatio").floatValue = 0.58f;
+            soMgr.FindProperty("exitDuration").floatValue = 1.0f;
+            soMgr.FindProperty("enterDuration").floatValue = 1.0f;
+            soMgr.FindProperty("verticalLiftOffset").floatValue = 0.9f;
+            soMgr.FindProperty("bayVerticalLiftOffset").floatValue = 9.5f;
             soMgr.ApplyModifiedPropertiesWithoutUndo();
 
             EditorUtility.SetDirty(mechMgr);
@@ -306,7 +313,11 @@ namespace HangarGame.EditorTools
             var wb = GetOrAdd<RepairWorkbench>(wbObj);
             var plate = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Eger/Plate.fbx");
             wb.SetPlatePrefab(plate);
-            wb.SetRestOffset(new Vector3(0f, 1.10f, 0f));
+            wb.SetRestOffset(new Vector3(0f, 1.12f, 0f));
+            var soWb = new SerializedObject(wb);
+            var extProp = soWb.FindProperty("normalizedPartExtent");
+            if (extProp != null) extProp.floatValue = 0.68f;
+            soWb.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(wb);
 
             var rCam = Object.FindAnyObjectByType<RoomCamera>();
@@ -358,10 +369,18 @@ namespace HangarGame.EditorTools
 
             jaeger.Configure(sceneParts, prefabs, plate);
             var soJg = new SerializedObject(jaeger);
+            string[] names = { "Голова", "Левая рука", "Правая рука", "Щит", "Копьё" };
             int[] creds = { 160, 210, 260, 330, 420 };
             int[] allys = { 70, 95, 120, 150, 190 };
+            var nProp = soJg.FindProperty("stageNames");
             var cProp = soJg.FindProperty("stageCredits");
             var aProp = soJg.FindProperty("stageAlloy");
+            if (nProp != null)
+            {
+                nProp.arraySize = names.Length;
+                for (int i = 0; i < names.Length; i++)
+                    nProp.GetArrayElementAtIndex(i).stringValue = names[i];
+            }
             if (cProp != null && aProp != null)
             {
                 cProp.arraySize = creds.Length;
@@ -478,9 +497,20 @@ namespace HangarGame.EditorTools
                 EditorUtility.SetDirty(tTitle);
             }
             var tLog = bg.Find("Txt_BattleLog")?.GetComponent<Text>();
+            if (tLog != null) tLog.text = "Радар чист.";
             var tJaeger = bg.Find("Txt_JaegerInfo")?.GetComponent<Text>();
             var bJaeger = bg.Find("Btn_BuildJaeger")?.GetComponent<Button>();
+            if (bJaeger != null)
+            {
+                var bt = bJaeger.GetComponentInChildren<Text>();
+                if (bt != null) bt.text = "Собрать Егеря";
+            }
             var bScan = bg.Find("Btn_ScanThreat")?.GetComponent<Button>();
+            if (bScan != null)
+            {
+                var st = bScan.GetComponentInChildren<Text>();
+                if (st != null) st.text = "Вызвать волну";
+            }
             var rBox = bg.Find("Radar_Screen")?.GetComponent<RectTransform>();
             var rClick = rBox != null ? GetOrAdd<RadarClickHandler>(rBox.gameObject) : null;
             var mContainer = rBox != null ? rBox.Find("Marker_Container") : null;
@@ -535,7 +565,7 @@ namespace HangarGame.EditorTools
                 if (rCam != null && armoryUi != null)
                 {
                     Transform aTr = armoryUi.transform;
-                    Vector3 focusPos = aTr.position + (-aTr.forward) * 0.72f;
+                    Vector3 focusPos = aTr.position + (-aTr.forward) * 0.58f;
                     rCam.ConfigureDispatchMonitorCamera(1.32f, focusPos, aTr.eulerAngles.y);
                     EditorUtility.SetDirty(rCam);
                 }

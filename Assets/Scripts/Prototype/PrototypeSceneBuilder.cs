@@ -564,14 +564,14 @@ namespace HangarGame.Prototype
             Font font = LoadDefaultFont();
             GameObject bg = CreatePanel(cObj.transform, "BG", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(0.04f, 0.07f, 0.12f, 0.98f));
 
-            Text tTitle = CreateTxt(bg.transform, "Txt_RadarTitle", "СЕКТОР-7: РАДАР СКАНИРУЕТ ПЕРИМЕТР", new Vector2(0f, 1f), new Vector2(28f, -28f), new Vector2(680f, 34f), 16, font, Color.cyan);
+            Text tTitle = CreateTxt(bg.transform, "Txt_RadarTitle", "Радар чист  |  База 100%", new Vector2(0f, 1f), new Vector2(28f, -28f), new Vector2(680f, 34f), 16, font, Color.cyan);
             tTitle.rectTransform.pivot = new Vector2(0f, 0.5f);
             tTitle.alignment = TextAnchor.MiddleLeft;
             tTitle.horizontalOverflow = HorizontalWrapMode.Overflow;
 
-            Text tJaeger = CreateTxt(bg.transform, "Txt_JaegerInfo", "ПРОЕКТ 'ЕГЕРЬ' (0/5)", new Vector2(1f, 1f), new Vector2(-320f, -20f), new Vector2(440f, 25f), 14, font, Color.yellow);
-            Button bJaeger = CreateBtn(bg.transform, "Btn_BuildJaeger", "СОБРАТЬ МОДУЛЬ ЕГЕРЯ", new Vector2(1f, 1f), new Vector2(-320f, -50f), new Vector2(260f, 32f), font, new Color(0.18f, 0.45f, 0.7f));
-            Button bScan = CreateBtn(bg.transform, "Btn_ScanThreat", "ВЫЗВАТЬ ВОЛНУ", new Vector2(1f, 1f), new Vector2(-90f, -50f), new Vector2(150f, 32f), font, new Color(0.2f, 0.6f, 0.35f));
+            Text tJaeger = CreateTxt(bg.transform, "Txt_JaegerInfo", "Егерь 0/5", new Vector2(1f, 1f), new Vector2(-320f, -20f), new Vector2(440f, 25f), 14, font, Color.yellow);
+            Button bJaeger = CreateBtn(bg.transform, "Btn_BuildJaeger", "Собрать Егеря", new Vector2(1f, 1f), new Vector2(-320f, -50f), new Vector2(260f, 32f), font, new Color(0.18f, 0.45f, 0.7f));
+            Button bScan = CreateBtn(bg.transform, "Btn_ScanThreat", "Вызвать волну", new Vector2(1f, 1f), new Vector2(-90f, -50f), new Vector2(150f, 32f), font, new Color(0.2f, 0.6f, 0.35f));
 
             GameObject rBox = CreatePanel(bg.transform, "Radar_Screen", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(920f, 430f), new Color(0.02f, 0.05f, 0.08f, 1f));
             RadarClickHandler rClick = rBox.AddComponent<RadarClickHandler>();
@@ -601,7 +601,7 @@ namespace HangarGame.Prototype
                 bRecalls[i] = CreateBtn(slotRoot.transform, $"Btn_Recall_{i}", "НА БАЗУ", new Vector2(1f, 0f), new Vector2(-85f, 14f), new Vector2(155f, 24f), font, new Color(0.75f, 0.25f, 0.2f));
             }
 
-            Text tLog = CreateTxt(bg.transform, "Txt_BattleLog", "База готова к дежурству. Радар чист.", new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(1200f, 25f), 14, font, new Color(0.85f, 0.9f, 0.95f));
+            Text tLog = CreateTxt(bg.transform, "Txt_BattleLog", "Радар чист.", new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(1200f, 25f), 14, font, new Color(0.85f, 0.9f, 0.95f));
 
             TerminalUI ui = cObj.AddComponent<TerminalUI>();
             ui.Configure(tTitle, tLog, tJaeger, bJaeger, bScan, rBox.GetComponent<RectTransform>(), rClick, mContainer.transform, bSlots, bShields, bRecalls, tSlots, iSlots);
@@ -681,62 +681,66 @@ namespace HangarGame.Prototype
             cObj.transform.SetParent(consoleGroup, false);
             cObj.transform.position = worldPos;
             cObj.transform.rotation = monRot;
-            cObj.transform.localScale = new Vector3(0.00080f, 0.00080f, 0.00080f);
+            cObj.transform.localScale = new Vector3(0.00050f, 0.00050f, 0.00050f);
 
             Canvas c = cObj.AddComponent<Canvas>();
             c.renderMode = RenderMode.WorldSpace;
             c.worldCamera = cam;
             c.sortingOrder = 5;
-            cObj.GetComponent<RectTransform>().sizeDelta = new Vector2(436f, 592f);
+            cObj.GetComponent<RectTransform>().sizeDelta = new Vector2(700f, 950f);
 
             var gr = cObj.AddComponent<GraphicRaycaster>();
             gr.ignoreReversedGraphics = false;
             gr.blockingObjects = GraphicRaycaster.BlockingObjects.None;
 
+            Font hiFont = Font.CreateDynamicFontFromOSFont("Arial", 28);
+            if (hiFont == null) hiFont = font;
+
             GameObject border = CreatePanel(cObj.transform, "FrameBorder", Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero, new Color(0.12f, 0.68f, 0.88f, 0.85f));
             var borderImg = border.GetComponent<Image>();
             if (borderImg != null) borderImg.raycastTarget = false;
 
-            GameObject bg = CreatePanel(cObj.transform, "BG", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-6f, -6f), new Color(0.03f, 0.06f, 0.11f, 0.98f));
+            GameObject bg = CreatePanel(cObj.transform, "BG", Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-10f, -10f), new Color(0.03f, 0.06f, 0.11f, 0.98f));
 
-            Text titleTxt = CreateTxt(bg.transform, "Txt_Title", "АРСЕНАЛ БАЗЫ", new Vector2(0f, 1f), new Vector2(14f, -22f), new Vector2(250f, 28f), 17, font, Color.cyan);
+            Text titleTxt = CreateTxt(bg.transform, "Txt_Title", "АРСЕНАЛ", new Vector2(0f, 1f), new Vector2(24f, -38f), new Vector2(380f, 44f), 34, hiFont, Color.cyan);
             titleTxt.rectTransform.pivot = new Vector2(0f, 0.5f);
             titleTxt.alignment = TextAnchor.MiddleLeft;
             titleTxt.fontStyle = FontStyle.Bold;
 
-            Button focusBtn = CreateBtn(bg.transform, "Btn_FocusMonitor", "ПРИБЛИЗИТЬ", new Vector2(1f, 1f), new Vector2(-72f, -22f), new Vector2(124f, 28f), font, new Color(0.14f, 0.36f, 0.56f));
+            Button focusBtn = CreateBtn(bg.transform, "Btn_FocusMonitor", "КРУПНЕЕ", new Vector2(1f, 1f), new Vector2(-114f, -38f), new Vector2(188f, 48f), hiFont, new Color(0.14f, 0.36f, 0.56f));
             Text focusTxt = focusBtn.GetComponentInChildren<Text>();
-            if (focusTxt != null) { focusTxt.fontSize = 12; focusTxt.fontStyle = FontStyle.Bold; }
+            if (focusTxt != null) { focusTxt.fontSize = 22; focusTxt.fontStyle = FontStyle.Bold; }
 
-            Text resTxt = CreateTxt(bg.transform, "Txt_ArmoryResources", "КРЕДИТЫ: 220 ¢  |  СПЛАВ: 95 т.", new Vector2(0.5f, 1f), new Vector2(0f, -52f), new Vector2(408f, 24f), 14, font, new Color(1f, 0.85f, 0.25f));
+            Text resTxt = CreateTxt(bg.transform, "Txt_ArmoryResources", "220 ¢   |   95 т", new Vector2(0.5f, 1f), new Vector2(0f, -92f), new Vector2(650f, 38f), 26, hiFont, new Color(1f, 0.85f, 0.25f));
             resTxt.fontStyle = FontStyle.Bold;
 
-            GameObject pageMech = CreatePanel(bg.transform, "Panel_MechSelect", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 258f), new Vector2(414f, 504f), new Color(0f, 0f, 0f, 0f));
+            GameObject pageMech = CreatePanel(bg.transform, "Panel_MechSelect", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 412f), new Vector2(664f, 804f), new Color(0f, 0f, 0f, 0f));
             var pmImg = pageMech.GetComponent<Image>();
             if (pmImg != null) pmImg.raycastTarget = false;
 
-            Text step1Lbl = CreateTxt(pageMech.transform, "Txt_Step1", "ШАГ 1: ВЫБЕРИТЕ РОБОТА", new Vector2(0.5f, 1f), new Vector2(0f, -18f), new Vector2(400f, 26f), 14, font, new Color(0.68f, 0.90f, 1f));
+            Text step1Lbl = CreateTxt(pageMech.transform, "Txt_Step1", "ВЫБЕРИТЕ РОБОТА", new Vector2(0.5f, 1f), new Vector2(0f, -26f), new Vector2(640f, 36f), 26, hiFont, new Color(0.68f, 0.90f, 1f));
             step1Lbl.fontStyle = FontStyle.Bold;
 
             Button[] mechBtns = new Button[3];
             Text[] mechTxts = new Text[3];
             Image[] mechCardImgs = new Image[3];
             Image[] mechAccentImgs = new Image[3];
-            float[] cardY = { -110f, -256f, -402f };
+            float[] cardY = { -168f, -396f, -624f };
 
             for (int i = 0; i < 3; i++)
             {
-                GameObject card = CreatePanel(pageMech.transform, $"Btn_SelectMech_{i}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, cardY[i]), new Vector2(404f, 134f), new Color(0.08f, 0.13f, 0.19f, 0.96f));
+                GameObject card = CreatePanel(pageMech.transform, $"Btn_SelectMech_{i}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, cardY[i]), new Vector2(648f, 208f), new Color(0.08f, 0.13f, 0.19f, 0.96f));
                 Button cardBtn = card.AddComponent<Button>();
                 Image cardImg = card.GetComponent<Image>();
 
-                GameObject accent = CreatePanel(card.transform, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(6f, 0f), new Vector2(10f, 126f), Color.cyan);
+                GameObject accent = CreatePanel(card.transform, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(9f, 0f), new Vector2(14f, 192f), Color.cyan);
                 var accImg = accent.GetComponent<Image>();
                 if (accImg != null) accImg.raycastTarget = false;
 
-                Text cardTxt = CreateTxt(card.transform, "Txt_Info", $"Робот #{i + 1}", new Vector2(0.5f, 0.5f), new Vector2(8f, 0f), new Vector2(372f, 122f), 14, font, Color.white);
+                Text cardTxt = CreateTxt(card.transform, "Txt_Info", $"РОБОТ {i + 1}", new Vector2(0.5f, 0.5f), new Vector2(14f, 0f), new Vector2(598f, 184f), 25, hiFont, Color.white);
                 cardTxt.alignment = TextAnchor.MiddleLeft;
                 cardTxt.supportRichText = true;
+                cardTxt.lineSpacing = 1.25f;
 
                 mechBtns[i] = cardBtn;
                 mechTxts[i] = cardTxt;
@@ -744,33 +748,31 @@ namespace HangarGame.Prototype
                 mechAccentImgs[i] = accImg;
             }
 
-            Text hintTxt = CreateTxt(pageMech.transform, "Txt_Hint", "Клик по карточке открывает меню вооружения", new Vector2(0.5f, 0f), new Vector2(0f, 18f), new Vector2(400f, 24f), 12, font, new Color(0.55f, 0.72f, 0.85f));
-
-            GameObject pageLoadout = CreatePanel(bg.transform, "Panel_LoadoutMenu", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 258f), new Vector2(414f, 504f), new Color(0f, 0f, 0f, 0f));
+            GameObject pageLoadout = CreatePanel(bg.transform, "Panel_LoadoutMenu", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 412f), new Vector2(664f, 804f), new Color(0f, 0f, 0f, 0f));
             var plImg = pageLoadout.GetComponent<Image>();
             if (plImg != null) plImg.raycastTarget = false;
 
-            Button backBtn = CreateBtn(pageLoadout.transform, "Btn_BackToMechs", "◀ РОБОТЫ", new Vector2(0f, 1f), new Vector2(62f, -20f), new Vector2(114f, 34f), font, new Color(0.18f, 0.30f, 0.45f));
+            Button backBtn = CreateBtn(pageLoadout.transform, "Btn_BackToMechs", "◀ НАЗАД", new Vector2(0f, 1f), new Vector2(98f, -32f), new Vector2(180f, 52f), hiFont, new Color(0.18f, 0.30f, 0.45f));
             var backTxt = backBtn.GetComponentInChildren<Text>();
-            if (backTxt != null) { backTxt.fontSize = 13; backTxt.fontStyle = FontStyle.Bold; }
+            if (backTxt != null) { backTxt.fontSize = 24; backTxt.fontStyle = FontStyle.Bold; }
 
-            Text mechTitle = CreateTxt(pageLoadout.transform, "Txt_SelectedMech", "СТРАЖ-1", new Vector2(1f, 1f), new Vector2(-6f, -20f), new Vector2(280f, 34f), 15, font, Color.yellow);
+            Text mechTitle = CreateTxt(pageLoadout.transform, "Txt_SelectedMech", "СТРАЖ-1", new Vector2(1f, 1f), new Vector2(-12f, -32f), new Vector2(440f, 52f), 30, hiFont, Color.yellow);
             mechTitle.rectTransform.pivot = new Vector2(1f, 0.5f);
             mechTitle.alignment = TextAnchor.MiddleRight;
             mechTitle.fontStyle = FontStyle.Bold;
 
-            GameObject summaryBox = CreatePanel(pageLoadout.transform, "SummaryBox", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -66f), new Vector2(404f, 48f), new Color(0.06f, 0.11f, 0.17f, 0.95f));
+            GameObject summaryBox = CreatePanel(pageLoadout.transform, "SummaryBox", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -96f), new Vector2(648f, 54f), new Color(0.06f, 0.11f, 0.17f, 0.95f));
             var sumImg = summaryBox.GetComponent<Image>();
             if (sumImg != null) sumImg.raycastTarget = false;
-            Text summary = CreateTxt(summaryBox.transform, "Txt_LoadoutSummary", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(392f, 44f), 13, font, new Color(0.75f, 0.95f, 1f));
+            Text summary = CreateTxt(summaryBox.transform, "Txt_LoadoutSummary", "", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(630f, 46f), 22, hiFont, new Color(0.75f, 0.95f, 1f));
 
-            Button tabWeaponsBtn = CreateBtn(pageLoadout.transform, "Btn_TabWeapons", "ОРУЖИЕ (П)", new Vector2(0.5f, 1f), new Vector2(-102f, -114f), new Vector2(198f, 34f), font, new Color(0.14f, 0.52f, 0.72f));
+            Button tabWeaponsBtn = CreateBtn(pageLoadout.transform, "Btn_TabWeapons", "ОРУЖИЕ", new Vector2(0.5f, 1f), new Vector2(-164f, -162f), new Vector2(316f, 54f), hiFont, new Color(0.14f, 0.52f, 0.72f));
             var twTxt = tabWeaponsBtn.GetComponentInChildren<Text>();
-            if (twTxt != null) { twTxt.fontSize = 14; twTxt.fontStyle = FontStyle.Bold; }
+            if (twTxt != null) { twTxt.fontSize = 26; twTxt.fontStyle = FontStyle.Bold; }
 
-            Button tabShieldsBtn = CreateBtn(pageLoadout.transform, "Btn_TabShields", "ЩИТЫ (Л)", new Vector2(0.5f, 1f), new Vector2(102f, -114f), new Vector2(198f, 34f), font, new Color(0.11f, 0.16f, 0.22f));
+            Button tabShieldsBtn = CreateBtn(pageLoadout.transform, "Btn_TabShields", "ЩИТЫ", new Vector2(0.5f, 1f), new Vector2(164f, -162f), new Vector2(316f, 54f), hiFont, new Color(0.11f, 0.16f, 0.22f));
             var tsTxt = tabShieldsBtn.GetComponentInChildren<Text>();
-            if (tsTxt != null) { tsTxt.fontSize = 14; tsTxt.fontStyle = FontStyle.Bold; }
+            if (tsTxt != null) { tsTxt.fontSize = 26; tsTxt.fontStyle = FontStyle.Bold; }
 
             GameObject listObj = new GameObject("ItemsContainer");
             listObj.transform.SetParent(pageLoadout.transform, false);
@@ -778,16 +780,16 @@ namespace HangarGame.Prototype
             listRect.anchorMin = new Vector2(0.5f, 1f);
             listRect.anchorMax = new Vector2(0.5f, 1f);
             listRect.pivot = new Vector2(0.5f, 1f);
-            listRect.anchoredPosition = new Vector2(0f, -136f);
-            listRect.sizeDelta = new Vector2(404f, 326f);
+            listRect.anchoredPosition = new Vector2(0f, -206f);
+            listRect.sizeDelta = new Vector2(648f, 540f);
 
             var vl = listObj.AddComponent<VerticalLayoutGroup>();
-            vl.spacing = 8f;
+            vl.spacing = 14f;
             vl.childAlignment = TextAnchor.UpperCenter;
             vl.childControlWidth = false;
             vl.childControlHeight = false;
 
-            Text feedback = CreateTxt(pageLoadout.transform, "Txt_ArmoryFeedback", "Выберите модуль для установки", new Vector2(0.5f, 0f), new Vector2(0f, 16f), new Vector2(400f, 24f), 13, font, new Color(0.75f, 0.9f, 1f));
+            Text feedback = CreateTxt(pageLoadout.transform, "Txt_ArmoryFeedback", "", new Vector2(0.5f, 0f), new Vector2(0f, 24f), new Vector2(640f, 34f), 22, hiFont, new Color(0.75f, 0.9f, 1f));
             pageLoadout.SetActive(false);
 
             var ui = GetOrAdd<ArmoryUI>(cObj);

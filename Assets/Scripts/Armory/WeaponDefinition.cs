@@ -36,7 +36,7 @@ namespace HangarGame.Armory
                 new WeaponDefinition
                 {
                     id = DefaultWeaponId,
-                    displayName = "Автопушка Мк-1 (Базовая)",
+                    displayName = "Автопушка",
                     slot = ArmorySlot.RightArm,
                     damageType = DamageType.Physical,
                     costCredits = 0,
@@ -49,7 +49,7 @@ namespace HangarGame.Armory
                 new WeaponDefinition
                 {
                     id = "weapon_plasma",
-                    displayName = "Плазменная пушка 'Сверхновая'",
+                    displayName = "Сверхновая",
                     slot = ArmorySlot.RightArm,
                     damageType = DamageType.Plasma,
                     costCredits = 170,
@@ -63,7 +63,7 @@ namespace HangarGame.Armory
                 new WeaponDefinition
                 {
                     id = "weapon_spear",
-                    displayName = "Энергокопьё 'Лонгин'",
+                    displayName = "Копьё Лонгин",
                     slot = ArmorySlot.RightArm,
                     damageType = DamageType.Thermal,
                     costCredits = 260,
@@ -78,7 +78,7 @@ namespace HangarGame.Armory
                 new WeaponDefinition
                 {
                     id = DefaultShieldId,
-                    displayName = "Стандартный щит (Базовый)",
+                    displayName = "Обычный щит",
                     slot = ArmorySlot.LeftArm,
                     damageType = DamageType.Physical,
                     costCredits = 0,
@@ -92,7 +92,7 @@ namespace HangarGame.Armory
                 new WeaponDefinition
                 {
                     id = "shield_aegis",
-                    displayName = "Энергощит 'Эгида'",
+                    displayName = "Эгида",
                     slot = ArmorySlot.LeftArm,
                     damageType = DamageType.Plasma,
                     costCredits = 150,
@@ -107,7 +107,7 @@ namespace HangarGame.Armory
                 new WeaponDefinition
                 {
                     id = "shield_bastion",
-                    displayName = "Тяжёлый щит 'Бастион'",
+                    displayName = "Бастион",
                     slot = ArmorySlot.LeftArm,
                     damageType = DamageType.Physical,
                     costCredits = 240,

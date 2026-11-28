@@ -17,11 +17,11 @@ namespace HangarGame.Repair
         [Header("Стоимость и названия")]
         [SerializeField] private string[] stageNames =
         {
-            "Голова Егеря (Нейро-визор)",
-            "Левая рука Егеря",
-            "Правая рука Егеря",
-            "Щит Егеря 'Цитадель'",
-            "Копьё Егеря 'Рассвет'"
+            "Голова",
+            "Левая рука",
+            "Правая рука",
+            "Щит",
+            "Копьё"
         };
         [SerializeField] private int[] stageCredits = { 160, 210, 260, 330, 420 };
         [SerializeField] private int[] stageAlloy = { 70, 95, 120, 150, 190 };
@@ -53,9 +53,9 @@ namespace HangarGame.Repair
         public string GetNextStageInfo()
         {
             if (IsComplete)
-                return "ПРОЕКТ 'ЕГЕРЬ': 5/5 (ПОСТРОЕН)";
+                return "Егерь: собран (5/5)";
 
-            return $"ПРОЕКТ 'ЕГЕРЬ' ({CurrentStage}/{TotalStages}): {stageNames[CurrentStage]} [{stageCredits[CurrentStage]}¢, {stageAlloy[CurrentStage]}т]";
+            return $"Егерь {CurrentStage}/{TotalStages}: {stageNames[CurrentStage]} ({stageCredits[CurrentStage]}¢, {stageAlloy[CurrentStage]}т)";
         }
 
         public bool CanStartNext()

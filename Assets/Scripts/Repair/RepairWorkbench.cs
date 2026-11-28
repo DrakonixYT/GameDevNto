@@ -11,8 +11,8 @@ namespace HangarGame.Repair
         public static RepairWorkbench Instance { get; private set; }
 
         [Header("Размещение на верстаке")]
-        [SerializeField] private Vector3 tableRestOffset = new Vector3(0f, 1.10f, 0f);
-        [SerializeField] private float normalizedPartExtent = 0.56f;
+        [SerializeField] private Vector3 tableRestOffset = new Vector3(0f, 1.12f, 0f);
+        [SerializeField] private float normalizedPartExtent = 0.68f;
         [SerializeField] private Vector3 initialEuler = new Vector3(0f, 0f, 0f);
 
         [Header("Вращение")]
