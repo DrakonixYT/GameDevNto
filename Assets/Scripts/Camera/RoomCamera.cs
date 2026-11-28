@@ -1,9 +1,8 @@
 using HangarGame.Core;
 using HangarGame.Repair;
 using UnityEngine;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace HangarGame.CameraControl
 {
@@ -11,32 +10,38 @@ namespace HangarGame.CameraControl
     {
         public static RoomCamera Instance { get; private set; }
 
-        [Header("Позиции обзора")]
+        [Header("Позиции")]
         [SerializeField] private Vector3 hangarPos = new Vector3(-14.94f, 1.53f, -0.02f);
-        [SerializeField] private Vector3 dispatchPos = new Vector3(-14.94f, 1.53f, -0.5f);
+        [SerializeField] private Vector3 dispatchPos = new Vector3(-14.89f, 1.38f, 1.02f);
         [SerializeField] private float hangarYaw = 180f;
-        [SerializeField] private float dispatchYaw = 0f;
+        [SerializeField] private float dispatchYaw;
 
-        [Header("Камера верстака")]
+        [Header("Верстак и пульт")]
         [SerializeField] private Vector3 wbCameraOffset = new Vector3(0f, 1.62f, -1.26f);
         [SerializeField] private float wbCameraPitch = 25f;
-        [SerializeField] private float wbParallaxYaw = 1.2f;
-        [SerializeField] private float wbParallaxPitch = 1.0f;
-
-        [Header("Камера пульта")]
         [SerializeField] private float dispatchDistance = 1.32f;
-        [SerializeField] private Vector3 armoryFocusPos = new Vector3(-14.44f, 1.47f, 1.56f);
-        [SerializeField] private float armoryFocusYaw = 28f;
+        [SerializeField] private Vector3 armoryFocusPos = new Vector3(-14.38f, 1.47f, 1.72f);
+        [SerializeField] private float armoryFocusYaw = 30f;
 
         public bool IsArmoryFocused { get; private set; }
 
-        private float targetBaseYaw;
-        private float curBaseYaw;
+        private float targetYaw;
+        private float currentYaw;
         private float wbZoom;
         private float shakeTime;
         private float shakeMag;
 
-        private void Awake() => Instance = this;
+        private void Awake()
+        {
+            Instance = this;
+            var camData = GetComponent<UniversalAdditionalCameraData>();
+            if (camData != null) camData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+            foreach (var v in Object.FindObjectsByType<Volume>(FindObjectsInactive.Include))
+            {
+                if (Application.isPlaying && v.profile != null && v.profile.TryGet<ChromaticAberration>(out var ca))
+                    ca.active = false;
+            }
+        }
 
         public void ConfigureAnchor(Vector3 hPos, Vector3 dPos, float hYaw, float dYaw)
         {
@@ -44,8 +49,8 @@ namespace HangarGame.CameraControl
             dispatchPos = dPos;
             hangarYaw = hYaw;
             dispatchYaw = dYaw;
-            targetBaseYaw = hYaw;
-            curBaseYaw = hYaw;
+            targetYaw = hYaw;
+            currentYaw = hYaw;
             transform.position = hPos;
             transform.rotation = Quaternion.Euler(0f, hYaw, 0f);
         }
@@ -61,28 +66,6 @@ namespace HangarGame.CameraControl
             dispatchDistance = overviewDist;
             armoryFocusPos = armoryPos;
             armoryFocusYaw = armoryYaw;
-        }
-
-        public void ToggleArmoryFocus()
-        {
-            if (GameManager.Instance == null || GameManager.Instance.CurrentView != RoomView.DispatchConsole) return;
-            IsArmoryFocused = !IsArmoryFocused;
-            float goalYaw = IsArmoryFocused ? armoryFocusYaw : dispatchYaw;
-            targetBaseYaw += Mathf.DeltaAngle(targetBaseYaw, goalYaw);
-            HangarAudio.Instance?.PlayClick();
-        }
-
-        public void SetArmoryFocus(bool focused)
-        {
-            if (GameManager.Instance == null || GameManager.Instance.CurrentView != RoomView.DispatchConsole)
-            {
-                IsArmoryFocused = false;
-                return;
-            }
-            if (IsArmoryFocused == focused) return;
-            IsArmoryFocused = focused;
-            float goalYaw = IsArmoryFocused ? armoryFocusYaw : dispatchYaw;
-            targetBaseYaw += Mathf.DeltaAngle(targetBaseYaw, goalYaw);
         }
 
         private void Start()
@@ -102,18 +85,17 @@ namespace HangarGame.CameraControl
                     Vector3 sPoint = tCanvas != null ? tCanvas.transform.position : c104.position + Vector3.up * 0.34f;
                     dispatchPos = new Vector3(sPoint.x, sPoint.y, sPoint.z - dispatchDistance);
                     dispatchYaw = 0f;
+
                     var armoryCanvas = GameObject.Find("Armory_Canvas");
                     if (armoryCanvas != null)
                     {
-                        Vector3 screenOut = -armoryCanvas.transform.forward;
-                        armoryFocusPos = armoryCanvas.transform.position + screenOut * 0.58f;
+                        armoryFocusPos = armoryCanvas.transform.position - armoryCanvas.transform.forward * 0.58f;
                         armoryFocusYaw = armoryCanvas.transform.eulerAngles.y;
                     }
                 }
             }
 
-            targetBaseYaw = hangarYaw;
-            curBaseYaw = hangarYaw;
+            targetYaw = currentYaw = hangarYaw;
             transform.position = hangarPos;
             transform.rotation = Quaternion.Euler(0f, hangarYaw, 0f);
 
@@ -131,89 +113,63 @@ namespace HangarGame.CameraControl
         {
             IsArmoryFocused = false;
             if (view == RoomView.Hangar)
-                targetBaseYaw += Mathf.DeltaAngle(targetBaseYaw, hangarYaw);
+                targetYaw += Mathf.DeltaAngle(targetYaw, hangarYaw);
             else if (view == RoomView.DispatchConsole)
-                targetBaseYaw += Mathf.DeltaAngle(targetBaseYaw, dispatchYaw);
+                targetYaw += Mathf.DeltaAngle(targetYaw, dispatchYaw);
+        }
+
+        public void ToggleArmoryFocus()
+        {
+            if (GameManager.Instance == null || GameManager.Instance.CurrentView != RoomView.DispatchConsole) return;
+            IsArmoryFocused = !IsArmoryFocused;
+            targetYaw += Mathf.DeltaAngle(targetYaw, IsArmoryFocused ? armoryFocusYaw : dispatchYaw);
+            HangarAudio.Instance?.PlayClick();
         }
 
         private void Update()
         {
-            RoomView view = GameManager.Instance != null ? GameManager.Instance.CurrentView : RoomView.Hangar;
+            var gm = GameManager.Instance;
+            RoomView view = gm != null ? gm.CurrentView : RoomView.Hangar;
 
-            HandleTurnInput(view);
-            HandleZoomInput(view);
-            UpdateTransform(view);
-        }
-
-        private void HandleTurnInput(RoomView view)
-        {
-            if (view == RoomView.WorkbenchFocus) return;
-            if (GameManager.Instance != null && (GameManager.Instance.IsGameWon || GameManager.Instance.IsGameLost)) return;
-
-            bool turnL = false, turnR = false, toggleArmory = false;
-#if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null)
+            if (view != RoomView.WorkbenchFocus && (gm == null || (!gm.IsGameWon && !gm.IsGameLost)))
             {
-                turnL = Keyboard.current.qKey.wasPressedThisFrame;
-                turnR = Keyboard.current.eKey.wasPressedThisFrame;
-                toggleArmory = Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.iKey.wasPressedThisFrame;
+                if (view == RoomView.DispatchConsole && (GameInput.KeyDown(KeyCode.Tab) || GameInput.KeyDown(KeyCode.I)))
+                    ToggleArmoryFocus();
+                if (GameInput.KeyDown(KeyCode.Q)) TurnLeft();
+                if (GameInput.KeyDown(KeyCode.E)) TurnRight();
             }
-#else
-            turnL = Input.GetKeyDown(KeyCode.Q);
-            turnR = Input.GetKeyDown(KeyCode.E);
-            toggleArmory = Input.GetKeyDown(KeyCode.Tab) || Input.GetKeyDown(KeyCode.I);
-#endif
-            if (toggleArmory && view == RoomView.DispatchConsole) ToggleArmoryFocus();
-            if (turnL) TurnLeft();
-            if (turnR) TurnRight();
-        }
+            else if (view == RoomView.WorkbenchFocus)
+            {
+                float scroll = GameInput.ScrollY;
+                if (Mathf.Abs(scroll) > 0.01f)
+                    wbZoom = Mathf.Clamp(wbZoom - Mathf.Sign(scroll) * 0.14f, -0.35f, 0.55f);
+            }
 
-        private void HandleZoomInput(RoomView view)
-        {
-            if (view != RoomView.WorkbenchFocus) return;
+            Vector2 m = GameInput.MousePosition;
+            float nx = Mathf.Clamp(m.x / Mathf.Max(1, Screen.width) * 2f - 1f, -1f, 1f);
+            float ny = Mathf.Clamp(m.y / Mathf.Max(1, Screen.height) * 2f - 1f, -1f, 1f);
 
-            float scroll = 0f;
-#if ENABLE_INPUT_SYSTEM
-            if (Mouse.current != null) scroll = Mouse.current.scroll.ReadValue().y;
-#else
-            scroll = Input.GetAxis("Mouse ScrollWheel");
-#endif
-            if (Mathf.Abs(scroll) > 0.01f)
-                wbZoom = Mathf.Clamp(wbZoom - Mathf.Sign(scroll) * 0.14f, -0.35f, 0.55f);
-        }
+            currentYaw = Mathf.Lerp(currentYaw, targetYaw, Time.deltaTime * 8f);
 
-        private void UpdateTransform(RoomView view)
-        {
-            Vector2 m = Vector2.zero;
-#if ENABLE_INPUT_SYSTEM
-            if (Mouse.current != null) m = Mouse.current.position.ReadValue();
-#else
-            m = Input.mousePosition;
-#endif
-            float nx = Mathf.Clamp((m.x / Mathf.Max(1, Screen.width)) * 2f - 1f, -1f, 1f);
-            float ny = Mathf.Clamp((m.y / Mathf.Max(1, Screen.height)) * 2f - 1f, -1f, 1f);
-
-            curBaseYaw = Mathf.Lerp(curBaseYaw, targetBaseYaw, Time.deltaTime * 8f);
-
-            float wbYaw = RepairWorkbench.Instance != null ? RepairWorkbench.Instance.transform.eulerAngles.y : 270f;
-            float pitch = view == RoomView.WorkbenchFocus
-                ? (wbCameraPitch - ny * wbParallaxPitch)
-                : (IsArmoryFocused ? -ny * 3.5f : -ny * 6.5f);
-            float yaw = view == RoomView.WorkbenchFocus
-                ? (wbYaw + nx * wbParallaxYaw)
-                : (curBaseYaw + (IsArmoryFocused ? nx * 5.0f : nx * 11f));
-
+            float pitch;
+            float yaw;
             Vector3 targetPos = hangarPos;
+
             if (view == RoomView.WorkbenchFocus)
             {
-                Vector3 wbLocal = wbCameraOffset + new Vector3(0f, wbZoom * 0.2f, -wbZoom);
-                targetPos = RepairWorkbench.Instance != null
-                    ? RepairWorkbench.Instance.transform.TransformPoint(wbLocal)
-                    : hangarPos;
+                var wb = RepairWorkbench.Instance;
+                float wbYaw = wb != null ? wb.transform.eulerAngles.y : 270f;
+                pitch = wbCameraPitch - ny;
+                yaw = wbYaw + nx * 1.2f;
+                if (wb != null)
+                    targetPos = wb.transform.TransformPoint(wbCameraOffset + new Vector3(0f, wbZoom * 0.2f, -wbZoom));
             }
-            else if (view == RoomView.DispatchConsole)
+            else
             {
-                targetPos = IsArmoryFocused ? armoryFocusPos : dispatchPos;
+                pitch = IsArmoryFocused ? -ny * 3.5f : -ny * 6.5f;
+                yaw = currentYaw + (IsArmoryFocused ? nx * 5.0f : nx * 11f);
+                if (view == RoomView.DispatchConsole)
+                    targetPos = IsArmoryFocused ? armoryFocusPos : dispatchPos;
             }
 
             transform.position = Vector3.Lerp(transform.position, targetPos, Time.deltaTime * 6f);
@@ -226,7 +182,10 @@ namespace HangarGame.CameraControl
             }
         }
 
-        public void TurnLeft()
+        public void TurnLeft() => RotateRoom(-180f);
+        public void TurnRight() => RotateRoom(180f);
+
+        private void RotateRoom(float deltaYaw)
         {
             if (GameManager.Instance == null) return;
             if (GameManager.Instance.CurrentView == RoomView.WorkbenchFocus)
@@ -234,29 +193,10 @@ namespace HangarGame.CameraControl
                 RepairWorkbench.Instance?.CancelWork();
                 return;
             }
-            targetBaseYaw -= 180f;
-            SyncViewWithYaw();
-        }
-
-        public void TurnRight()
-        {
-            if (GameManager.Instance == null) return;
-            if (GameManager.Instance.CurrentView == RoomView.WorkbenchFocus)
-            {
-                RepairWorkbench.Instance?.CancelWork();
-                return;
-            }
-            targetBaseYaw += 180f;
-            SyncViewWithYaw();
-        }
-
-        private void SyncViewWithYaw()
-        {
-            float norm = Mathf.Repeat(targetBaseYaw, 360f);
-            float dH = Mathf.Abs(Mathf.DeltaAngle(norm, hangarYaw));
-            float dD = Mathf.Abs(Mathf.DeltaAngle(norm, dispatchYaw));
-            RoomView next = dD < dH ? RoomView.DispatchConsole : RoomView.Hangar;
-            GameManager.Instance.SwitchView(next);
+            targetYaw += deltaYaw;
+            float norm = Mathf.Repeat(targetYaw, 360f);
+            bool toDispatch = Mathf.Abs(Mathf.DeltaAngle(norm, dispatchYaw)) < Mathf.Abs(Mathf.DeltaAngle(norm, hangarYaw));
+            GameManager.Instance.SwitchView(toDispatch ? RoomView.DispatchConsole : RoomView.Hangar);
         }
 
         public void Shake(float duration, float magnitude)

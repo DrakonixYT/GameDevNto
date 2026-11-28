@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using HangarGame.Armory;
 using HangarGame.CameraControl;
 using HangarGame.Core;
-using HangarGame.Dispatch;
 using HangarGame.Mechs;
 using UnityEngine;
 using UnityEngine.UI;
@@ -14,20 +13,18 @@ namespace HangarGame.UI
         public static ArmoryUI Instance { get; private set; }
         public bool IsOpen => false;
 
-        [Header("Экран терминала вооружения")]
         [SerializeField] private GameObject panelRoot;
         [SerializeField] private Text txtResources;
         [SerializeField] private Text txtFocusBtn;
         [SerializeField] private Button btnFocusMonitor;
 
-        [Header("Шаг 1: Выбор робота")]
         [SerializeField] private GameObject pageMechSelect;
         [SerializeField] private Button[] btnMechChoices = new Button[3];
         [SerializeField] private Text[] txtMechChoices = new Text[3];
         [SerializeField] private Image[] imgMechCards = new Image[3];
         [SerializeField] private Image[] imgMechAccents = new Image[3];
+        [SerializeField] private Image[] barMechHp = new Image[3];
 
-        [Header("Шаг 2: Меню снаряжения")]
         [SerializeField] private GameObject pageLoadout;
         [SerializeField] private Button btnBackToMechs;
         [SerializeField] private Button btnTabWeapons;
@@ -37,154 +34,152 @@ namespace HangarGame.UI
         [SerializeField] private Text txtFeedback;
         [SerializeField] private Transform itemsContainer;
 
-        private readonly List<GameObject> rowObjects = new List<GameObject>();
-        private Font cachedFont;
-        private int selectedMechIndex;
         private ArmorySlot activeSlot = ArmorySlot.RightArm;
-        private bool isLoadoutStep;
-        private float lastStatusRefreshTime;
+        private bool isSelectingMech = true;
+        private Font cachedFont;
+        private readonly List<GameObject> spawnedRows = new List<GameObject>();
+        private bool eventsBound;
+
+        public void BindFromHierarchy()
+        {
+            Transform bg = transform.Find("BG");
+            if (bg == null) return;
+
+            panelRoot = bg.gameObject;
+            txtResources = bg.Find("Txt_ArmoryResources")?.GetComponent<Text>();
+            btnFocusMonitor = bg.Find("Btn_FocusMonitor")?.GetComponent<Button>();
+            txtFocusBtn = btnFocusMonitor != null ? btnFocusMonitor.GetComponentInChildren<Text>() : null;
+
+            Transform pMech = bg.Find("Panel_MechSelect");
+            pageMechSelect = pMech != null ? pMech.gameObject : null;
+            if (pMech != null)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    Transform card = pMech.Find($"Btn_SelectMech_{i}");
+                    if (card == null) continue;
+                    btnMechChoices[i] = card.GetComponent<Button>();
+                    imgMechCards[i] = card.GetComponent<Image>();
+                    imgMechAccents[i] = card.Find("Accent")?.GetComponent<Image>();
+                    txtMechChoices[i] = card.Find("Txt_Info")?.GetComponent<Text>();
+                    barMechHp[i] = card.Find("Bar_Hp/Fill")?.GetComponent<Image>();
+                }
+            }
+
+            Transform pLoad = bg.Find("Panel_LoadoutMenu");
+            pageLoadout = pLoad != null ? pLoad.gameObject : null;
+            if (pLoad != null)
+            {
+                btnBackToMechs = pLoad.Find("Btn_BackToMechs")?.GetComponent<Button>();
+                btnTabWeapons = pLoad.Find("Btn_TabWeapons")?.GetComponent<Button>();
+                btnTabShields = pLoad.Find("Btn_TabShields")?.GetComponent<Button>();
+                txtSelectedMechTitle = pLoad.Find("Txt_SelectedMech")?.GetComponent<Text>();
+                txtLoadoutSummary = pLoad.Find("SummaryBox/Txt_LoadoutSummary")?.GetComponent<Text>();
+                txtFeedback = pLoad.Find("Txt_ArmoryFeedback")?.GetComponent<Text>();
+                itemsContainer = pLoad.Find("ItemsContainer");
+            }
+        }
 
         private void Awake()
         {
             Instance = this;
+            if (panelRoot == null) BindFromHierarchy();
+            if (panelRoot != null) panelRoot.SetActive(true);
+
+            WireBtn(btnFocusMonitor, () =>
+            {
+                RoomCamera.Instance?.ToggleArmoryFocus();
+                Refresh();
+            });
+            WireBtn(btnBackToMechs, () =>
+            {
+                HangarAudio.Instance?.PlayClick();
+                ShowMechSelectStep();
+            });
+            WireBtn(btnTabWeapons, () => SwitchSlotTab(ArmorySlot.RightArm));
+            WireBtn(btnTabShields, () => SwitchSlotTab(ArmorySlot.LeftArm));
+
+            for (int i = 0; i < 3; i++)
+            {
+                int idx = i;
+                WireBtn(btnMechChoices[idx], () => SelectMechAndOpenMenu(idx));
+            }
         }
 
-        public void ConfigureWorldMonitor(
-            GameObject root, Text resText, Button focusBtn, Text focusTxt,
-            GameObject mechPage, Button[] mechBtns, Text[] mechTxts, Image[] mechCardImgs, Image[] mechAccentImgs,
-            GameObject loadoutPage, Button backBtn, Button tabWeaponsBtn, Button tabShieldsBtn,
-            Text mechTitle, Text loadoutSummary, Text feedback, Transform container)
+        private static void WireBtn(Button btn, UnityEngine.Events.UnityAction action)
         {
-            panelRoot = root;
-            txtResources = resText;
-            btnFocusMonitor = focusBtn;
-            txtFocusBtn = focusTxt;
-            pageMechSelect = mechPage;
-            btnMechChoices = mechBtns;
-            txtMechChoices = mechTxts;
-            imgMechCards = mechCardImgs;
-            imgMechAccents = mechAccentImgs;
-            pageLoadout = loadoutPage;
-            btnBackToMechs = backBtn;
-            btnTabWeapons = tabWeaponsBtn;
-            btnTabShields = tabShieldsBtn;
-            txtSelectedMechTitle = mechTitle;
-            txtLoadoutSummary = loadoutSummary;
-            txtFeedback = feedback;
-            itemsContainer = container;
-        }
-
-        private Font LoadUiFont()
-        {
-            if (cachedFont != null) return cachedFont;
-            cachedFont = Font.CreateDynamicFontFromOSFont("Arial", 28);
-            if (cachedFont == null) cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            return cachedFont;
+            if (btn == null) return;
+            btn.onClick.RemoveAllListeners();
+            btn.onClick.AddListener(action);
         }
 
         private void Start()
         {
-            LoadUiFont();
-
-            var canvas = GetComponent<Canvas>();
-            if (canvas != null && canvas.worldCamera == null)
-                canvas.worldCamera = UnityEngine.Camera.main;
-
-            var gr = GetComponent<GraphicRaycaster>();
-            if (gr != null)
-            {
-                gr.ignoreReversedGraphics = false;
-                gr.blockingObjects = GraphicRaycaster.BlockingObjects.None;
-            }
-
-            if (btnFocusMonitor != null)
-                btnFocusMonitor.onClick.AddListener(() => RoomCamera.Instance?.ToggleArmoryFocus());
-
-            if (btnMechChoices != null)
-            {
-                for (int i = 0; i < btnMechChoices.Length; i++)
-                {
-                    int idx = i;
-                    if (btnMechChoices[i] != null)
-                        btnMechChoices[i].onClick.AddListener(() => SelectMechAndOpenMenu(idx));
-                }
-            }
-
-            if (btnBackToMechs != null)
-                btnBackToMechs.onClick.AddListener(ShowMechSelectStep);
-
-            if (btnTabWeapons != null)
-                btnTabWeapons.onClick.AddListener(() => SwitchSlotTab(ArmorySlot.RightArm));
-
-            if (btnTabShields != null)
-                btnTabShields.onClick.AddListener(() => SwitchSlotTab(ArmorySlot.LeftArm));
-
-            if (ArmoryManager.Instance != null)
-                ArmoryManager.Instance.OnArmoryChanged += Refresh;
-
-            if (HangarMechManager.Instance != null)
-                HangarMechManager.Instance.OnMechSwitched += HandleMechSwitched;
-
-            if (GameManager.Instance != null)
-                GameManager.Instance.OnResourcesChanged += HandleResourcesChanged;
-
-            if (panelRoot != null) panelRoot.SetActive(true);
-            ShowMechSelectStep();
+            BindEvents();
+            Refresh();
         }
 
-        private void OnDestroy()
+        private void OnEnable()
         {
-            if (Instance == this) Instance = null;
+            BindEvents();
+            Refresh();
+        }
+
+        private void OnDisable() => UnbindEvents();
+
+        private void BindEvents()
+        {
+            if (eventsBound) return;
+            if (GameManager.Instance == null) return;
+            GameManager.Instance.OnResourcesChanged += OnResourcesChanged;
+            GameManager.Instance.OnViewChanged += OnViewChanged;
+            if (HangarMechManager.Instance != null)
+                HangarMechManager.Instance.OnMechSwitched += OnMechSwitched;
+            if (ArmoryManager.Instance != null)
+                ArmoryManager.Instance.OnArmoryChanged += Refresh;
+            eventsBound = true;
+        }
+
+        private void UnbindEvents()
+        {
+            if (!eventsBound) return;
+            eventsBound = false;
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.OnResourcesChanged -= OnResourcesChanged;
+                GameManager.Instance.OnViewChanged -= OnViewChanged;
+            }
+            if (HangarMechManager.Instance != null)
+                HangarMechManager.Instance.OnMechSwitched -= OnMechSwitched;
             if (ArmoryManager.Instance != null)
                 ArmoryManager.Instance.OnArmoryChanged -= Refresh;
-            if (HangarMechManager.Instance != null)
-                HangarMechManager.Instance.OnMechSwitched -= HandleMechSwitched;
-            if (GameManager.Instance != null)
-                GameManager.Instance.OnResourcesChanged -= HandleResourcesChanged;
         }
 
         private void Update()
         {
+            if (GameManager.Instance != null && GameManager.Instance.CurrentView != RoomView.DispatchConsole)
+                return;
+
             if (txtFocusBtn != null && RoomCamera.Instance != null)
-                txtFocusBtn.text = RoomCamera.Instance.IsArmoryFocused ? "◀ РАДАР" : "КРУПНЕЕ";
-
-            if (Time.unscaledTime - lastStatusRefreshTime >= 0.4f)
-            {
-                lastStatusRefreshTime = Time.unscaledTime;
-                RefreshResources();
-                if (!isLoadoutStep) RefreshMechCards();
-            }
+                txtFocusBtn.text = RoomCamera.Instance.IsArmoryFocused ? "ОБЗОР" : "КРУПНЕЕ";
         }
 
-        private void HandleMechSwitched(int idx)
-        {
-            selectedMechIndex = idx;
-            Refresh();
-        }
-
-        private void HandleResourcesChanged(int _, int __) => Refresh();
+        private void OnResourcesChanged(int c, int a) => Refresh();
+        private void OnViewChanged(RoomView view) => Refresh();
+        private void OnMechSwitched(int idx) => Refresh();
 
         public void ShowMechSelectStep()
         {
-            isLoadoutStep = false;
-            HangarAudio.Instance?.PlayClick();
-            if (pageMechSelect != null) pageMechSelect.SetActive(true);
-            if (pageLoadout != null) pageLoadout.SetActive(false);
+            isSelectingMech = true;
+            if (txtFeedback != null) txtFeedback.text = "";
             Refresh();
         }
 
         public void SelectMechAndOpenMenu(int idx)
         {
-            var mgr = HangarMechManager.Instance;
-            if (mgr == null || idx < 0 || idx >= mgr.Mechs.Count) return;
-
-            selectedMechIndex = idx;
-            mgr.SelectMech(idx);
-            isLoadoutStep = true;
             HangarAudio.Instance?.PlayClick();
-
-            if (pageMechSelect != null) pageMechSelect.SetActive(false);
-            if (pageLoadout != null) pageLoadout.SetActive(true);
+            HangarMechManager.Instance?.SelectMech(idx);
+            isSelectingMech = false;
             if (txtFeedback != null) txtFeedback.text = "";
             Refresh();
         }
@@ -193,65 +188,59 @@ namespace HangarGame.UI
         {
             activeSlot = slot;
             HangarAudio.Instance?.PlayClick();
-            RefreshLoadoutMenu();
+            if (txtFeedback != null) txtFeedback.text = "";
+            Refresh();
         }
 
         public void Refresh()
         {
-            RefreshResources();
-            if (isLoadoutStep)
-            {
-                if (pageMechSelect != null) pageMechSelect.SetActive(false);
-                if (pageLoadout != null) pageLoadout.SetActive(true);
-                RefreshLoadoutMenu();
-            }
-            else
-            {
-                if (pageMechSelect != null) pageMechSelect.SetActive(true);
-                if (pageLoadout != null) pageLoadout.SetActive(false);
-                RefreshMechCards();
-            }
-        }
-
-        private void RefreshResources()
-        {
-            if (txtResources == null || GameManager.Instance == null) return;
             var gm = GameManager.Instance;
-            txtResources.text = $"{gm.Credits} ¢   |   {gm.Alloy} т";
+            if (txtResources != null && gm != null)
+                txtResources.text = $"Кредиты: {gm.Credits}   •   Сплав: {gm.Alloy}";
+
+            if (pageMechSelect != null) pageMechSelect.SetActive(isSelectingMech);
+            if (pageLoadout != null) pageLoadout.SetActive(!isSelectingMech);
+
+            if (isSelectingMech) RefreshMechCards();
+            else RefreshLoadoutMenu();
         }
 
         private void RefreshMechCards()
         {
             var mgr = HangarMechManager.Instance;
-            var armory = ArmoryManager.Instance;
-            if (mgr == null || txtMechChoices == null) return;
+            var arm = ArmoryManager.Instance;
 
-            for (int i = 0; i < txtMechChoices.Length; i++)
+            for (int i = 0; i < 3; i++)
             {
-                if (i >= mgr.Mechs.Count || mgr.Mechs[i] == null) continue;
-                var mech = mgr.Mechs[i];
+                if (mgr == null || i >= mgr.Mechs.Count || mgr.Mechs[i] == null)
+                {
+                    if (btnMechChoices[i] != null) btnMechChoices[i].gameObject.SetActive(false);
+                    continue;
+                }
 
-                string shortTitle = StripParens(mech.mechName).ToUpperInvariant();
-                string stateStr = mech.isDeployed ? "В БОЮ" : "В АНГАРЕ";
-                var rightDef = armory != null ? armory.FindWeapon(mech.equippedRightWeaponId) : null;
-                string rName = rightDef != null ? rightDef.displayName : "Автопушка";
+                var m = mgr.Mechs[i];
+                bool isCurrent = i == mgr.CurrentIndex;
+                string wName = arm?.FindWeapon(m.equippedRightWeaponId)?.displayName ?? "Автопушка";
+                string sName = arm?.FindWeapon(m.equippedLeftWeaponId)?.displayName ?? "Обычный щит";
+                string state = m.isDeployed ? "В бою" : (m.HasMissingOrDetachedParts() ? "Повреждён" : "В ангаре");
+
+                if (btnMechChoices[i] != null) btnMechChoices[i].gameObject.SetActive(true);
+                if (imgMechCards[i] != null) imgMechCards[i].color = isCurrent ? UITheme.BgCardActive : UITheme.BgCard;
+                if (imgMechAccents[i] != null) imgMechAccents[i].color = Color.Lerp(m.themeColor, UITheme.Border, 0.35f);
 
                 if (txtMechChoices[i] != null)
                 {
                     txtMechChoices[i].text =
-                        $"<size=30><b>{shortTitle}</b></size>  <color=#8FE8FF>[{stateStr}]</color>\n" +
-                        $"<size=23>HP {mech.currentHp:F0}/{mech.maxHp:F0}  |  АТК {mech.attackPower:F0}  |  {rName}</size>";
+                        $"<b>{m.mechName}</b>   ({state})\n" +
+                        $"ХП: {m.currentHp:F0}/{m.maxHp:F0}   •   Урон: {m.attackPower:F0}   •   Эн.: {m.currentEnergy:F0}%\n" +
+                        $"<color=#94ABBE>{wName}  /  {sName}</color>";
                 }
 
-                if (imgMechAccents != null && i < imgMechAccents.Length && imgMechAccents[i] != null)
-                    imgMechAccents[i].color = mech.isDeployed ? new Color(0.75f, 0.28f, 0.18f) : mech.themeColor;
-
-                if (imgMechCards != null && i < imgMechCards.Length && imgMechCards[i] != null)
+                if (barMechHp[i] != null)
                 {
-                    bool curSelected = i == mgr.CurrentIndex;
-                    imgMechCards[i].color = mech.isDeployed
-                        ? new Color(0.18f, 0.10f, 0.10f, 0.96f)
-                        : (curSelected ? new Color(0.10f, 0.22f, 0.30f, 0.98f) : new Color(0.08f, 0.13f, 0.19f, 0.95f));
+                    float r = m.GetTotalHpPercent();
+                    barMechHp[i].color = r > 0.5f ? UITheme.AccentGreen : (r > 0.25f ? UITheme.AccentAmber : UITheme.AccentRed);
+                    UIBuilder.SetBar(barMechHp[i], r);
                 }
             }
         }
@@ -259,187 +248,118 @@ namespace HangarGame.UI
         private void RefreshLoadoutMenu()
         {
             var mgr = HangarMechManager.Instance;
-            var armory = ArmoryManager.Instance;
-            if (mgr == null || armory == null || itemsContainer == null) return;
+            var arm = ArmoryManager.Instance;
+            var mech = mgr != null ? mgr.CurrentMech : null;
 
-            MechUnit mech = (selectedMechIndex >= 0 && selectedMechIndex < mgr.Mechs.Count)
-                ? mgr.Mechs[selectedMechIndex]
-                : mgr.CurrentMech;
-            if (mech == null) return;
-
-            string shortTitle = StripParens(mech.mechName).ToUpperInvariant();
             if (txtSelectedMechTitle != null)
-                txtSelectedMechTitle.text = mech.isDeployed ? $"{shortTitle} [БОЙ]" : shortTitle;
+                txtSelectedMechTitle.text = mech != null ? mech.mechName.ToUpper() : "РОБОТ";
 
-            if (txtLoadoutSummary != null)
-                txtLoadoutSummary.text = $"АТК {mech.attackPower:F0}   |   ЗАЩ {mech.TotalDefense:F0}   |   HP {mech.currentHp:F0}/{mech.maxHp:F0}";
-
-            UpdateTabVisuals();
-            ClearRows();
-
-            var catalog = armory.Catalog;
-            for (int i = 0; i < catalog.Count; i++)
+            if (txtLoadoutSummary != null && mech != null)
             {
-                if (catalog[i].slot == activeSlot)
-                    CreateItemCard(catalog[i], armory, mech);
+                string rName = arm?.FindWeapon(mech.equippedRightWeaponId)?.displayName ?? "Автопушка";
+                string lName = arm?.FindWeapon(mech.equippedLeftWeaponId)?.displayName ?? "Обычный щит";
+                txtLoadoutSummary.text = $"Урон: {mech.attackPower:F0}  •  Броня: {mech.TotalDefense:F0}  •  {rName} / {lName}";
             }
 
-            if (itemsContainer is RectTransform itemsRt)
-                LayoutRebuilder.ForceRebuildLayoutImmediate(itemsRt);
-            Canvas.ForceUpdateCanvases();
-        }
-
-        private void UpdateTabVisuals()
-        {
             if (btnTabWeapons != null)
             {
                 var img = btnTabWeapons.GetComponent<Image>();
-                if (img != null)
-                    img.color = activeSlot == ArmorySlot.RightArm ? new Color(0.14f, 0.52f, 0.72f) : new Color(0.11f, 0.16f, 0.22f);
+                if (img != null) img.color = activeSlot == ArmorySlot.RightArm ? UITheme.AccentTeal : UITheme.BgCard;
             }
             if (btnTabShields != null)
             {
                 var img = btnTabShields.GetComponent<Image>();
-                if (img != null)
-                    img.color = activeSlot == ArmorySlot.LeftArm ? new Color(0.14f, 0.52f, 0.72f) : new Color(0.11f, 0.16f, 0.22f);
-            }
-        }
-
-        private void CreateItemCard(WeaponDefinition def, ArmoryManager armory, MechUnit mech)
-        {
-            LoadUiFont();
-
-            GameObject card = new GameObject($"Card_{def.id}");
-            card.transform.SetParent(itemsContainer, false);
-            var cardRect = card.AddComponent<RectTransform>();
-            cardRect.sizeDelta = new Vector2(640f, 162f);
-
-            var bg = card.AddComponent<Image>();
-            bool equipped = armory.IsEquipped(mech, def.id);
-            bool owned = armory.IsOwned(def.id);
-            bg.color = equipped ? new Color(0.09f, 0.28f, 0.22f, 0.98f) : new Color(0.08f, 0.12f, 0.18f, 0.96f);
-
-            GameObject titleObj = new GameObject("Title");
-            titleObj.transform.SetParent(card.transform, false);
-            var tRect = titleObj.AddComponent<RectTransform>();
-            tRect.anchorMin = new Vector2(0f, 1f);
-            tRect.anchorMax = new Vector2(1f, 1f);
-            tRect.pivot = new Vector2(0.5f, 1f);
-            tRect.anchoredPosition = new Vector2(0f, -12f);
-            tRect.sizeDelta = new Vector2(-28f, 38f);
-            var tTxt = titleObj.AddComponent<Text>();
-            tTxt.font = cachedFont;
-            tTxt.fontSize = 28;
-            tTxt.fontStyle = FontStyle.Bold;
-            tTxt.alignment = TextAnchor.MiddleLeft;
-            tTxt.color = Color.white;
-            tTxt.raycastTarget = false;
-            tTxt.text = def.displayName;
-
-            string stats = "";
-            if (def.bonusAttack > 0) stats += $"+{def.bonusAttack:F0} АТК   ";
-            if (def.bonusDefense > 0) stats += $"+{def.bonusDefense:F0} ЗАЩ   ";
-            if (def.bonusMaxHp > 0) stats += $"+{def.bonusMaxHp:F0} HP   ";
-            if (stats.Length == 0) stats = "Стандарт   ";
-
-            GameObject statObj = new GameObject("Stats");
-            statObj.transform.SetParent(card.transform, false);
-            var sRect = statObj.AddComponent<RectTransform>();
-            sRect.anchorMin = new Vector2(0f, 1f);
-            sRect.anchorMax = new Vector2(1f, 1f);
-            sRect.pivot = new Vector2(0.5f, 1f);
-            sRect.anchoredPosition = new Vector2(0f, -52f);
-            sRect.sizeDelta = new Vector2(-28f, 32f);
-            var sTxt = statObj.AddComponent<Text>();
-            sTxt.font = cachedFont;
-            sTxt.fontSize = 22;
-            sTxt.alignment = TextAnchor.MiddleLeft;
-            sTxt.color = new Color(0.65f, 0.88f, 1f);
-            sTxt.raycastTarget = false;
-            sTxt.text = $"{stats}|  {DispatchSystem.FormatDamageType(def.damageType)}";
-
-            GameObject btnObj = new GameObject("ActionBtn");
-            btnObj.transform.SetParent(card.transform, false);
-            var bRect = btnObj.AddComponent<RectTransform>();
-            bRect.anchorMin = new Vector2(0.5f, 0f);
-            bRect.anchorMax = new Vector2(0.5f, 0f);
-            bRect.pivot = new Vector2(0.5f, 0f);
-            bRect.anchoredPosition = new Vector2(0f, 14f);
-            bRect.sizeDelta = new Vector2(608f, 54f);
-            var btnImg = btnObj.AddComponent<Image>();
-            var btn = btnObj.AddComponent<Button>();
-
-            bool canBuy = GameManager.Instance != null && GameManager.Instance.CanAfford(def.costCredits, def.costAlloy);
-            if (equipped)
-            {
-                btnImg.color = new Color(0.18f, 0.55f, 0.34f);
-                btn.interactable = false;
-            }
-            else if (owned)
-            {
-                btnImg.color = mech.isDeployed ? new Color(0.28f, 0.25f, 0.25f) : new Color(0.18f, 0.52f, 0.82f);
-                btn.interactable = !mech.isDeployed;
-            }
-            else
-            {
-                btnImg.color = canBuy && !mech.isDeployed ? new Color(0.82f, 0.52f, 0.14f) : new Color(0.36f, 0.18f, 0.18f);
-                btn.interactable = canBuy && !mech.isDeployed;
+                if (img != null) img.color = activeSlot == ArmorySlot.LeftArm ? UITheme.AccentTeal : UITheme.BgCard;
             }
 
-            GameObject btnTxtObj = new GameObject("Text");
-            btnTxtObj.transform.SetParent(btnObj.transform, false);
-            var btRect = btnTxtObj.AddComponent<RectTransform>();
-            btRect.anchorMin = Vector2.zero;
-            btRect.anchorMax = Vector2.one;
-            btRect.sizeDelta = Vector2.zero;
-            var bt = btnTxtObj.AddComponent<Text>();
-            bt.font = cachedFont;
-            bt.fontSize = 24;
-            bt.fontStyle = FontStyle.Bold;
-            bt.alignment = TextAnchor.MiddleCenter;
-            bt.color = Color.white;
-            bt.raycastTarget = false;
-            bt.text = equipped
-                ? "НАДЕТО"
-                : (mech.isDeployed
-                    ? "В БОЮ"
-                    : (owned ? "НАДЕТЬ" : $"{def.costCredits} ¢  /  {def.costAlloy} т"));
+            ClearRows();
+            if (itemsContainer == null || arm == null) return;
 
-            string weaponId = def.id;
-            string weaponName = def.displayName;
-            btn.onClick.AddListener(() =>
+            if (cachedFont == null) cachedFont = UIBuilder.GetFont(26);
+
+            foreach (var def in arm.Catalog)
             {
-                bool ok = ArmoryManager.Instance != null && ArmoryManager.Instance.TryBuyOrEquip(weaponId);
-                if (txtFeedback != null)
+                if (def.slot != activeSlot) continue;
+                CreateItemRow(def, mech, arm);
+            }
+
+            if (mech != null && mech.HasMissingOrDetachedParts())
+            {
+                var hintBtn = UIBuilder.Button(itemsContainer, "Btn_GoHangarRepair", "Модуль повреждён — перейти в ангар (ремонт)", Vector2.one * 0.5f, Vector2.zero, new Vector2(648f, 68f), UITheme.AccentAmber, UITheme.Border, 22, cachedFont);
+                hintBtn.onClick.AddListener(() =>
                 {
-                    txtFeedback.text = ok ? $"Надето: {weaponName}" : "Не хватает ресурсов";
-                    txtFeedback.color = ok ? new Color(0.45f, 1f, 0.65f) : new Color(1f, 0.45f, 0.4f);
-                }
-                if (!ok) RefreshLoadoutMenu();
-            });
+                    HangarAudio.Instance?.PlayClick();
+                    GameManager.Instance?.SwitchView(RoomView.Hangar);
+                });
+                spawnedRows.Add(hintBtn.gameObject);
+            }
 
-            rowObjects.Add(card);
-        }
-
-        private string StripParens(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return "";
-            int idx = text.IndexOf('(');
-            return idx > 0 ? text.Substring(0, idx).Trim() : text;
+            if (itemsContainer is RectTransform rt)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
         }
 
         private void ClearRows()
         {
-            for (int i = 0; i < rowObjects.Count; i++)
+            foreach (var go in spawnedRows)
             {
-                if (rowObjects[i] != null)
-                {
-                    rowObjects[i].SetActive(false);
-                    rowObjects[i].transform.SetParent(null, false);
-                    Destroy(rowObjects[i]);
-                }
+                if (go == null) continue;
+                go.transform.SetParent(null, false);
+                ModelUtils.DestroySafe(go);
             }
-            rowObjects.Clear();
+            spawnedRows.Clear();
+        }
+
+        private void CreateItemRow(WeaponDefinition def, MechUnit mech, ArmoryManager arm)
+        {
+            bool owned = arm.IsOwned(def.id);
+            bool equipped = arm.IsEquipped(mech, def.id);
+            bool canAfford = GameManager.Instance != null && GameManager.Instance.CanAfford(def.costCredits, def.costAlloy);
+            bool mechBusy = mech != null && mech.isDeployed;
+
+            Color bgCol = equipped ? UITheme.BgCardActive : UITheme.BgCard;
+            GameObject row = UIBuilder.Panel(itemsContainer, $"Item_{def.id}", Vector2.one * 0.5f, Vector2.one * 0.5f, Vector2.zero, new Vector2(648f, 154f), bgCol, equipped ? UITheme.AccentTeal : UITheme.Border);
+            row.GetComponent<Image>().raycastTarget = false;
+            spawnedRows.Add(row);
+
+            GameObject bar = UIBuilder.Panel(row.transform, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, 0f), new Vector2(10f, 134f), def.accentColor);
+            bar.GetComponent<Image>().raycastTarget = false;
+
+            Text nTxt = UIBuilder.Label(row.transform, "Name", def.displayName, new Vector2(0f, 0.5f), new Vector2(210f, 34f), new Vector2(375f, 44f), 28, UITheme.TextMain, cachedFont, FontStyle.Bold, TextAnchor.MiddleLeft);
+            nTxt.raycastTarget = false;
+
+            string stats = "";
+            if (def.bonusAttack > 0f) stats += $"+{def.bonusAttack:F0} урон  •  ";
+            if (def.bonusDefense > 0f) stats += $"+{def.bonusDefense:F0} броня  •  ";
+            if (def.bonusMaxHp > 0f) stats += $"+{def.bonusMaxHp:F0} ХП  •  ";
+            stats += def.damageType.ToRu();
+
+            UIBuilder.Label(row.transform, "Stats", stats, new Vector2(0f, 0.5f), new Vector2(210f, -24f), new Vector2(375f, 46f), 22, UITheme.TextMuted, cachedFont, FontStyle.Normal, TextAnchor.MiddleLeft);
+
+            string btnLabel = equipped ? "Надето" : (owned ? "Надеть" : $"{def.costCredits} кр / {def.costAlloy} м");
+            Color btnCol = equipped ? UITheme.AccentGreen
+                : (mechBusy ? UITheme.BgRecessed
+                : (owned ? UITheme.AccentTeal
+                : (canAfford ? UITheme.AccentAmber : UITheme.BgRecessed)));
+
+            Button btn = UIBuilder.Button(row.transform, "Btn_Action", btnLabel, new Vector2(1f, 0.5f), new Vector2(-114f, 0f), new Vector2(204f, 68f), btnCol, UITheme.Border, 22, cachedFont);
+            btn.interactable = !equipped && !mechBusy && (owned || canAfford);
+            btn.onClick.AddListener(() =>
+            {
+                if (arm.TryBuyOrEquip(def.id))
+                {
+                    if (txtFeedback != null)
+                    {
+                        txtFeedback.color = UITheme.AccentGreen;
+                        txtFeedback.text = $"Установлено: {def.displayName}";
+                    }
+                    Refresh();
+                }
+                else if (txtFeedback != null)
+                {
+                    txtFeedback.color = UITheme.AccentRed;
+                    txtFeedback.text = mechBusy ? "Робот в бою" : "Недостаточно ресурсов";
+                }
+            });
         }
     }
 }

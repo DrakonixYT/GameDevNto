@@ -30,6 +30,10 @@ namespace HangarGame.Repair
         public int TotalStages => 5;
         public bool IsComplete => CurrentStage >= TotalStages;
 
+        public string GetStageName(int idx) => (stageNames != null && idx >= 0 && idx < stageNames.Length) ? stageNames[idx] : $"Этап {idx + 1}";
+        public int GetStageCredits(int idx) => (stageCredits != null && idx >= 0 && idx < stageCredits.Length) ? stageCredits[idx] : 0;
+        public int GetStageAlloy(int idx) => (stageAlloy != null && idx >= 0 && idx < stageAlloy.Length) ? stageAlloy[idx] : 0;
+
         private void Awake()
         {
             Instance = this;
@@ -53,9 +57,9 @@ namespace HangarGame.Repair
         public string GetNextStageInfo()
         {
             if (IsComplete)
-                return "Егерь: собран (5/5)";
+                return "Егерь собран (5/5)";
 
-            return $"Егерь {CurrentStage}/{TotalStages}: {stageNames[CurrentStage]} ({stageCredits[CurrentStage]}¢, {stageAlloy[CurrentStage]}т)";
+            return $"Егерь {CurrentStage}/{TotalStages}: {stageNames[CurrentStage]} ({stageCredits[CurrentStage]} кр / {stageAlloy[CurrentStage]} м)";
         }
 
         public bool CanStartNext()

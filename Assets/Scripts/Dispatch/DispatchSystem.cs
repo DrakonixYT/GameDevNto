@@ -24,15 +24,16 @@ namespace HangarGame.Dispatch
         [SerializeField] private float breachBaseDamage = 25f;
 
         [Header("Дистанция боя на радаре")]
-        [SerializeField] private float combatEngageRange = 175f;
-        [SerializeField] private float holdToFightRange = 135f;
-        [SerializeField] private float enemyAggroRange = 195f;
+        [SerializeField] private float combatEngageRange = 185f;
+        [SerializeField] private float holdToFightRange = 145f;
+        [SerializeField] private float enemyAggroRange = 210f;
 
         public List<EnemyDot> Enemies { get; } = new List<EnemyDot>();
         public string LastBattleLog { get; private set; } = "Радар чист.";
         public int SelectedMechId { get; set; } = -1;
         public bool IsDeployMode { get; set; }
         public Vector2 BasePosition => basePos;
+        public int EnemyCountTotal => enemyCounter;
 
         private readonly Vector2 basePos = new Vector2(0f, -240f);
         private float spawnTimer;
@@ -70,23 +71,13 @@ namespace HangarGame.Dispatch
             UpdateMechsCombat();
         }
 
-        public static string FormatDamageType(DamageType type)
-        {
-            switch (type)
-            {
-                case DamageType.Physical: return "Физика";
-                case DamageType.Plasma: return "Плазма";
-                case DamageType.Thermal: return "Термо";
-                case DamageType.Corrosive: return "Кислота";
-                default: return type.ToString();
-            }
-        }
+        public static string FormatDamageType(DamageType type) => type.ToRu();
 
         public void SpawnEnemy()
         {
             enemyCounter++;
             int waveTier = Mathf.Min(4, (enemyCounter - 1) / 3);
-            string[] names = { "Дрон", "Шипохвост", "Краб", "Скорпион" };
+            string[] names = { "Разведчик", "Огнемётчик", "Штурмовик", "Кислотник" };
             DamageType[] types = { DamageType.Physical, DamageType.Plasma, DamageType.Thermal, DamageType.Corrosive };
 
             DamageType atk = types[Random.Range(0, types.Length)];
@@ -109,7 +100,7 @@ namespace HangarGame.Dispatch
 
             Enemies.Add(enemy);
             HangarAlarmLight.Instance?.SetAlarm(true);
-            LastBattleLog = $"Радар: {enemy.name} (уязв: {FormatDamageType(weak)}).";
+            LastBattleLog = $"{enemy.name} на подходе (уязв.: {weak.ToRu()}).";
         }
 
         private void UpdateEnemies()
@@ -147,7 +138,7 @@ namespace HangarGame.Dispatch
             RoomCamera.Instance?.Shake(0.35f, 0.16f);
             HangarAudio.Instance?.PlayAlarm();
             float baseHp = GameManager.Instance != null ? GameManager.Instance.BaseHp : 0f;
-            LastBattleLog = $"Прорыв {enemy.name}: База {baseHp:F0}%, -{lostC}¢, -{lostA}т";
+            LastBattleLog = $"Прорыв {enemy.name}: база {baseHp:F0}%, -{lostC} кр, -{lostA} м";
             if (Enemies.Count == 0) HangarAlarmLight.Instance?.SetAlarm(false);
         }
 
@@ -177,7 +168,7 @@ namespace HangarGame.Dispatch
                 bool holdToFight = !mech.isReturning
                     && targetEnemy != null
                     && Vector2.Distance(mech.battlefieldPos, targetEnemy.position) <= holdToFightRange
-                    && Vector2.Distance(mech.targetPos, targetEnemy.position) <= 185f;
+                    && Vector2.Distance(mech.targetPos, targetEnemy.position) <= 220f;
 
                 if (!holdToFight && Vector2.Distance(mech.battlefieldPos, mech.targetPos) > 4f)
                     mech.battlefieldPos = Vector2.MoveTowards(mech.battlefieldPos, mech.targetPos, mech.moveSpeed * Time.deltaTime);
@@ -230,7 +221,7 @@ namespace HangarGame.Dispatch
         private void OnEnemyDefeated(EnemyDot enemy)
         {
             GameManager.Instance?.AddResources(enemy.rewardCredits, enemy.rewardAlloy);
-            LastBattleLog = $"{enemy.name} сбит (+{enemy.rewardCredits}¢, +{enemy.rewardAlloy}т).";
+            LastBattleLog = $"{enemy.name} уничтожен (+{enemy.rewardCredits} кр, +{enemy.rewardAlloy} м).";
             HangarAudio.Instance?.PlaySuccess();
             if (Enemies.Count == 0) HangarAlarmLight.Instance?.SetAlarm(false);
         }

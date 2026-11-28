@@ -1,13 +1,9 @@
 using System;
 using System.Collections.Generic;
 using HangarGame.Core;
-using HangarGame.UI;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem;
-#endif
 
 namespace HangarGame.Interaction
 {
@@ -17,42 +13,39 @@ namespace HangarGame.Interaction
         public string CurrentPrompt { get; private set; } = "";
 
         [SerializeField] private float maxRayDistance = 45f;
-        [SerializeField] private float sphereCastFallbackRadius = 0.06f;
+        [SerializeField] private float sphereCastRadius = 0.06f;
 
-        private UnityEngine.Camera cam;
+        private Camera cam;
         private IInteractable hovered;
-        private IInteractable pressedTarget;
+        private IInteractable pressed;
         private readonly List<RaycastResult> uiResults = new List<RaycastResult>();
 
         private void Awake()
         {
             Instance = this;
-            cam = GetComponent<UnityEngine.Camera>();
-            if (cam == null) cam = UnityEngine.Camera.main;
+            cam = GetComponent<Camera>() ?? Camera.main;
         }
 
         private void Update()
         {
             if (cam == null) return;
-
-            if (GameManager.Instance != null && (GameManager.Instance.IsGameWon || GameManager.Instance.IsGameLost))
+            var gm = GameManager.Instance;
+            if (gm != null && (gm.IsGameWon || gm.IsGameLost))
             {
                 ClearHover();
-                pressedTarget = null;
+                pressed = null;
                 return;
             }
 
-            Vector2 mousePos = ReadMousePosition();
-
+            Vector2 mousePos = GameInput.MousePosition;
             if (IsPointerOverUI(mousePos))
             {
                 ClearHover();
-                if (!ReadMouseHeld()) pressedTarget = null;
+                if (!GameInput.MouseLeftHeld) pressed = null;
                 return;
             }
 
             IInteractable best = FindTarget(cam.ScreenPointToRay(mousePos));
-
             if (best != hovered)
             {
                 ClearHover();
@@ -62,41 +55,36 @@ namespace HangarGame.Interaction
 
             CurrentPrompt = hovered != null ? hovered.GetPrompt() : "";
 
-            if (ReadMouseDown() && hovered != null)
+            if (GameInput.MouseLeftDown && hovered != null)
             {
-                pressedTarget = hovered;
+                pressed = hovered;
                 hovered.OnInteract();
             }
-            else if (ReadMouseHeld() && pressedTarget != null && pressedTarget == hovered && pressedTarget.CanInteract())
+            else if (GameInput.MouseLeftHeld && pressed != null && pressed == hovered && pressed.CanInteract())
             {
-                pressedTarget.OnInteractHold();
+                pressed.OnInteractHold();
             }
-            else if (!ReadMouseHeld())
+            else if (!GameInput.MouseLeftHeld)
             {
-                pressedTarget = null;
+                pressed = null;
             }
         }
 
         private IInteractable FindTarget(Ray ray)
         {
-            var hits = Physics.RaycastAll(ray, maxRayDistance);
-            IInteractable match = PickFirstInteractable(hits);
-            if (match != null) return match;
-
-            var sphereHits = Physics.SphereCastAll(ray, sphereCastFallbackRadius, maxRayDistance);
-            return PickFirstInteractable(sphereHits);
+            var hit = PickFirst(Physics.RaycastAll(ray, maxRayDistance));
+            return hit ?? PickFirst(Physics.SphereCastAll(ray, sphereCastRadius, maxRayDistance));
         }
 
-        private IInteractable PickFirstInteractable(RaycastHit[] hits)
+        private IInteractable PickFirst(RaycastHit[] hits)
         {
             if (hits == null || hits.Length == 0) return null;
             Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
             for (int i = 0; i < hits.Length; i++)
             {
-                var interactable = hits[i].collider.GetComponentInParent<IInteractable>();
-                if (interactable != null && interactable.CanInteract())
-                    return interactable;
+                var target = hits[i].collider.GetComponentInParent<IInteractable>();
+                if (target != null && target.CanInteract()) return target;
             }
             return null;
         }
@@ -110,12 +98,10 @@ namespace HangarGame.Interaction
 
             for (int i = 0; i < uiResults.Count; i++)
             {
-                var hitGo = uiResults[i].gameObject;
-                if (hitGo.GetComponentInParent<Selectable>() != null)
-                    return true;
-
-                var canvas = hitGo.GetComponentInParent<Canvas>();
-                var graphic = hitGo.GetComponent<Graphic>();
+                var go = uiResults[i].gameObject;
+                if (go.GetComponentInParent<Selectable>() != null) return true;
+                var canvas = go.GetComponentInParent<Canvas>();
+                var graphic = go.GetComponent<Graphic>();
                 if (canvas != null && canvas.renderMode != RenderMode.WorldSpace && graphic != null && graphic.raycastTarget)
                     return true;
             }
@@ -130,33 +116,6 @@ namespace HangarGame.Interaction
                 hovered = null;
             }
             CurrentPrompt = "";
-        }
-
-        private Vector2 ReadMousePosition()
-        {
-#if ENABLE_INPUT_SYSTEM
-            return Mouse.current != null ? Mouse.current.position.ReadValue() : Vector2.zero;
-#else
-            return Input.mousePosition;
-#endif
-        }
-
-        private bool ReadMouseDown()
-        {
-#if ENABLE_INPUT_SYSTEM
-            return Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
-#else
-            return Input.GetMouseButtonDown(0);
-#endif
-        }
-
-        private bool ReadMouseHeld()
-        {
-#if ENABLE_INPUT_SYSTEM
-            return Mouse.current != null && Mouse.current.leftButton.isPressed;
-#else
-            return Input.GetMouseButton(0);
-#endif
         }
     }
 }
