@@ -6,6 +6,8 @@ namespace HangarGame.Mechs
 {
     public class BatteryStation : MonoBehaviour, IInteractable
     {
+        public HangarMechManager hangar;
+
         private Renderer rend;
         private Color baseColor = Color.white;
 
@@ -13,13 +15,14 @@ namespace HangarGame.Mechs
         {
             rend = GetComponent<Renderer>();
             if (rend != null) baseColor = ModelUtils.GetColor(rend);
+            hangar ??= GameManager.Instance?.hangar ?? FindAnyObjectByType<HangarMechManager>();
         }
 
         public bool CanInteract() => gameObject.activeInHierarchy;
 
         public string GetPrompt()
         {
-            var mech = HangarMechManager.Instance?.CurrentMech;
+            var mech = hangar?.CurrentMech;
             if (mech == null) return "Зарядка недоступна";
             return mech.isDeployed ? $"{mech.mechName} в бою" : $"Батарея {mech.currentEnergy:F0}% — зарядить";
         }
@@ -32,10 +35,10 @@ namespace HangarGame.Mechs
 
         public void OnInteract()
         {
-            var mech = HangarMechManager.Instance?.CurrentMech;
+            var mech = hangar?.CurrentMech;
             if (mech == null || mech.isDeployed) return;
             mech.RechargeBattery();
-            HangarAudio.Play(Sfx.Battery);
+            GameManager.Instance?.PlaySfx(Sfx.Battery);
         }
 
         public void OnInteractHold() { }

@@ -8,8 +8,6 @@ namespace HangarGame.Mechs
 {
     public class HangarMechManager : MonoBehaviour
     {
-        public static HangarMechManager Instance { get; private set; }
-
         public List<MechUnit> Mechs = new List<MechUnit>();
         public List<Transform> bayMechs = new List<Transform>();
         public Animator podiumAnimator;
@@ -63,7 +61,6 @@ namespace HangarGame.Mechs
 
         private void Awake()
         {
-            Instance = this;
             if (Mechs.Count == 0)
                 Mechs.AddRange(GetComponentsInChildren<MechUnit>(true));
 
@@ -112,7 +109,7 @@ namespace HangarGame.Mechs
             CurrentIndex = targetIdx;
             MechUnit nextMech = CurrentMech;
 
-            HangarAudio.Play(Sfx.Swap);
+            GameManager.Instance?.PlaySfx(Sfx.Swap);
             if (podiumAnimator != null) podiumAnimator.SetTrigger("Swap");
 
             if (!Application.isPlaying || !gameObject.activeInHierarchy)

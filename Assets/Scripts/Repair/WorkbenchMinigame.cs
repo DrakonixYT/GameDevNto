@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using HangarGame.Core;
@@ -8,6 +9,7 @@ namespace HangarGame.Repair
 {
     public class WorkbenchMinigame : MonoBehaviour
     {
+        public GameManager game;
         [SerializeField] private GameObject platePrefab;
 
         private static readonly Color[] ChannelColors =
@@ -43,6 +45,8 @@ namespace HangarGame.Repair
         public bool IsComplete => boltsRemaining <= 0 && stepsRemaining <= 0;
         public string StatusText { get; private set; } = "";
 
+        public event Action OnStepChanged;
+
         public void SetPlatePrefab(GameObject prefab) => platePrefab = prefab;
 
         public void Begin(Transform modelPivot, Bounds localBounds, Vector3 camLocalDir, bool isJaeger)
@@ -70,7 +74,9 @@ namespace HangarGame.Repair
             hatchRoot.transform.localRotation = Quaternion.LookRotation(dir, Vector3.up);
             spawned.Add(hatchRoot);
 
-            coverPlate = CreatePrimitive(PrimitiveType.Cube, "Service_Cover", hatchRoot.transform, new Vector3(0f, 0f, -0.003f), new Vector3(panelW, panelH, 0.008f), new Color(0.15f, 0.18f, 0.22f), false);
+            coverPlate = CreatePrimitive(PrimitiveType.Cube, "Service_Cover", hatchRoot.transform,
+                new Vector3(0f, 0f, -0.003f), new Vector3(panelW, panelH, 0.008f),
+                new Color(0.15f, 0.18f, 0.22f), false);
             SpawnBolts();
         }
 
@@ -87,6 +93,13 @@ namespace HangarGame.Repair
             return go;
         }
 
+        private void SetStatus(string text)
+        {
+            StatusText = text;
+            OnStepChanged?.Invoke();
+        }
+
+        // Нечитаемые импортированные FBX-меши нельзя опросить по .vertices — используем их 8 углов bounds
         private static IEnumerable<Vector3> EnumerateLocalPoints(Transform pivot, MeshFilter mf, int maxSamples)
         {
             Mesh m = mf.sharedMesh;
@@ -190,7 +203,7 @@ namespace HangarGame.Repair
 
             boltsRemaining = corners.Length;
             stepsRemaining = jaegerMode ? 4 : 3;
-            StatusText = $"Болты: {boltsRemaining}";
+            SetStatus($"Болты: {boltsRemaining}");
 
             for (int i = 0; i < corners.Length; i++)
             {
@@ -215,20 +228,20 @@ namespace HangarGame.Repair
             if (bolt == null) return;
             clk.isInteractable = false;
             boltsRemaining--;
-            HangarAudio.Play(Sfx.Bolt);
+            game?.PlaySfx(Sfx.Bolt);
 
             if (Application.isPlaying) StartCoroutine(AnimateBoltOut(bolt));
             else { spawned.Remove(bolt); ModelUtils.DestroySafe(bolt); }
 
             if (boltsRemaining <= 0)
             {
-                HangarAudio.Play(Sfx.Success);
+                game?.PlaySfx(Sfx.Success);
                 if (Application.isPlaying) StartCoroutine(OpenCoverNextFrame());
                 else BeginStep2();
             }
             else
             {
-                StatusText = $"Болты: {boltsRemaining}";
+                SetStatus($"Болты: {boltsRemaining}");
             }
         }
 
@@ -280,7 +293,7 @@ namespace HangarGame.Repair
             leftPins.Clear();
             rightPins.Clear();
             stepsRemaining = 3;
-            StatusText = "Провода: 3";
+            SetStatus("Провода: 3");
 
             float xSpan = panelW * 0.34f, yStep = panelH * 0.34f;
             for (int i = 0; i < 3; i++)
@@ -313,7 +326,7 @@ namespace HangarGame.Repair
             if (selectedObj == null)
             {
                 SelectPin(pin, colorId, side, origColor);
-                StatusText = $"Контакт #{colorId + 1} — выберите пару";
+                SetStatus($"Контакт #{colorId + 1} — выберите пару");
                 return;
             }
             if (selectedObj == pin) return;
@@ -330,8 +343,8 @@ namespace HangarGame.Repair
 
             if (selectedId != colorId)
             {
-                HangarAudio.Play(Sfx.Error);
-                StatusText = "Неверный контакт";
+                game?.PlaySfx(Sfx.Error);
+                SetStatus("Неверный контакт");
                 return;
             }
 
@@ -350,9 +363,9 @@ namespace HangarGame.Repair
             selectedSide = -1;
 
             stepsRemaining--;
-            HangarAudio.Play(Sfx.Wire);
-            StatusText = stepsRemaining <= 0 ? "Готово — жмите ГОТОВО или Пробел" : $"Провода: {stepsRemaining}";
-            if (stepsRemaining <= 0) HangarAudio.Play(Sfx.Success);
+            game?.PlaySfx(Sfx.Wire);
+            SetStatus(stepsRemaining <= 0 ? "Готово — жмите ГОТОВО или Пробел" : $"Провода: {stepsRemaining}");
+            if (stepsRemaining <= 0) game?.PlaySfx(Sfx.Success);
         }
 
         private static void DisablePin(GameObject pin, Color color)
@@ -373,13 +386,13 @@ namespace HangarGame.Repair
             if (clk != null) clk.disableHover = true;
             pin.GetComponent<Renderer>().material = ModelUtils.CreateLitMaterial(Color.white, true, 0.7f);
             pin.transform.localScale = Vector3.one * (pinScale * 1.28f);
-            HangarAudio.Play(Sfx.Click);
+            game?.PlaySfx(Sfx.Click);
         }
 
         private void StartPlatesPhase()
         {
             stepsRemaining = 4;
-            StatusText = "Платы: 4";
+            SetStatus("Платы: 4");
 
             float sx = panelW * 0.28f, sy = panelH * 0.22f;
             Vector3[] slotCoords =
@@ -475,22 +488,22 @@ namespace HangarGame.Repair
             var clk = plateObj.GetComponent<ClickableObject>();
             if (clk != null) clk.disableHover = true;
             plateObj.transform.localPosition = restPos + new Vector3(0f, 0f, 0.02f);
-            HangarAudio.Play(Sfx.Click);
-            StatusText = $"Плата #{colorId + 1} — выберите разъем";
+            game?.PlaySfx(Sfx.Click);
+            SetStatus($"Плата #{colorId + 1} — выберите разъем");
         }
 
         private void OnPlateSlotClicked(GameObject slotObj, ClickableObject slotClk, int slotId, Vector3 targetPos, Color slotColor)
         {
             if (selectedObj == null)
             {
-                HangarAudio.Play(Sfx.Click);
-                StatusText = "Сначала выберите плату";
+                game?.PlaySfx(Sfx.Click);
+                SetStatus("Сначала выберите плату");
                 return;
             }
             if (selectedId != slotId)
             {
-                HangarAudio.Play(Sfx.Error);
-                StatusText = "Неверный разъем";
+                game?.PlaySfx(Sfx.Error);
+                SetStatus("Неверный разъем");
                 return;
             }
 
@@ -508,9 +521,9 @@ namespace HangarGame.Repair
             else inserted.transform.localPosition = targetPos;
 
             stepsRemaining--;
-            HangarAudio.Play(Sfx.Plate);
-            StatusText = stepsRemaining <= 0 ? "Готово — жмите ГОТОВО или Пробел" : $"Платы: {stepsRemaining}";
-            if (stepsRemaining <= 0) HangarAudio.Play(Sfx.Success);
+            game?.PlaySfx(Sfx.Plate);
+            SetStatus(stepsRemaining <= 0 ? "Готово — жмите ГОТОВО или Пробел" : $"Платы: {stepsRemaining}");
+            if (stepsRemaining <= 0) game?.PlaySfx(Sfx.Success);
         }
 
         private static IEnumerator AnimatePlateInsert(GameObject plate, Vector3 endPos)
@@ -541,7 +554,7 @@ namespace HangarGame.Repair
             selectedSide = -1;
             boltsRemaining = 0;
             stepsRemaining = 0;
-            StatusText = "";
+            SetStatus("");
         }
 
         private static Renderer PickPrimaryRenderer(GameObject root)

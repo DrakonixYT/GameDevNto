@@ -8,9 +8,7 @@ namespace HangarGame.Armory
 {
     public class ArmoryManager : MonoBehaviour
     {
-        public static ArmoryManager Instance { get; private set; }
-
-        [Header("Каталог вооружения")]
+        [SerializeField] private GameManager game;
         [SerializeField] private List<WeaponDefinition> catalog = new List<WeaponDefinition>();
 
         private readonly HashSet<string> ownedIds = new HashSet<string>();
@@ -23,6 +21,7 @@ namespace HangarGame.Armory
                 return catalog;
             }
         }
+
         public event Action OnArmoryChanged;
 
         public void EnsureCatalog()
@@ -37,42 +36,30 @@ namespace HangarGame.Armory
             if (catalog != null)
             {
                 foreach (var item in catalog)
-                {
                     if (item != null && !string.IsNullOrEmpty(item.id) && item.visualPrefab != null)
                         prevPrefabs[item.id] = item.visualPrefab;
-                }
             }
 
             catalog = ArmoryCatalog.CreateDefaultCatalog();
             foreach (var item in catalog)
-            {
                 if (item != null && prevPrefabs.TryGetValue(item.id, out var prefab))
                     item.visualPrefab = prefab;
-            }
         }
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-            {
-                Destroy(gameObject);
-                return;
-            }
-            Instance = this;
-
+            game ??= GetComponent<GameManager>() ?? FindAnyObjectByType<GameManager>();
             EnsureCatalog();
-
             ownedIds.Add(ArmoryCatalog.DefaultWeaponId);
             ownedIds.Add(ArmoryCatalog.DefaultShieldId);
         }
 
         private void Start()
         {
-            if (HangarMechManager.Instance == null) return;
-            foreach (var mech in HangarMechManager.Instance.Mechs)
-            {
+            var hangar = game?.hangar;
+            if (hangar == null) return;
+            foreach (var mech in hangar.Mechs)
                 if (mech != null) SyncMechLoadout(mech);
-            }
         }
 
         public void SetWeaponPrefab(string weaponId, GameObject prefab)
@@ -90,15 +77,12 @@ namespace HangarGame.Armory
 
         public bool IsOwned(string id) => ownedIds.Contains(id);
 
-        public bool IsEquipped(MechUnit mech, string weaponId)
-        {
-            if (mech == null) return false;
-            return mech.equippedLeftWeaponId == weaponId || mech.equippedRightWeaponId == weaponId;
-        }
+        public bool IsEquipped(MechUnit mech, string weaponId) =>
+            mech != null && (mech.equippedLeftWeaponId == weaponId || mech.equippedRightWeaponId == weaponId);
 
         public bool TryBuyOrEquip(string weaponId)
         {
-            var mech = HangarMechManager.Instance != null ? HangarMechManager.Instance.CurrentMech : null;
+            var mech = game?.hangar?.CurrentMech;
             if (mech == null || mech.isDeployed) return false;
 
             var def = FindWeapon(weaponId);
@@ -106,17 +90,17 @@ namespace HangarGame.Armory
 
             if (!IsOwned(weaponId))
             {
-                if (GameManager.Instance == null || !GameManager.Instance.TrySpend(def.costCredits, def.costAlloy))
+                if (game == null || !game.TrySpend(def.costCredits, def.costAlloy))
                 {
-                    HangarAudio.Play(Sfx.Error);
+                    game?.PlaySfx(Sfx.Error);
                     return false;
                 }
                 ownedIds.Add(weaponId);
-                HangarAudio.Play(Sfx.Buy);
+                game?.PlaySfx(Sfx.Buy);
             }
             else
             {
-                HangarAudio.Play(Sfx.Equip);
+                game?.PlaySfx(Sfx.Equip);
             }
 
             if (def.slot == ArmorySlot.LeftArm) mech.equippedLeftWeaponId = def.id;
@@ -132,7 +116,6 @@ namespace HangarGame.Armory
             if (mech == null) return;
             var left = FindWeapon(mech.equippedLeftWeaponId) ?? FindWeapon(ArmoryCatalog.DefaultShieldId);
             var right = FindWeapon(mech.equippedRightWeaponId) ?? FindWeapon(ArmoryCatalog.DefaultWeaponId);
-
             mech.ApplyLoadout(left, right, left?.visualPrefab, right?.visualPrefab);
         }
     }

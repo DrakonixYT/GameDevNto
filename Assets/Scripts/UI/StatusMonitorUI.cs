@@ -17,50 +17,27 @@ namespace HangarGame.UI
             public Text label;
         }
 
-        [SerializeField] private Text txtHeaderStatus;
-        [SerializeField] private Text txtBaseHp;
-        [SerializeField] private Image barBaseHp;
-        [SerializeField] private Text txtResources;
-        [SerializeField] private Text txtJaegerHeader;
-        [SerializeField] private StageRowView[] stages = new StageRowView[5];
-        [SerializeField] private Button btnBuildJaeger;
-        [SerializeField] private Text txtBuildBtn;
+        [Header("Ссылки")]
+        public GameManager game;
+        public JaegerProject jaeger;
+        public DispatchSystem dispatch;
 
-        private float refreshTimer;
-
-        public void BindFromHierarchy()
-        {
-            Transform bg = transform.Find("BG");
-            if (bg == null) return;
-
-            txtHeaderStatus = bg.Find("Header/Txt_Wave")?.GetComponent<Text>();
-            Transform baseCard = bg.Find("BaseCard");
-            if (baseCard != null)
-            {
-                txtBaseHp = baseCard.Find("Txt_BaseHp")?.GetComponent<Text>();
-                barBaseHp = baseCard.Find("Bar_BaseHp/Fill")?.GetComponent<Image>();
-                txtResources = baseCard.Find("Txt_Resources")?.GetComponent<Text>();
-            }
-
-            txtJaegerHeader = bg.Find("Txt_JaegerHeader")?.GetComponent<Text>();
-            for (int i = 0; i < 5; i++)
-            {
-                Transform row = bg.Find($"Stage_{i}");
-                stages[i] = row == null ? null : new StageRowView
-                {
-                    bg = row.GetComponent<Image>(),
-                    accent = row.Find("Accent")?.GetComponent<Image>(),
-                    label = row.Find("Txt_Stage")?.GetComponent<Text>()
-                };
-            }
-
-            btnBuildJaeger = bg.Find("Btn_BuildJaeger")?.GetComponent<Button>();
-            txtBuildBtn = btnBuildJaeger != null ? btnBuildJaeger.GetComponentInChildren<Text>() : null;
-        }
+        [Header("Виджеты")]
+        public Text txtHeaderStatus;
+        public Text txtBaseHp;
+        public Image barBaseHp;
+        public Text txtResources;
+        public Text txtJaegerHeader;
+        public StageRowView[] stages = new StageRowView[5];
+        public Button btnBuildJaeger;
+        public Text txtBuildBtn;
 
         private void Awake()
         {
-            if (txtBaseHp == null) BindFromHierarchy();
+            game ??= GameManager.Instance ?? FindAnyObjectByType<GameManager>();
+            jaeger ??= game?.jaeger ?? FindAnyObjectByType<JaegerProject>();
+            dispatch ??= game?.dispatch ?? FindAnyObjectByType<DispatchSystem>();
+
             if (btnBuildJaeger != null)
             {
                 btnBuildJaeger.onClick.RemoveAllListeners();
@@ -74,30 +51,27 @@ namespace HangarGame.UI
 
         private void HookEvents(bool subscribe)
         {
-            var gm = GameManager.Instance;
-            if (gm == null) return;
-
-            gm.OnResourcesChanged -= OnResourcesChanged;
-            gm.OnBaseHpChanged -= OnBaseChanged;
-            gm.OnJaegerProgressChanged -= OnJaegerChanged;
-
-            if (subscribe)
+            if (game != null)
             {
-                gm.OnResourcesChanged += OnResourcesChanged;
-                gm.OnBaseHpChanged += OnBaseChanged;
-                gm.OnJaegerProgressChanged += OnJaegerChanged;
-                Refresh();
-            }
-        }
+                game.OnResourcesChanged -= OnResourcesChanged;
+                game.OnBaseHpChanged -= OnBaseChanged;
+                game.OnJaegerProgressChanged -= OnJaegerChanged;
 
-        private void Update()
-        {
-            refreshTimer += Time.deltaTime;
-            if (refreshTimer >= 0.25f)
-            {
-                refreshTimer = 0f;
-                Refresh();
+                if (subscribe)
+                {
+                    game.OnResourcesChanged += OnResourcesChanged;
+                    game.OnBaseHpChanged += OnBaseChanged;
+                    game.OnJaegerProgressChanged += OnJaegerChanged;
+                }
             }
+
+            if (dispatch != null)
+            {
+                dispatch.OnRadarChanged -= Refresh;
+                if (subscribe) dispatch.OnRadarChanged += Refresh;
+            }
+
+            if (subscribe) Refresh();
         }
 
         private void OnResourcesChanged(int c, int a) => Refresh();
@@ -106,81 +80,79 @@ namespace HangarGame.UI
 
         private void OnBuildClicked()
         {
-            HangarAudio.Play(Sfx.Click);
-            JaegerProject.Instance?.StartNextStage();
+            game?.PlaySfx(Sfx.Click);
+            jaeger?.StartNextStage();
             Refresh();
         }
 
         public void Refresh()
         {
-            var gm = GameManager.Instance;
-            var jp = JaegerProject.Instance;
-            var ds = DispatchSystem.Instance;
-
             if (txtHeaderStatus != null)
             {
-                int active = ds != null ? ds.Enemies.Count : 0;
+                int active = dispatch != null ? dispatch.Enemies.Count : 0;
                 txtHeaderStatus.text = active > 0 ? $"Угроз: {active}" : "Спокойно";
                 txtHeaderStatus.color = active > 0 ? UITheme.AccentAmber : UITheme.TextMuted;
             }
 
-            if (gm != null)
+            if (game != null)
             {
-                float ratio = gm.maxBaseHp > 0f ? Mathf.Clamp01(gm.BaseHp / gm.maxBaseHp) : 1f;
+                float ratio = game.maxBaseHp > 0f ? Mathf.Clamp01(game.BaseHp / game.maxBaseHp) : 1f;
+                Color hpColor = ratio > 0.5f ? UITheme.AccentGreen : (ratio > 0.25f ? UITheme.AccentAmber : UITheme.AccentRed);
+
                 if (txtBaseHp != null)
                 {
-                    txtBaseHp.text = $"{gm.BaseHp:F0}%";
-                    txtBaseHp.color = ratio > 0.5f ? UITheme.AccentGreen : (ratio > 0.25f ? UITheme.AccentAmber : UITheme.AccentRed);
+                    txtBaseHp.text = $"{game.BaseHp:F0}%";
+                    txtBaseHp.color = hpColor;
                 }
                 if (barBaseHp != null)
                 {
-                    barBaseHp.color = ratio > 0.5f ? UITheme.AccentGreen : (ratio > 0.25f ? UITheme.AccentAmber : UITheme.AccentRed);
+                    barBaseHp.color = hpColor;
                     UIBuilder.SetBar(barBaseHp, ratio);
                 }
                 if (txtResources != null)
-                    txtResources.text = $"Кредиты: {gm.Credits}   •   Сплав: {gm.Alloy}";
+                    txtResources.text = $"Кредиты: {game.Credits}   •   Сплав: {game.Alloy}";
             }
 
-            if (jp == null) return;
+            if (jaeger == null) return;
 
             if (txtJaegerHeader != null)
-                txtJaegerHeader.text = $"ПРОЕКТ «ЕГЕРЬ»   {jp.CurrentStage}/{jp.TotalStages}";
+                txtJaegerHeader.text = $"ПРОЕКТ «ЕГЕРЬ»   {jaeger.CurrentStage}/{jaeger.TotalStages}";
 
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < stages.Length; i++)
             {
                 var row = stages[i];
                 if (row == null) continue;
 
-                bool done = i < jp.CurrentStage;
-                bool next = i == jp.CurrentStage;
+                bool done = i < jaeger.CurrentStage;
+                bool next = i == jaeger.CurrentStage;
                 if (row.bg != null) row.bg.color = done ? UITheme.BgCardActive : (next ? UITheme.BgHeader : UITheme.BgCard);
                 if (row.accent != null) row.accent.color = done ? UITheme.AccentGreen : (next ? UITheme.AccentAmber : UITheme.Border);
                 if (row.label != null)
                 {
-                    string state = done ? "ГОТОВО" : $"{jp.GetStageCredits(i)} кр / {jp.GetStageAlloy(i)} м";
-                    row.label.text = $"{i + 1}. {jp.GetStageName(i)}    —    {state}";
+                    string state = done ? "ГОТОВО" : $"{jaeger.GetStageCredits(i)} кр / {jaeger.GetStageAlloy(i)} м";
+                    row.label.text = $"{i + 1}. {jaeger.GetStageName(i)}    —    {state}";
                     row.label.color = (next && !done) ? UITheme.TextMain : UITheme.TextMuted;
                 }
             }
 
             if (btnBuildJaeger != null)
             {
-                bool canBuild = jp.CanStartNext();
+                bool canBuild = jaeger.CanStartNext();
                 btnBuildJaeger.interactable = canBuild;
                 var img = btnBuildJaeger.GetComponent<Image>();
                 if (img != null)
-                    img.color = jp.IsComplete ? UITheme.AccentGreen : (canBuild ? UITheme.AccentTeal : UITheme.BgRecessed);
+                    img.color = jaeger.IsComplete ? UITheme.AccentGreen : (canBuild ? UITheme.AccentTeal : UITheme.BgRecessed);
 
                 if (txtBuildBtn != null)
                 {
-                    if (jp.IsComplete)
+                    if (jaeger.IsComplete)
                     {
                         txtBuildBtn.text = "ЕГЕРЬ СОБРАН";
                     }
                     else
                     {
-                        int s = jp.CurrentStage;
-                        txtBuildBtn.text = $"СОБРАТЬ: {jp.GetStageName(s).ToUpper()} ({jp.GetStageCredits(s)}/{jp.GetStageAlloy(s)})";
+                        int s = jaeger.CurrentStage;
+                        txtBuildBtn.text = $"СОБРАТЬ: {jaeger.GetStageName(s).ToUpper()} ({jaeger.GetStageCredits(s)}/{jaeger.GetStageAlloy(s)})";
                         txtBuildBtn.color = canBuild ? UITheme.TextMain : UITheme.TextMuted;
                     }
                 }

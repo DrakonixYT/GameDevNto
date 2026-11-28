@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -7,6 +8,19 @@ namespace HangarGame.Core
 {
     public static class GameInput
     {
+#if ENABLE_INPUT_SYSTEM
+        private static readonly Dictionary<KeyCode, Key> KeyMap = new Dictionary<KeyCode, Key>
+        {
+            { KeyCode.Q, Key.Q }, { KeyCode.E, Key.E },
+            { KeyCode.W, Key.W }, { KeyCode.S, Key.S },
+            { KeyCode.A, Key.A }, { KeyCode.D, Key.D },
+            { KeyCode.LeftArrow, Key.LeftArrow }, { KeyCode.RightArrow, Key.RightArrow },
+            { KeyCode.UpArrow, Key.UpArrow }, { KeyCode.DownArrow, Key.DownArrow },
+            { KeyCode.Tab, Key.Tab }, { KeyCode.I, Key.I },
+            { KeyCode.Escape, Key.Escape }, { KeyCode.Space, Key.Space }
+        };
+#endif
+
         public static Vector2 PointerPos
         {
             get
@@ -79,22 +93,21 @@ namespace HangarGame.Core
             }
         }
 
-        public static bool TurnLeft => WasPressed(KeyCode.Q);
-        public static bool TurnRight => WasPressed(KeyCode.E);
-        public static bool PrevMech => WasPressed(KeyCode.A) || WasPressed(KeyCode.LeftArrow);
-        public static bool NextMech => WasPressed(KeyCode.D) || WasPressed(KeyCode.RightArrow);
-        public static bool FocusArmory => WasPressed(KeyCode.Tab) || WasPressed(KeyCode.I);
-        public static bool Confirm => WasPressed(KeyCode.Space);
-        public static bool Cancel => WasPressed(KeyCode.Escape);
+        public static bool TurnLeft => Pressed(KeyCode.Q);
+        public static bool TurnRight => Pressed(KeyCode.E);
+        public static bool PrevMech => Pressed(KeyCode.A) || Pressed(KeyCode.LeftArrow);
+        public static bool NextMech => Pressed(KeyCode.D) || Pressed(KeyCode.RightArrow);
+        public static bool FocusArmory => Pressed(KeyCode.Tab) || Pressed(KeyCode.I);
+        public static bool Confirm => Pressed(KeyCode.Space);
+        public static bool Cancel => Pressed(KeyCode.Escape);
 
         public static Vector2 WorkbenchRotate()
         {
-            float x = 0f;
-            float y = 0f;
-            if (IsHeld(KeyCode.A) || IsHeld(KeyCode.LeftArrow) || IsHeld(KeyCode.Q)) x -= 1f;
-            if (IsHeld(KeyCode.D) || IsHeld(KeyCode.RightArrow) || IsHeld(KeyCode.E)) x += 1f;
-            if (IsHeld(KeyCode.W) || IsHeld(KeyCode.UpArrow)) y += 1f;
-            if (IsHeld(KeyCode.S) || IsHeld(KeyCode.DownArrow)) y -= 1f;
+            float x = 0f, y = 0f;
+            if (Held(KeyCode.A) || Held(KeyCode.LeftArrow) || Held(KeyCode.Q)) x -= 1f;
+            if (Held(KeyCode.D) || Held(KeyCode.RightArrow) || Held(KeyCode.E)) x += 1f;
+            if (Held(KeyCode.W) || Held(KeyCode.UpArrow)) y += 1f;
+            if (Held(KeyCode.S) || Held(KeyCode.DownArrow)) y -= 1f;
             return new Vector2(x, y);
         }
 
@@ -107,47 +120,19 @@ namespace HangarGame.Core
 #endif
         }
 
-        private static bool WasPressed(KeyCode k)
+        private static bool Pressed(KeyCode k)
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current == null) return false;
-            switch (k)
-            {
-                case KeyCode.Q: return Keyboard.current.qKey.wasPressedThisFrame;
-                case KeyCode.E: return Keyboard.current.eKey.wasPressedThisFrame;
-                case KeyCode.A: return Keyboard.current.aKey.wasPressedThisFrame;
-                case KeyCode.D: return Keyboard.current.dKey.wasPressedThisFrame;
-                case KeyCode.LeftArrow: return Keyboard.current.leftArrowKey.wasPressedThisFrame;
-                case KeyCode.RightArrow: return Keyboard.current.rightArrowKey.wasPressedThisFrame;
-                case KeyCode.Tab: return Keyboard.current.tabKey.wasPressedThisFrame;
-                case KeyCode.I: return Keyboard.current.iKey.wasPressedThisFrame;
-                case KeyCode.Escape: return Keyboard.current.escapeKey.wasPressedThisFrame;
-                case KeyCode.Space: return Keyboard.current.spaceKey.wasPressedThisFrame;
-                default: return false;
-            }
+            return Keyboard.current != null && KeyMap.TryGetValue(k, out var key) && Keyboard.current[key].wasPressedThisFrame;
 #else
             return Input.GetKeyDown(k);
 #endif
         }
 
-        private static bool IsHeld(KeyCode k)
+        private static bool Held(KeyCode k)
         {
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current == null) return false;
-            switch (k)
-            {
-                case KeyCode.Q: return Keyboard.current.qKey.isPressed;
-                case KeyCode.E: return Keyboard.current.eKey.isPressed;
-                case KeyCode.A: return Keyboard.current.aKey.isPressed;
-                case KeyCode.D: return Keyboard.current.dKey.isPressed;
-                case KeyCode.W: return Keyboard.current.wKey.isPressed;
-                case KeyCode.S: return Keyboard.current.sKey.isPressed;
-                case KeyCode.LeftArrow: return Keyboard.current.leftArrowKey.isPressed;
-                case KeyCode.RightArrow: return Keyboard.current.rightArrowKey.isPressed;
-                case KeyCode.UpArrow: return Keyboard.current.upArrowKey.isPressed;
-                case KeyCode.DownArrow: return Keyboard.current.downArrowKey.isPressed;
-                default: return false;
-            }
+            return Keyboard.current != null && KeyMap.TryGetValue(k, out var key) && Keyboard.current[key].isPressed;
 #else
             return Input.GetKey(k);
 #endif

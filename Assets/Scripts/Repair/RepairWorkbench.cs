@@ -6,10 +6,20 @@ using UnityEngine;
 
 namespace HangarGame.Repair
 {
+    public enum WorkbenchState
+    {
+        Idle,
+        Mounting,
+        Active
+    }
+
     public class RepairWorkbench : MonoBehaviour
     {
-        public static RepairWorkbench Instance { get; private set; }
+        [Header("Ссылки")]
+        public GameManager game;
+        public HangarMechManager hangar;
 
+        [Header("Размещение детали")]
         public Vector3 tableRestOffset = new Vector3(0f, 1.00f, -0.04f);
         public float normalizedPartExtent = 0.64f;
         public Vector3 initialEuler;
@@ -20,14 +30,17 @@ namespace HangarGame.Repair
         [SerializeField] private float minPitch = -65f;
         [SerializeField] private float maxPitch = 65f;
 
+        public WorkbenchState State { get; private set; } = WorkbenchState.Idle;
         public MechPart CurrentPart { get; private set; }
         public GameObject CurrentJaegerModule { get; private set; }
-        public bool HasItem => CurrentPart != null || CurrentJaegerModule != null;
+        public bool HasItem => State != WorkbenchState.Idle;
         public bool IsWorkComplete => minigame == null || minigame.IsComplete;
         public string RepairStepInfo => minigame != null ? minigame.StatusText : "";
         public string CurrentItemName => CurrentPart?.Data != null
             ? CurrentPart.Data.partName
             : (!string.IsNullOrEmpty(jaegerTitle) ? jaegerTitle : "Деталь");
+
+        public event Action OnWorkChanged;
 
         private WorkbenchMinigame minigame;
         private Transform workPivot;
@@ -38,10 +51,20 @@ namespace HangarGame.Repair
 
         private void Awake()
         {
-            Instance = this;
+            game ??= GameManager.Instance ?? FindAnyObjectByType<GameManager>();
+            hangar ??= game?.hangar ?? FindAnyObjectByType<HangarMechManager>();
             minigame = ModelUtils.GetOrAdd<WorkbenchMinigame>(gameObject);
+            minigame.game = game;
+            minigame.OnStepChanged += NotifyWorkChanged;
             if (platePrefab != null) minigame.SetPlatePrefab(platePrefab);
         }
+
+        private void OnDestroy()
+        {
+            if (minigame != null) minigame.OnStepChanged -= NotifyWorkChanged;
+        }
+
+        private void NotifyWorkChanged() => OnWorkChanged?.Invoke();
 
         private void Update()
         {
@@ -116,11 +139,15 @@ namespace HangarGame.Repair
             curYaw = targetYaw = initialEuler.y;
             curPitch = targetPitch = initialEuler.x;
 
+            State = WorkbenchState.Mounting;
             FitTargetInPivot(target);
-            GameManager.Instance?.SwitchView(RoomView.WorkbenchFocus);
+            game?.SwitchView(RoomView.WorkbenchFocus);
 
-            if (minigame == null) minigame = ModelUtils.GetOrAdd<WorkbenchMinigame>(gameObject);
+            minigame ??= ModelUtils.GetOrAdd<WorkbenchMinigame>(gameObject);
+            minigame.game = game;
             if (platePrefab != null) minigame.SetPlatePrefab(platePrefab);
+
+            OnWorkChanged?.Invoke();
 
             if (Application.isPlaying)
                 mountRoutine = StartCoroutine(DropIntoPlaceRoutine(target, isJaeger));
@@ -181,20 +208,15 @@ namespace HangarGame.Repair
         private void StartMinigame(bool isJaeger)
         {
             if (workPivot == null) return;
+            State = WorkbenchState.Active;
             Bounds world = ModelUtils.CalcBounds(workPivot.gameObject, false);
             Bounds local = new Bounds(workPivot.InverseTransformPoint(world.center), world.size);
             minigame.Begin(workPivot, local, Vector3.back, isJaeger);
+            OnWorkChanged?.Invoke();
         }
 
-        public void FinishWork()
-        {
-            ClearCurrentWork(applyResult: true);
-        }
-
-        public void CancelWork()
-        {
-            ClearCurrentWork(applyResult: false);
-        }
+        public void FinishWork() => ClearCurrentWork(applyResult: true);
+        public void CancelWork() => ClearCurrentWork(applyResult: false);
 
         private void ClearCurrentWork(bool applyResult)
         {
@@ -204,6 +226,7 @@ namespace HangarGame.Repair
                 mountRoutine = null;
             }
             minigame?.Clear();
+            State = WorkbenchState.Idle;
 
             if (CurrentJaegerModule != null)
             {
@@ -219,7 +242,7 @@ namespace HangarGame.Repair
                 if (applyResult)
                 {
                     cb?.Invoke();
-                    HangarAudio.Play(Sfx.Success);
+                    game?.PlaySfx(Sfx.Success);
                 }
             }
             else if (CurrentPart != null)
@@ -227,7 +250,7 @@ namespace HangarGame.Repair
                 MechPart part = CurrentPart;
                 CurrentPart = null;
                 if (applyResult && part.Data != null)
-                    GameManager.Instance?.TrySpend(part.Data.repairCredits, part.Data.repairAlloy);
+                    game?.TrySpend(part.Data.repairCredits, part.Data.repairAlloy);
 
                 part.ReturnToSocket();
                 DestroyPivot();
@@ -236,12 +259,13 @@ namespace HangarGame.Repair
                 {
                     part.RepairFull();
                     part.GetComponentInParent<MechUnit>()?.SyncHpFromParts();
-                    HangarAudio.Play(Sfx.Success);
+                    game?.PlaySfx(Sfx.Success);
                 }
             }
 
-            HangarMechManager.Instance?.UpdatePodiumDisplay();
-            GameManager.Instance?.SwitchView(RoomView.Hangar);
+            hangar?.UpdatePodiumDisplay();
+            game?.SwitchView(RoomView.Hangar);
+            OnWorkChanged?.Invoke();
         }
 
         private void DestroyPivot()

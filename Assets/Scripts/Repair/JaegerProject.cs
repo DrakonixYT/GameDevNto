@@ -7,7 +7,9 @@ namespace HangarGame.Repair
 {
     public class JaegerProject : MonoBehaviour
     {
-        public static JaegerProject Instance { get; private set; }
+        public GameManager game;
+        public RepairWorkbench workbench;
+        public RoomCamera roomCamera;
 
         public Transform[] stageVisualParts = new Transform[5];
         public GameObject[] stageWorkbenchPrefabs = new GameObject[5];
@@ -21,13 +23,18 @@ namespace HangarGame.Repair
         public int TotalStages => 5;
         public bool IsComplete => CurrentStage >= TotalStages;
 
-        private void Awake() => Instance = this;
+        private void Awake()
+        {
+            game ??= GetComponent<GameManager>() ?? FindAnyObjectByType<GameManager>();
+            workbench ??= game?.workbench ?? FindAnyObjectByType<RepairWorkbench>();
+            roomCamera ??= game?.roomCamera ?? FindAnyObjectByType<RoomCamera>();
+        }
 
         private void Start()
         {
             RefreshVisualStages();
-            if (RepairWorkbench.Instance != null && platePrefab != null)
-                RepairWorkbench.Instance.platePrefab = platePrefab;
+            if (workbench != null && platePrefab != null)
+                workbench.platePrefab = platePrefab;
         }
 
         public string GetStageName(int idx) => (stageNames != null && idx >= 0 && idx < stageNames.Length) ? stageNames[idx] : $"Этап {idx + 1}";
@@ -44,22 +51,22 @@ namespace HangarGame.Repair
         public bool CanStartNext()
         {
             return !IsComplete
-                && RepairWorkbench.Instance != null
-                && !RepairWorkbench.Instance.HasItem
-                && GameManager.Instance != null
-                && GameManager.Instance.CanAfford(stageCredits[CurrentStage], stageAlloy[CurrentStage]);
+                && workbench != null
+                && !workbench.HasItem
+                && game != null
+                && game.CanAfford(stageCredits[CurrentStage], stageAlloy[CurrentStage]);
         }
 
         public void StartNextStage()
         {
             if (!CanStartNext()) return;
-            if (!GameManager.Instance.TrySpend(stageCredits[CurrentStage], stageAlloy[CurrentStage])) return;
+            if (!game.TrySpend(stageCredits[CurrentStage], stageAlloy[CurrentStage])) return;
 
-            if (platePrefab != null && RepairWorkbench.Instance != null)
-                RepairWorkbench.Instance.platePrefab = platePrefab;
+            if (platePrefab != null && workbench != null)
+                workbench.platePrefab = platePrefab;
 
             GameObject model = CreateWorkbenchModel(CurrentStage);
-            RepairWorkbench.Instance?.ReceiveJaegerModule(model, stageNames[CurrentStage], OnStageCompleted);
+            workbench?.ReceiveJaegerModule(model, stageNames[CurrentStage], OnStageCompleted);
         }
 
         private void OnStageCompleted()
@@ -72,14 +79,14 @@ namespace HangarGame.Repair
                 if (Application.isPlaying) StartCoroutine(AnimateStageMount(part));
             }
 
-            HangarAudio.Play(Sfx.JaegerStage);
-            RoomCamera.Instance?.Shake(0.32f, 0.14f);
-            GameManager.Instance?.SetJaegerProgress(CurrentStage / (float)TotalStages);
+            game?.PlaySfx(Sfx.JaegerStage);
+            roomCamera?.Shake(0.32f, 0.14f);
+            game?.SetJaegerProgress(CurrentStage / (float)TotalStages);
 
             if (IsComplete)
             {
-                HangarAudio.Play(Sfx.Victory);
-                GameManager.Instance?.TriggerVictory();
+                game?.PlaySfx(Sfx.Victory);
+                game?.TriggerVictory();
             }
         }
 

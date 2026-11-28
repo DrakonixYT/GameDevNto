@@ -4,6 +4,7 @@ using HangarGame.Armory;
 using HangarGame.CameraControl;
 using HangarGame.Core;
 using HangarGame.Dispatch;
+using HangarGame.Interaction;
 using HangarGame.Mechs;
 using HangarGame.Prototype;
 using HangarGame.Repair;
@@ -52,11 +53,24 @@ namespace HangarGame.EditorTools
         {
             var activeScene = OpenMainScene();
 
-            SetupManagers();
-            SetupMechs();
-            SetupWorkbench();
-            SetupJaeger();
-            SetupUIAndCamera();
+            GameManager gm = SetupManagers();
+            HangarMechManager mechMgr = SetupMechs();
+            RepairWorkbench wb = SetupWorkbench(gm, mechMgr);
+            JaegerProject jaeger = SetupJaeger(gm, wb);
+
+            if (gm != null)
+            {
+                gm.hangar = mechMgr;
+                gm.workbench = wb;
+                gm.jaeger = jaeger;
+            }
+
+            SetupUIAndCamera(gm);
+            if (gm != null)
+            {
+                gm.ResolveMissingRefs();
+                EditorUtility.SetDirty(gm);
+            }
 
             EditorSceneManager.MarkSceneDirty(activeScene);
             EditorSceneManager.SaveScene(activeScene);
@@ -71,26 +85,29 @@ namespace HangarGame.EditorTools
                 : EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
         }
 
-        private static void SetupManagers()
+        private static GameManager SetupManagers()
         {
             GameObject mgrs = GameObject.Find("--- 01_MANAGERS ---");
-            if (mgrs == null) return;
-
-            ModelUtils.GetOrAdd<HangarAudio>(mgrs);
-            var alarm = ModelUtils.GetOrAdd<HangarAlarmLight>(mgrs);
-            var alarmLightObj = GameObject.Find("Spotlight_Alarm_Red");
-            if (alarmLightObj != null) alarm.ConfigureLight(alarmLightObj.GetComponent<Light>());
-            EditorUtility.SetDirty(alarm);
+            if (mgrs == null) return Object.FindAnyObjectByType<GameManager>();
 
             var gm = ModelUtils.GetOrAdd<GameManager>(mgrs);
+            gm.sfx = ModelUtils.GetOrAdd<HangarAudio>(mgrs);
+            gm.alarmLight = ModelUtils.GetOrAdd<HangarAlarmLight>(mgrs);
+
+            var alarmLightObj = GameObject.Find("Spotlight_Alarm_Red");
+            if (alarmLightObj != null) gm.alarmLight.redAlarmLight = alarmLightObj.GetComponent<Light>();
+            EditorUtility.SetDirty(gm.alarmLight);
+
             gm.startingCredits = 220;
             gm.startingAlloy = 95;
             gm.maxBaseHp = 100f;
-            EditorUtility.SetDirty(gm);
 
             var disp = mgrs.GetComponent<DispatchSystem>();
             if (disp != null)
             {
+                gm.dispatch = disp;
+                disp.game = gm;
+                disp.alarmLight = gm.alarmLight;
                 disp.firstEnemyDelay = 9f;
                 disp.minSpawnInterval = 18f;
                 disp.maxSpawnInterval = 27f;
@@ -106,16 +123,19 @@ namespace HangarGame.EditorTools
             }
 
             var armory = ModelUtils.GetOrAdd<ArmoryManager>(mgrs);
+            gm.armory = armory;
             armory.ResetCatalogFromDefaults();
             armory.SetWeaponPrefab("weapon_spear", AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Eger/EgerSpear.fbx"));
             armory.SetWeaponPrefab("shield_bastion", AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Eger/EgerShield.fbx"));
             EditorUtility.SetDirty(armory);
+            EditorUtility.SetDirty(gm);
+            return gm;
         }
 
-        private static void SetupMechs()
+        private static HangarMechManager SetupMechs()
         {
             var mechMgr = Object.FindAnyObjectByType<HangarMechManager>();
-            if (mechMgr == null) return;
+            if (mechMgr == null) return null;
 
             Transform bay0 = mechMgr.transform.Find("Bay_Mech_0_Страж-1")
                 ?? mechMgr.transform.Find("Mech_0_Страж-1 (Лёгкий) (1)");
@@ -156,7 +176,12 @@ namespace HangarGame.EditorTools
                 mech.GetPartBySlot(PartSlot.RightArm)?.AttachBrokenVisual(brokenRight);
 
                 var battery = mech.transform.parent?.Find("Battery_Charging_Station/Battery_Energy_Core");
-                if (battery != null) ModelUtils.GetOrAdd<BatteryStation>(battery.gameObject);
+                if (battery != null)
+                {
+                    var bs = ModelUtils.GetOrAdd<BatteryStation>(battery.gameObject);
+                    bs.hangar = mechMgr;
+                    EditorUtility.SetDirty(bs);
+                }
                 EditorUtility.SetDirty(mech);
             }
 
@@ -201,6 +226,7 @@ namespace HangarGame.EditorTools
             mechMgr.verticalLiftOffset = 0.9f;
             mechMgr.bayVerticalLiftOffset = 9.5f;
             EditorUtility.SetDirty(mechMgr);
+            return mechMgr;
         }
 
         private static Transform RebuildBayClone(Transform parent, Transform source, string cloneName, float scaleMult, Material mat, float floorMinY)
@@ -239,38 +265,49 @@ namespace HangarGame.EditorTools
                     Object.DestroyImmediate(tr.gameObject);
         }
 
-        private static void SetupWorkbench()
+        private static RepairWorkbench SetupWorkbench(GameManager gm, HangarMechManager mgr)
         {
             GameObject wbObj = GameObject.Find("--- 06_WORKBENCH ---");
-            if (wbObj == null) return;
+            if (wbObj == null) return Object.FindAnyObjectByType<RepairWorkbench>();
 
             var wb = ModelUtils.GetOrAdd<RepairWorkbench>(wbObj);
+            wb.game = gm;
+            wb.hangar = mgr;
             wb.platePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Eger/Plate.fbx");
             wb.tableRestOffset = new Vector3(0f, 1.00f, -0.04f);
             wb.normalizedPartExtent = 0.64f;
             EditorUtility.SetDirty(wb);
 
-            PrototypeSceneBuilder.BuildWorkbenchControlPanel3D(wbObj.transform);
+            PrototypeSceneBuilder.BuildWorkbenchControlPanel3D(wbObj.transform, wb, gm);
+            return wb;
         }
 
-        private static void SetupJaeger()
+        private static JaegerProject SetupJaeger(GameManager gm, RepairWorkbench wb)
         {
             var jaeger = Object.FindAnyObjectByType<JaegerProject>();
-            if (jaeger == null) return;
+            if (jaeger == null) return null;
+
+            jaeger.game = gm;
+            jaeger.workbench = wb;
 
             var frame = GameObject.Find("--- 05_JAEGER_FRAME ---");
             GameObject egerRoot = GameObject.Find("Eger")
                 ?? (frame != null ? (frame.transform.Find("Eger")?.gameObject ?? frame.transform.Find("Jaeger_Chassis")?.gameObject) : null);
-            if (egerRoot == null) return;
 
-            jaeger.stageVisualParts = new[]
+            if (egerRoot != null)
             {
-                egerRoot.transform.Find("EgerHead"),
-                egerRoot.transform.Find("EgerLeftArm"),
-                egerRoot.transform.Find("EgerRightArm"),
-                egerRoot.transform.Find("EgerShield"),
-                egerRoot.transform.Find("EgerSpear")
-            };
+                jaeger.stageVisualParts = new[]
+                {
+                    egerRoot.transform.Find("EgerHead"),
+                    egerRoot.transform.Find("EgerLeftArm"),
+                    egerRoot.transform.Find("EgerRightArm"),
+                    egerRoot.transform.Find("EgerShield"),
+                    egerRoot.transform.Find("EgerSpear")
+                };
+                if (frame != null && egerRoot.transform.parent != frame.transform)
+                    frame.SetActive(false);
+            }
+
             jaeger.stageWorkbenchPrefabs = new[]
             {
                 AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Eger/EgerHead.fbx"),
@@ -282,57 +319,87 @@ namespace HangarGame.EditorTools
             jaeger.platePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Eger/Plate.fbx");
             jaeger.RefreshVisualStages();
             EditorUtility.SetDirty(jaeger);
-
-            if (frame != null && egerRoot.transform.parent != frame.transform)
-                frame.SetActive(false);
+            return jaeger;
         }
 
-        private static void SetupUIAndCamera()
+        private static void SetupUIAndCamera(GameManager gm)
         {
-            HUDOverlay hud = PrototypeSceneBuilder.BuildHUD();
-            if (hud != null) EditorUtility.SetDirty(hud);
+            var rCam = Object.FindAnyObjectByType<RoomCamera>();
+            var ray = Object.FindAnyObjectByType<PlayerRaycaster>();
+            if (gm != null)
+            {
+                gm.roomCamera = rCam;
+                gm.raycaster = ray;
+            }
+
+            if (gm?.dispatch != null)
+            {
+                gm.dispatch.hangar = gm.hangar;
+                gm.dispatch.workbench = gm.workbench;
+                gm.dispatch.roomCamera = rCam;
+                EditorUtility.SetDirty(gm.dispatch);
+            }
+
+            if (gm?.jaeger != null)
+            {
+                gm.jaeger.roomCamera = rCam;
+                EditorUtility.SetDirty(gm.jaeger);
+            }
 
             GameObject consoleGroup = GameObject.Find("--- 07_DISPATCH_CONSOLE ---");
-            if (consoleGroup == null) return;
-
-            var hf = GameObject.Find("HANGARFULL");
-            Transform c85 = hf != null ? hf.transform.Find("Cube.085") : GameObject.Find("Cube.085")?.transform;
-            Transform c104 = hf != null ? hf.transform.Find("Cube.104") : GameObject.Find("Cube.104")?.transform;
-
-            Vector3 screenCenter = c104 != null && c104.GetComponent<Renderer>() != null
-                ? c104.GetComponent<Renderer>().bounds.center
-                : consoleGroup.transform.position;
-
-            PrototypeSceneBuilder.BuildDispatchMonitors(consoleGroup.transform, c104, screenCenter, UnityEngine.Camera.main);
-
-            var rCam = Object.FindAnyObjectByType<RoomCamera>();
-            if (rCam != null)
+            if (consoleGroup != null)
             {
-                if (c85 != null && c104 != null)
+                var hf = GameObject.Find("HANGARFULL");
+                Transform c85 = hf != null ? hf.transform.Find("Cube.085") : GameObject.Find("Cube.085")?.transform;
+                Transform c104 = hf != null ? hf.transform.Find("Cube.104") : GameObject.Find("Cube.104")?.transform;
+
+                Vector3 screenCenter = c104 != null && c104.GetComponent<Renderer>() != null
+                    ? c104.GetComponent<Renderer>().bounds.center
+                    : consoleGroup.transform.position;
+
+                var armoryUi = PrototypeSceneBuilder.BuildDispatchMonitors(consoleGroup.transform, c104, screenCenter, UnityEngine.Camera.main, gm);
+
+                if (rCam != null)
                 {
-                    Vector3 mid = Vector3.Lerp(c85.position, c104.position, 0.45f) + Vector3.up * 0.75f;
-                    rCam.hangarPos = mid;
-                    rCam.hangarYaw = Quaternion.LookRotation(c85.position - mid).eulerAngles.y;
+                    rCam.game = gm;
+                    rCam.workbench = gm?.workbench;
+                    rCam.wbCameraOffset = new Vector3(0f, 1.54f, -1.24f);
+                    rCam.wbCameraPitch = 22f;
 
-                    var tCanvas = GameObject.Find("Terminal_Canvas");
-                    Vector3 sPoint = tCanvas != null ? tCanvas.transform.position : c104.position + Vector3.up * 0.34f;
-                    rCam.dispatchDistance = 1.32f;
-                    rCam.dispatchPos = new Vector3(sPoint.x, sPoint.y, sPoint.z - rCam.dispatchDistance);
-                    rCam.dispatchYaw = 0f;
+                    if (c85 != null && c104 != null)
+                    {
+                        Vector3 mid = Vector3.Lerp(c85.position, c104.position, 0.45f) + Vector3.up * 0.75f;
+                        rCam.hangarView = new ViewAnchor
+                        {
+                            position = mid,
+                            yaw = Quaternion.LookRotation(c85.position - mid).eulerAngles.y
+                        };
+
+                        var tCanvas = GameObject.Find("Terminal_Canvas");
+                        Vector3 sPoint = tCanvas != null ? tCanvas.transform.position : c104.position + Vector3.up * 0.34f;
+                        rCam.dispatchDistance = 1.32f;
+                        rCam.dispatchView = new ViewAnchor
+                        {
+                            position = new Vector3(sPoint.x, sPoint.y, sPoint.z - rCam.dispatchDistance),
+                            yaw = 0f
+                        };
+                    }
+
+                    if (armoryUi != null)
+                    {
+                        Transform aTr = armoryUi.transform;
+                        rCam.armoryView = new ViewAnchor
+                        {
+                            position = aTr.position - aTr.forward * 0.58f,
+                            yaw = aTr.eulerAngles.y
+                        };
+                    }
+                    EditorUtility.SetDirty(rCam);
                 }
-
-                var armoryUi = Object.FindAnyObjectByType<ArmoryUI>();
-                if (armoryUi != null)
-                {
-                    Transform aTr = armoryUi.transform;
-                    rCam.armoryFocusPos = aTr.position - aTr.forward * 0.58f;
-                    rCam.armoryFocusYaw = aTr.eulerAngles.y;
-                }
-
-                rCam.wbCameraOffset = new Vector3(0f, 1.54f, -1.24f);
-                rCam.wbCameraPitch = 22f;
-                EditorUtility.SetDirty(rCam);
             }
+
+            HUDOverlay hud = PrototypeSceneBuilder.BuildHUD(null, gm);
+            if (hud != null) EditorUtility.SetDirty(hud);
         }
     }
 }

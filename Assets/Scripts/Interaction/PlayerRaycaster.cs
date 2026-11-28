@@ -9,9 +9,9 @@ namespace HangarGame.Interaction
 {
     public class PlayerRaycaster : MonoBehaviour
     {
-        public static PlayerRaycaster Instance { get; private set; }
         public string CurrentPrompt { get; private set; } = "";
 
+        [SerializeField] private GameManager game;
         [SerializeField] private float maxRayDistance = 45f;
         [SerializeField] private float sphereCastRadius = 0.06f;
 
@@ -22,14 +22,13 @@ namespace HangarGame.Interaction
 
         private void Awake()
         {
-            Instance = this;
             cam = GetComponent<Camera>() ?? Camera.main;
+            game ??= GameManager.Instance ?? FindAnyObjectByType<GameManager>();
         }
 
         private void Update()
         {
-            var gm = GameManager.Instance;
-            if (cam == null || (gm != null && (gm.IsGameWon || gm.IsGameLost)))
+            if (cam == null || (game != null && (game.IsGameWon || game.IsGameLost)))
             {
                 ClearHover();
                 pressed = null;

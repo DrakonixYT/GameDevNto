@@ -17,6 +17,8 @@ namespace HangarGame.Repair
 
     public class WorkbenchButton3D : MonoBehaviour, IInteractable
     {
+        public RepairWorkbench workbench;
+        public GameManager game;
         public WorkbenchButtonAction action;
         public string label = "";
         public string prompt = "";
@@ -33,6 +35,8 @@ namespace HangarGame.Repair
         {
             capRenderer = GetComponent<Renderer>();
             restLocalPos = transform.localPosition;
+            game ??= GameManager.Instance ?? FindAnyObjectByType<GameManager>();
+            workbench ??= game?.workbench ?? GetComponentInParent<RepairWorkbench>();
         }
 
         private void Update()
@@ -50,12 +54,13 @@ namespace HangarGame.Repair
             RefreshColor();
         }
 
-        public void Init(WorkbenchButtonAction btnAction, string btnLabel, string btnPrompt, Color baseColor)
+        public void Init(WorkbenchButtonAction btnAction, string btnLabel, string btnPrompt, Color baseColor, RepairWorkbench wb)
         {
             action = btnAction;
             label = btnLabel;
             prompt = btnPrompt;
             idleColor = baseColor;
+            workbench = wb;
             restLocalPos = transform.localPosition;
             capRenderer = GetComponent<Renderer>();
 
@@ -69,7 +74,7 @@ namespace HangarGame.Repair
             if (capRenderer == null || !Application.isPlaying) return;
 
             Color target = idleColor;
-            if (action == WorkbenchButtonAction.FinishWork && RepairWorkbench.Instance != null && RepairWorkbench.Instance.IsWorkComplete)
+            if (action == WorkbenchButtonAction.FinishWork && workbench != null && workbench.IsWorkComplete)
                 target = readyColor;
             if (isHovered)
                 target = Color.Lerp(target, hoverColor, 0.55f);
@@ -77,12 +82,12 @@ namespace HangarGame.Repair
             ModelUtils.SetColor(capRenderer, target);
         }
 
-        public bool CanInteract() => gameObject.activeInHierarchy && RepairWorkbench.Instance != null && RepairWorkbench.Instance.HasItem;
+        public bool CanInteract() => gameObject.activeInHierarchy && workbench != null && workbench.HasItem;
 
         public string GetPrompt()
         {
-            if (action == WorkbenchButtonAction.FinishWork && RepairWorkbench.Instance != null)
-                return RepairWorkbench.Instance.IsWorkComplete ? "Готово — завершить" : "Ремонт не закончен";
+            if (action == WorkbenchButtonAction.FinishWork && workbench != null)
+                return workbench.IsWorkComplete ? "Готово — завершить" : "Ремонт не закончен";
             return string.IsNullOrEmpty(prompt) ? label : prompt;
         }
 
@@ -96,37 +101,35 @@ namespace HangarGame.Repair
         {
             if (!CanInteract()) return;
             pressTimer = 0.1f;
-            HangarAudio.Play(Sfx.Button3D);
+            game?.PlaySfx(Sfx.Button3D);
 
-            var wb = RepairWorkbench.Instance;
             const float step = 22f;
             switch (action)
             {
-                case WorkbenchButtonAction.RotateYawLeft: wb.Rotate(-step, 0f); break;
-                case WorkbenchButtonAction.RotateYawRight: wb.Rotate(step, 0f); break;
-                case WorkbenchButtonAction.RotatePitchUp: wb.Rotate(0f, -step * 0.7f); break;
-                case WorkbenchButtonAction.RotatePitchDown: wb.Rotate(0f, step * 0.7f); break;
-                case WorkbenchButtonAction.ResetRotation: wb.ResetRotation(); break;
+                case WorkbenchButtonAction.RotateYawLeft: workbench.Rotate(-step, 0f); break;
+                case WorkbenchButtonAction.RotateYawRight: workbench.Rotate(step, 0f); break;
+                case WorkbenchButtonAction.RotatePitchUp: workbench.Rotate(0f, -step * 0.7f); break;
+                case WorkbenchButtonAction.RotatePitchDown: workbench.Rotate(0f, step * 0.7f); break;
+                case WorkbenchButtonAction.ResetRotation: workbench.ResetRotation(); break;
                 case WorkbenchButtonAction.FinishWork:
-                    if (wb.IsWorkComplete) wb.FinishWork();
-                    else HangarAudio.Play(Sfx.Error);
+                    if (workbench.IsWorkComplete) workbench.FinishWork();
+                    else game?.PlaySfx(Sfx.Error);
                     break;
-                case WorkbenchButtonAction.CancelWork: wb.CancelWork(); break;
+                case WorkbenchButtonAction.CancelWork: workbench.CancelWork(); break;
             }
         }
 
         public void OnInteractHold()
         {
             if (!CanInteract()) return;
-            var wb = RepairWorkbench.Instance;
             float delta = 95f * Time.deltaTime;
 
             switch (action)
             {
-                case WorkbenchButtonAction.RotateYawLeft: pressTimer = 0.05f; wb.Rotate(-delta, 0f); break;
-                case WorkbenchButtonAction.RotateYawRight: pressTimer = 0.05f; wb.Rotate(delta, 0f); break;
-                case WorkbenchButtonAction.RotatePitchUp: pressTimer = 0.05f; wb.Rotate(0f, -delta * 0.75f); break;
-                case WorkbenchButtonAction.RotatePitchDown: pressTimer = 0.05f; wb.Rotate(0f, delta * 0.75f); break;
+                case WorkbenchButtonAction.RotateYawLeft: pressTimer = 0.05f; workbench.Rotate(-delta, 0f); break;
+                case WorkbenchButtonAction.RotateYawRight: pressTimer = 0.05f; workbench.Rotate(delta, 0f); break;
+                case WorkbenchButtonAction.RotatePitchUp: pressTimer = 0.05f; workbench.Rotate(0f, -delta * 0.75f); break;
+                case WorkbenchButtonAction.RotatePitchDown: pressTimer = 0.05f; workbench.Rotate(0f, delta * 0.75f); break;
             }
         }
     }

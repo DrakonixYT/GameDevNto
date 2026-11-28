@@ -34,8 +34,6 @@ namespace HangarGame.Core
 
     public class HangarAudio : MonoBehaviour
     {
-        public static HangarAudio Instance { get; private set; }
-
         [SerializeField] private AudioSource sfxSource;
         [SerializeField] private AudioSource ambientSource;
         [SerializeField, Range(0f, 1f)] private float sfxVolume = 0.85f;
@@ -49,13 +47,6 @@ namespace HangarGame.Core
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
-            {
-                Destroy(gameObject);
-                return;
-            }
-            Instance = this;
-
             if (sfxSource == null) sfxSource = gameObject.AddComponent<AudioSource>();
             if (ambientSource == null)
             {
@@ -81,9 +72,7 @@ namespace HangarGame.Core
             }
         }
 
-        public static void Play(Sfx id) => Instance?.PlayOneShot(id);
-
-        private void PlayOneShot(Sfx id)
+        public void Play(Sfx id)
         {
             if (sfxSource == null) return;
             if (clipMap.TryGetValue(id, out var custom) && custom != null)

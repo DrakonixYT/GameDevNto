@@ -424,10 +424,11 @@ namespace HangarGame.Mechs
             if (!CanInteract()) return;
             if (!IsDamaged)
             {
-                HangarAudio.Play(Sfx.Click);
+                GameManager.Instance?.PlaySfx(Sfx.Click);
                 return;
             }
-            RepairWorkbench.Instance?.ReceivePart(this);
+            var wb = GameManager.Instance?.workbench ?? FindAnyObjectByType<RepairWorkbench>();
+            wb?.ReceivePart(this);
         }
 
         public void OnInteractHold() { }

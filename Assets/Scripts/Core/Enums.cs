@@ -10,17 +10,14 @@ namespace HangarGame.Core
 
     public static class DamageTypeExtensions
     {
-        public static string ToRu(this DamageType type)
+        public static string ToRu(this DamageType type) => type switch
         {
-            switch (type)
-            {
-                case DamageType.Physical: return "Физика";
-                case DamageType.Thermal: return "Термо";
-                case DamageType.Plasma: return "Плазма";
-                case DamageType.Corrosive: return "Кислота";
-                default: return type.ToString();
-            }
-        }
+            DamageType.Physical => "Физика",
+            DamageType.Thermal => "Термо",
+            DamageType.Plasma => "Плазма",
+            DamageType.Corrosive => "Кислота",
+            _ => type.ToString()
+        };
     }
 
     public enum PartSlot

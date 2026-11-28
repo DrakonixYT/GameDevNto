@@ -11,9 +11,6 @@ namespace HangarGame.UI
 {
     public class ArmoryUI : MonoBehaviour
     {
-        public static ArmoryUI Instance { get; private set; }
-        public bool IsOpen => false;
-
         [Serializable]
         public class MechCardView
         {
@@ -24,85 +21,51 @@ namespace HangarGame.UI
             public Text info;
         }
 
-        [SerializeField] private GameObject panelRoot;
-        [SerializeField] private Text txtResources;
-        [SerializeField] private Text txtFocusBtn;
-        [SerializeField] private Button btnFocusMonitor;
+        [Header("Ссылки")]
+        public GameManager game;
+        public HangarMechManager hangar;
+        public ArmoryManager armory;
+        public RoomCamera roomCamera;
 
-        [SerializeField] private GameObject pageMechSelect;
-        [SerializeField] private MechCardView[] mechCards = new MechCardView[3];
-
-        [SerializeField] private GameObject pageLoadout;
-        [SerializeField] private Button btnBackToMechs;
-        [SerializeField] private Button btnTabWeapons;
-        [SerializeField] private Button btnTabShields;
-        [SerializeField] private Text txtSelectedMechTitle;
-        [SerializeField] private Text txtLoadoutSummary;
-        [SerializeField] private Text txtFeedback;
-        [SerializeField] private Transform itemsContainer;
+        [Header("Виджеты")]
+        public GameObject panelRoot;
+        public Text txtResources;
+        public Text txtFocusBtn;
+        public Button btnFocusMonitor;
+        public GameObject pageMechSelect;
+        public MechCardView[] mechCards = new MechCardView[3];
+        public GameObject pageLoadout;
+        public Button btnBackToMechs;
+        public Button btnTabWeapons;
+        public Button btnTabShields;
+        public Text txtSelectedMechTitle;
+        public Text txtLoadoutSummary;
+        public Text txtFeedback;
+        public Transform itemsContainer;
 
         private ArmorySlot activeSlot = ArmorySlot.RightArm;
         private bool isSelectingMech = true;
         private Font cachedFont;
         private readonly List<GameObject> spawnedRows = new List<GameObject>();
 
-        public void BindFromHierarchy()
-        {
-            Transform bg = transform.Find("BG");
-            if (bg == null) return;
-
-            panelRoot = bg.gameObject;
-            txtResources = bg.Find("Txt_ArmoryResources")?.GetComponent<Text>();
-            btnFocusMonitor = bg.Find("Btn_FocusMonitor")?.GetComponent<Button>();
-            txtFocusBtn = btnFocusMonitor != null ? btnFocusMonitor.GetComponentInChildren<Text>() : null;
-
-            Transform pMech = bg.Find("Panel_MechSelect");
-            pageMechSelect = pMech != null ? pMech.gameObject : null;
-            if (pMech != null)
-            {
-                for (int i = 0; i < 3; i++)
-                {
-                    Transform card = pMech.Find($"Btn_SelectMech_{i}");
-                    mechCards[i] = card == null ? null : new MechCardView
-                    {
-                        btn = card.GetComponent<Button>(),
-                        bg = card.GetComponent<Image>(),
-                        accent = card.Find("Accent")?.GetComponent<Image>(),
-                        info = card.Find("Txt_Info")?.GetComponent<Text>(),
-                        hpFill = card.Find("Bar_Hp/Fill")?.GetComponent<Image>()
-                    };
-                }
-            }
-
-            Transform pLoad = bg.Find("Panel_LoadoutMenu");
-            pageLoadout = pLoad != null ? pLoad.gameObject : null;
-            if (pLoad != null)
-            {
-                btnBackToMechs = pLoad.Find("Btn_BackToMechs")?.GetComponent<Button>();
-                btnTabWeapons = pLoad.Find("Btn_TabWeapons")?.GetComponent<Button>();
-                btnTabShields = pLoad.Find("Btn_TabShields")?.GetComponent<Button>();
-                txtSelectedMechTitle = pLoad.Find("Txt_SelectedMech")?.GetComponent<Text>();
-                txtLoadoutSummary = pLoad.Find("SummaryBox/Txt_LoadoutSummary")?.GetComponent<Text>();
-                txtFeedback = pLoad.Find("Txt_ArmoryFeedback")?.GetComponent<Text>();
-                itemsContainer = pLoad.Find("ItemsContainer");
-            }
-        }
-
         private void Awake()
         {
-            Instance = this;
-            if (panelRoot == null) BindFromHierarchy();
+            game ??= GameManager.Instance ?? FindAnyObjectByType<GameManager>();
+            hangar ??= game?.hangar ?? FindAnyObjectByType<HangarMechManager>();
+            armory ??= game?.armory ?? FindAnyObjectByType<ArmoryManager>();
+            roomCamera ??= game?.roomCamera ?? FindAnyObjectByType<RoomCamera>();
+
             if (panelRoot != null) panelRoot.SetActive(true);
 
             if (btnFocusMonitor != null)
             {
                 btnFocusMonitor.onClick.RemoveAllListeners();
-                btnFocusMonitor.onClick.AddListener(() => { RoomCamera.Instance?.ToggleArmoryFocus(); Refresh(); });
+                btnFocusMonitor.onClick.AddListener(() => { roomCamera?.ToggleArmoryFocus(); Refresh(); });
             }
             if (btnBackToMechs != null)
             {
                 btnBackToMechs.onClick.RemoveAllListeners();
-                btnBackToMechs.onClick.AddListener(() => { HangarAudio.Play(Sfx.Click); ShowMechSelectStep(); });
+                btnBackToMechs.onClick.AddListener(() => { game?.PlaySfx(Sfx.Click); ShowMechSelectStep(); });
             }
             if (btnTabWeapons != null)
             {
@@ -131,47 +94,42 @@ namespace HangarGame.UI
 
         private void HookEvents(bool subscribe)
         {
-            var gm = GameManager.Instance;
-            if (gm != null)
+            if (game != null)
             {
-                gm.OnResourcesChanged -= OnResourcesChanged;
-                gm.OnViewChanged -= OnViewChanged;
+                game.OnResourcesChanged -= OnResourcesChanged;
+                game.OnViewChanged -= OnViewChanged;
                 if (subscribe)
                 {
-                    gm.OnResourcesChanged += OnResourcesChanged;
-                    gm.OnViewChanged += OnViewChanged;
+                    game.OnResourcesChanged += OnResourcesChanged;
+                    game.OnViewChanged += OnViewChanged;
                 }
             }
 
-            var mgr = HangarMechManager.Instance;
-            if (mgr != null)
+            if (hangar != null)
             {
-                mgr.OnMechSwitched -= OnMechSwitched;
-                if (subscribe) mgr.OnMechSwitched += OnMechSwitched;
+                hangar.OnMechSwitched -= OnMechSwitched;
+                if (subscribe) hangar.OnMechSwitched += OnMechSwitched;
             }
 
-            var arm = ArmoryManager.Instance;
-            if (arm != null)
+            if (armory != null)
             {
-                arm.OnArmoryChanged -= Refresh;
-                if (subscribe) arm.OnArmoryChanged += Refresh;
+                armory.OnArmoryChanged -= Refresh;
+                if (subscribe) armory.OnArmoryChanged += Refresh;
+            }
+
+            if (roomCamera != null)
+            {
+                roomCamera.OnArmoryFocusChanged -= OnFocusChanged;
+                if (subscribe) roomCamera.OnArmoryFocusChanged += OnFocusChanged;
             }
 
             if (subscribe) Refresh();
         }
 
-        private void Update()
-        {
-            if (GameManager.Instance != null && GameManager.Instance.CurrentView != RoomView.DispatchConsole)
-                return;
-
-            if (txtFocusBtn != null && RoomCamera.Instance != null)
-                txtFocusBtn.text = RoomCamera.Instance.IsArmoryFocused ? "ОБЗОР" : "КРУПНЕЕ";
-        }
-
         private void OnResourcesChanged(int c, int a) => Refresh();
         private void OnViewChanged(RoomView view) => Refresh();
         private void OnMechSwitched(int idx) => Refresh();
+        private void OnFocusChanged(bool focused) => RefreshFocusButton();
 
         public void ShowMechSelectStep()
         {
@@ -182,8 +140,8 @@ namespace HangarGame.UI
 
         public void SelectMechAndOpenMenu(int idx)
         {
-            HangarAudio.Play(Sfx.Click);
-            HangarMechManager.Instance?.SelectMech(idx);
+            game?.PlaySfx(Sfx.Click);
+            hangar?.SelectMech(idx);
             isSelectingMech = false;
             if (txtFeedback != null) txtFeedback.text = "";
             Refresh();
@@ -192,16 +150,17 @@ namespace HangarGame.UI
         public void SwitchSlotTab(ArmorySlot slot)
         {
             activeSlot = slot;
-            HangarAudio.Play(Sfx.Click);
+            game?.PlaySfx(Sfx.Click);
             if (txtFeedback != null) txtFeedback.text = "";
             Refresh();
         }
 
         public void Refresh()
         {
-            var gm = GameManager.Instance;
-            if (txtResources != null && gm != null)
-                txtResources.text = $"Кредиты: {gm.Credits}   •   Сплав: {gm.Alloy}";
+            if (txtResources != null && game != null)
+                txtResources.text = $"Кредиты: {game.Credits}   •   Сплав: {game.Alloy}";
+
+            RefreshFocusButton();
 
             if (pageMechSelect != null) pageMechSelect.SetActive(isSelectingMech);
             if (pageLoadout != null) pageLoadout.SetActive(!isSelectingMech);
@@ -210,25 +169,28 @@ namespace HangarGame.UI
             else RefreshLoadoutMenu();
         }
 
+        private void RefreshFocusButton()
+        {
+            if (txtFocusBtn != null && roomCamera != null)
+                txtFocusBtn.text = roomCamera.IsArmoryFocused ? "ОБЗОР" : "КРУПНЕЕ";
+        }
+
         private void RefreshMechCards()
         {
-            var mgr = HangarMechManager.Instance;
-            var arm = ArmoryManager.Instance;
-
             for (int i = 0; i < mechCards.Length; i++)
             {
                 var card = mechCards[i];
                 if (card == null) continue;
-                if (mgr == null || i >= mgr.Mechs.Count || mgr.Mechs[i] == null)
+                if (hangar == null || i >= hangar.Mechs.Count || hangar.Mechs[i] == null)
                 {
                     if (card.btn != null) card.btn.gameObject.SetActive(false);
                     continue;
                 }
 
-                var m = mgr.Mechs[i];
-                bool isCurrent = i == mgr.CurrentIndex;
-                string wName = arm?.FindWeapon(m.equippedRightWeaponId)?.displayName ?? "Автопушка";
-                string sName = arm?.FindWeapon(m.equippedLeftWeaponId)?.displayName ?? "Обычный щит";
+                var m = hangar.Mechs[i];
+                bool isCurrent = i == hangar.CurrentIndex;
+                string wName = armory?.FindWeapon(m.equippedRightWeaponId)?.displayName ?? "Автопушка";
+                string sName = armory?.FindWeapon(m.equippedLeftWeaponId)?.displayName ?? "Обычный щит";
                 string state = m.isDeployed ? "В бою" : (m.HasMissingOrDetachedParts() ? "Повреждён" : "В ангаре");
 
                 if (card.btn != null) card.btn.gameObject.SetActive(true);
@@ -254,17 +216,15 @@ namespace HangarGame.UI
 
         private void RefreshLoadoutMenu()
         {
-            var mgr = HangarMechManager.Instance;
-            var arm = ArmoryManager.Instance;
-            var mech = mgr != null ? mgr.CurrentMech : null;
+            var mech = hangar?.CurrentMech;
 
             if (txtSelectedMechTitle != null)
                 txtSelectedMechTitle.text = mech != null ? mech.mechName.ToUpper() : "РОБОТ";
 
             if (txtLoadoutSummary != null && mech != null)
             {
-                string rName = arm?.FindWeapon(mech.equippedRightWeaponId)?.displayName ?? "Автопушка";
-                string lName = arm?.FindWeapon(mech.equippedLeftWeaponId)?.displayName ?? "Обычный щит";
+                string rName = armory?.FindWeapon(mech.equippedRightWeaponId)?.displayName ?? "Автопушка";
+                string lName = armory?.FindWeapon(mech.equippedLeftWeaponId)?.displayName ?? "Обычный щит";
                 txtLoadoutSummary.text = $"Урон: {mech.attackPower:F0}  •  Броня: {mech.TotalDefense:F0}  •  {rName} / {lName}";
             }
 
@@ -280,19 +240,19 @@ namespace HangarGame.UI
             }
 
             ClearRows();
-            if (itemsContainer == null || arm == null) return;
-            if (cachedFont == null) cachedFont = UIBuilder.GetFont(26);
+            if (itemsContainer == null || armory == null) return;
+            cachedFont ??= UIBuilder.GetFont(26);
 
-            foreach (var def in arm.Catalog)
-                if (def.slot == activeSlot) CreateItemRow(def, mech, arm);
+            foreach (var def in armory.Catalog)
+                if (def.slot == activeSlot) CreateItemRow(def, mech);
 
             if (mech != null && mech.HasMissingOrDetachedParts())
             {
                 var hintBtn = UIBuilder.Button(itemsContainer, "Btn_GoHangarRepair", "Модуль повреждён — перейти в ангар (ремонт)", Vector2.one * 0.5f, Vector2.zero, new Vector2(648f, 68f), UITheme.AccentAmber, UITheme.Border, 22, cachedFont);
                 hintBtn.onClick.AddListener(() =>
                 {
-                    HangarAudio.Play(Sfx.Click);
-                    GameManager.Instance?.SwitchView(RoomView.Hangar);
+                    game?.PlaySfx(Sfx.Click);
+                    game?.SwitchView(RoomView.Hangar);
                 });
                 spawnedRows.Add(hintBtn.gameObject);
             }
@@ -312,11 +272,11 @@ namespace HangarGame.UI
             spawnedRows.Clear();
         }
 
-        private void CreateItemRow(WeaponDefinition def, MechUnit mech, ArmoryManager arm)
+        private void CreateItemRow(WeaponDefinition def, MechUnit mech)
         {
-            bool owned = arm.IsOwned(def.id);
-            bool equipped = arm.IsEquipped(mech, def.id);
-            bool canAfford = GameManager.Instance != null && GameManager.Instance.CanAfford(def.costCredits, def.costAlloy);
+            bool owned = armory.IsOwned(def.id);
+            bool equipped = armory.IsEquipped(mech, def.id);
+            bool canAfford = game != null && game.CanAfford(def.costCredits, def.costAlloy);
             bool mechBusy = mech != null && mech.isDeployed;
 
             Color bgCol = equipped ? UITheme.BgCardActive : UITheme.BgCard;
@@ -347,7 +307,7 @@ namespace HangarGame.UI
             btn.interactable = !equipped && !mechBusy && (owned || canAfford);
             btn.onClick.AddListener(() =>
             {
-                if (arm.TryBuyOrEquip(def.id))
+                if (armory.TryBuyOrEquip(def.id))
                 {
                     if (txtFeedback != null)
                     {

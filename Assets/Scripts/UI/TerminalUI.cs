@@ -24,14 +24,21 @@ namespace HangarGame.UI
             public Text stats;
         }
 
-        [SerializeField] private Text txtRadarTitle;
-        [SerializeField] private Text txtBattleLog;
-        [SerializeField] private Text txtJaegerInfo;
-        [SerializeField] private Button btnScanThreat;
-        [SerializeField] private RectTransform radarArea;
-        [SerializeField] private RadarClickHandler radarClick;
-        [SerializeField] private Transform markerContainer;
-        [SerializeField] private MechSlotView[] slots = new MechSlotView[3];
+        [Header("Ссылки")]
+        public GameManager game;
+        public HangarMechManager hangar;
+        public DispatchSystem dispatch;
+        public JaegerProject jaeger;
+
+        [Header("Виджеты")]
+        public Text txtRadarTitle;
+        public Text txtBattleLog;
+        public Text txtJaegerInfo;
+        public Button btnScanThreat;
+        public RectTransform radarArea;
+        public RadarClickHandler radarClick;
+        public Transform markerContainer;
+        public MechSlotView[] slots = new MechSlotView[3];
 
         private struct MarkerView
         {
@@ -47,44 +54,13 @@ namespace HangarGame.UI
         private MarkerView baseMarker;
         private float refreshTimer;
 
-        public void BindFromHierarchy()
-        {
-            Transform bg = transform.Find("BG");
-            if (bg == null) return;
-
-            txtRadarTitle = bg.Find("Header/Txt_RadarTitle")?.GetComponent<Text>();
-            txtJaegerInfo = bg.Find("Header/Txt_JaegerInfo")?.GetComponent<Text>();
-            btnScanThreat = bg.Find("Header/Btn_ScanThreat")?.GetComponent<Button>();
-
-            Transform rBox = bg.Find("Radar_Screen");
-            radarArea = rBox != null ? rBox.GetComponent<RectTransform>() : null;
-            radarClick = rBox != null ? ModelUtils.GetOrAdd<RadarClickHandler>(rBox.gameObject) : null;
-            markerContainer = rBox != null ? rBox.Find("Marker_Container") : null;
-            txtBattleLog = bg.Find("Txt_BattleLog")?.GetComponent<Text>();
-
-            for (int i = 0; i < 3; i++)
-            {
-                Transform slot = bg.Find($"SlotRoot_{i}");
-                if (slot == null) { slots[i] = null; continue; }
-
-                Transform main = slot.Find($"Btn_MechSlot_{i}");
-                slots[i] = new MechSlotView
-                {
-                    mainBtn = main?.GetComponent<Button>(),
-                    mainBg = main?.GetComponent<Image>(),
-                    title = main?.GetComponentInChildren<Text>(),
-                    hpFill = slot.Find("Bar_Hp/Fill")?.GetComponent<Image>(),
-                    energyFill = slot.Find("Bar_En/Fill")?.GetComponent<Image>(),
-                    stats = slot.Find("Txt_Stats")?.GetComponent<Text>(),
-                    shieldBtn = slot.Find($"Btn_Shield_{i}")?.GetComponent<Button>(),
-                    recallBtn = slot.Find($"Btn_Recall_{i}")?.GetComponent<Button>()
-                };
-            }
-        }
-
         private void Awake()
         {
-            if (radarArea == null) BindFromHierarchy();
+            game ??= GameManager.Instance ?? FindAnyObjectByType<GameManager>();
+            hangar ??= game?.hangar ?? FindAnyObjectByType<HangarMechManager>();
+            dispatch ??= game?.dispatch ?? FindAnyObjectByType<DispatchSystem>();
+            jaeger ??= game?.jaeger ?? FindAnyObjectByType<JaegerProject>();
+
             if (radarClick != null) radarClick.onRadarClick = OnRadarClicked;
 
             if (btnScanThreat != null)
@@ -92,8 +68,8 @@ namespace HangarGame.UI
                 btnScanThreat.onClick.RemoveAllListeners();
                 btnScanThreat.onClick.AddListener(() =>
                 {
-                    HangarAudio.Play(Sfx.Click);
-                    DispatchSystem.Instance?.SpawnEnemy();
+                    game?.PlaySfx(Sfx.Click);
+                    dispatch?.SpawnEnemy();
                     Refresh();
                 });
             }
@@ -122,9 +98,23 @@ namespace HangarGame.UI
             }
         }
 
+        private void Start() => HookEvents(true);
+        private void OnEnable() => HookEvents(true);
+        private void OnDisable() => HookEvents(false);
+
+        private void HookEvents(bool subscribe)
+        {
+            if (dispatch != null)
+            {
+                dispatch.OnRadarChanged -= Refresh;
+                if (subscribe) dispatch.OnRadarChanged += Refresh;
+            }
+            if (subscribe) Refresh();
+        }
+
         private void Update()
         {
-            if (GameManager.Instance != null && GameManager.Instance.CurrentView != RoomView.DispatchConsole)
+            if (game != null && game.CurrentView != RoomView.DispatchConsole)
                 return;
 
             refreshTimer += Time.deltaTime;
@@ -137,33 +127,27 @@ namespace HangarGame.UI
 
         private void OnSlotClicked(int slotIdx)
         {
-            var mgr = HangarMechManager.Instance;
-            var ds = DispatchSystem.Instance;
-            if (mgr == null || ds == null || slotIdx >= mgr.Mechs.Count) return;
+            if (hangar == null || dispatch == null || slotIdx >= hangar.Mechs.Count) return;
 
-            var mech = mgr.Mechs[slotIdx];
-            HangarAudio.Play(Sfx.Click);
+            var mech = hangar.Mechs[slotIdx];
+            game?.PlaySfx(Sfx.Click);
 
-            bool toggleOff = !mech.CanDeploy() || (ds.SelectedMechId == mech.id && ds.IsDeployMode);
-            ds.SelectedMechId = mech.id;
-            ds.IsDeployMode = !toggleOff;
+            bool toggleOff = !mech.CanDeploy() || (dispatch.SelectedMechId == mech.id && dispatch.IsDeployMode);
+            dispatch.SelectedMechId = mech.id;
+            dispatch.IsDeployMode = !toggleOff;
             Refresh();
         }
 
         private void OnShieldClicked(int slotIdx)
         {
-            var mgr = HangarMechManager.Instance;
-            if (mgr == null || DispatchSystem.Instance == null || slotIdx >= mgr.Mechs.Count) return;
-            DispatchSystem.Instance.ToggleMechShield(mgr.Mechs[slotIdx].id);
-            Refresh();
+            if (hangar == null || dispatch == null || slotIdx >= hangar.Mechs.Count) return;
+            dispatch.ToggleMechShield(hangar.Mechs[slotIdx].id);
         }
 
         private void OnRecallClicked(int slotIdx)
         {
-            var mgr = HangarMechManager.Instance;
-            if (mgr == null || DispatchSystem.Instance == null || slotIdx >= mgr.Mechs.Count) return;
-            DispatchSystem.Instance.RecallMech(mgr.Mechs[slotIdx].id);
-            Refresh();
+            if (hangar == null || dispatch == null || slotIdx >= hangar.Mechs.Count) return;
+            dispatch.RecallMech(hangar.Mechs[slotIdx].id);
         }
 
         private Vector2 RadarToUI(Vector2 worldPos)
@@ -184,88 +168,79 @@ namespace HangarGame.UI
 
         public void OnRadarClicked(Vector2 pos)
         {
-            var ds = DispatchSystem.Instance;
-            var mgr = HangarMechManager.Instance;
-            if (ds == null || mgr == null) return;
+            if (dispatch == null || hangar == null) return;
 
             Vector2 mapPos = UIToRadar(pos);
-            if (ds.SelectedMechId >= 0)
+            if (dispatch.SelectedMechId >= 0)
             {
-                var mech = mgr.GetMechById(ds.SelectedMechId);
-                if (mech != null && ds.IsDeployMode && !mech.isDeployed)
+                var mech = hangar.GetMechById(dispatch.SelectedMechId);
+                if (mech != null && dispatch.IsDeployMode && !mech.isDeployed)
                 {
-                    ds.DeployMech(mech.id, mapPos);
-                    Refresh();
+                    dispatch.DeployMech(mech.id, mapPos);
                     return;
                 }
                 if (mech != null && mech.isDeployed)
                 {
-                    ds.OrderMechMove(mech.id, mapPos);
-                    Refresh();
+                    dispatch.OrderMechMove(mech.id, mapPos);
                     return;
                 }
             }
 
-            var nearby = ds.GetClosestMech(mapPos, 65f);
+            var nearby = dispatch.GetClosestMech(mapPos, 65f);
             if (nearby != null)
             {
-                ds.SelectedMechId = nearby.id;
-                ds.IsDeployMode = false;
-                HangarAudio.Play(Sfx.Click);
+                dispatch.SelectedMechId = nearby.id;
+                dispatch.IsDeployMode = false;
+                game?.PlaySfx(Sfx.Click);
                 Refresh();
             }
         }
 
         public void Refresh()
         {
-            var ds = DispatchSystem.Instance;
-            if (ds == null) return;
-
-            var mgr = HangarMechManager.Instance;
-            var jp = JaegerProject.Instance;
-            var gm = GameManager.Instance;
+            if (dispatch == null) return;
 
             if (txtRadarTitle != null)
             {
-                int enemies = ds.Enemies.Count;
-                float baseHp = gm != null ? gm.BaseHp : 100f;
+                int enemies = dispatch.Enemies.Count;
+                float baseHp = game != null ? game.BaseHp : 100f;
                 txtRadarTitle.text = enemies > 0
                     ? $"РАДАР ОБОРОНЫ   •   УГРОЗ: {enemies}   •   БАЗА: {baseHp:F0}%"
                     : $"РАДАР ОБОРОНЫ   •   ПЕРИМЕТР ЧИСТ   •   БАЗА: {baseHp:F0}%";
                 txtRadarTitle.color = enemies > 0 ? UITheme.AccentAmber : UITheme.TextMain;
             }
 
-            if (txtJaegerInfo != null && jp != null)
-                txtJaegerInfo.text = jp.IsComplete ? "Егерь 5/5" : $"Егерь {jp.CurrentStage}/{jp.TotalStages}";
+            if (txtJaegerInfo != null && jaeger != null)
+                txtJaegerInfo.text = jaeger.IsComplete ? "Егерь 5/5" : $"Егерь {jaeger.CurrentStage}/{jaeger.TotalStages}";
 
             if (txtBattleLog != null)
-                txtBattleLog.text = ds.LastBattleLog;
+                txtBattleLog.text = dispatch.LastBattleLog;
 
-            UpdateSlots(mgr, ds);
-            UpdateRadarMarkers(mgr, ds);
+            UpdateSlots();
+            UpdateRadarMarkers();
         }
 
-        private void UpdateSlots(HangarMechManager mgr, DispatchSystem ds)
+        private void UpdateSlots()
         {
-            if (mgr == null) return;
+            if (hangar == null) return;
 
             for (int i = 0; i < slots.Length; i++)
             {
                 var slot = slots[i];
                 if (slot == null) continue;
-                if (i >= mgr.Mechs.Count)
+                if (i >= hangar.Mechs.Count)
                 {
                     if (slot.mainBtn != null) slot.mainBtn.gameObject.SetActive(false);
                     continue;
                 }
 
-                var m = mgr.Mechs[i];
-                bool selected = ds.SelectedMechId == m.id;
+                var m = hangar.Mechs[i];
+                bool selected = dispatch.SelectedMechId == m.id;
                 bool damagedParts = m.HasMissingOrDetachedParts();
 
                 if (slot.mainBg != null)
                 {
-                    if (selected && ds.IsDeployMode) slot.mainBg.color = UITheme.AccentAmber;
+                    if (selected && dispatch.IsDeployMode) slot.mainBg.color = UITheme.AccentAmber;
                     else if (selected) slot.mainBg.color = UITheme.AccentTeal;
                     else if (m.isDeployed) slot.mainBg.color = UITheme.AccentGreen;
                     else if (damagedParts) slot.mainBg.color = UITheme.AccentRed;
@@ -273,14 +248,7 @@ namespace HangarGame.UI
                 }
 
                 if (slot.title != null)
-                {
-                    string status = m.isReturning ? "Отходит"
-                        : (m.isDeployed ? "В бою"
-                        : (selected && ds.IsDeployMode ? "Укажите точку"
-                        : (damagedParts ? "Нужен ремонт"
-                        : (m.CanDeploy() ? "Готов" : "Разряд / крит."))));
-                    slot.title.text = $"{m.mechName}  •  {status}";
-                }
+                    slot.title.text = $"{m.mechName}  •  {GetMechStatus(m, selected, damagedParts)}";
 
                 if (slot.hpFill != null)
                 {
@@ -313,7 +281,16 @@ namespace HangarGame.UI
             }
         }
 
-        private void UpdateRadarMarkers(HangarMechManager mgr, DispatchSystem ds)
+        private string GetMechStatus(MechUnit m, bool selected, bool damagedParts)
+        {
+            if (m.isReturning) return "Отходит";
+            if (m.isDeployed) return "В бою";
+            if (selected && dispatch.IsDeployMode) return "Укажите точку";
+            if (damagedParts) return "Нужен ремонт";
+            return m.CanDeploy() ? "Готов" : "Разряд / крит.";
+        }
+
+        private void UpdateRadarMarkers()
         {
             if (markerContainer == null) return;
 
@@ -324,28 +301,28 @@ namespace HangarGame.UI
                 Text lbl = UIBuilder.Label(go.transform, "Txt", "БАЗА", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(104f, 18f), 11, UITheme.AccentTeal, null, FontStyle.Bold);
                 baseMarker = new MarkerView { root = go, rt = go.GetComponent<RectTransform>(), label = lbl };
             }
-            baseMarker.rt.anchoredPosition = RadarToUI(ds.BasePosition);
+            baseMarker.rt.anchoredPosition = RadarToUI(dispatch.BasePosition);
 
             int mechIdx = 0;
-            if (mgr != null)
+            if (hangar != null)
             {
-                foreach (var m in mgr.Mechs)
+                foreach (var m in hangar.Mechs)
                 {
                     if (m == null || !m.isDeployed) continue;
                     var view = GetOrCreateMarker(mechPool, mechIdx++, true);
                     view.root.SetActive(true);
                     view.rt.anchoredPosition = RadarToUI(m.battlefieldPos);
-                    view.bg.color = m.isShieldActive ? UITheme.AccentAmber : (ds.SelectedMechId == m.id ? UITheme.AccentTeal : UITheme.AccentGreen);
+                    view.bg.color = m.isShieldActive ? UITheme.AccentAmber : (dispatch.SelectedMechId == m.id ? UITheme.AccentTeal : UITheme.AccentGreen);
                     view.label.text = m.mechName.Split(' ')[0];
                     UIBuilder.SetBar(view.fill, m.GetTotalHpPercent());
                 }
             }
             for (int i = mechIdx; i < mechPool.Count; i++) mechPool[i].root.SetActive(false);
 
-            int enemyCount = ds.Enemies.Count;
+            int enemyCount = dispatch.Enemies.Count;
             for (int i = 0; i < enemyCount; i++)
             {
-                var e = ds.Enemies[i];
+                var e = dispatch.Enemies[i];
                 var view = GetOrCreateMarker(enemyPool, i, false);
                 view.root.SetActive(true);
                 view.rt.anchoredPosition = RadarToUI(e.position);

@@ -248,7 +248,7 @@ namespace HangarGame.Mechs
             }
         }
 
-        public void SetDeployed(bool deployed, Vector2 startPos = default)
+        public void SetDeployed(bool deployed, HangarMechManager hangar = null, Vector2 startPos = default)
         {
             isDeployed = deployed;
             battlefieldPos = startPos;
@@ -261,7 +261,8 @@ namespace HangarGame.Mechs
                 isShieldActive = false;
             }
 
-            bool showOnPodium = !deployed && HangarMechManager.Instance != null && HangarMechManager.Instance.CurrentMech == this;
+            hangar ??= GameManager.Instance?.hangar;
+            bool showOnPodium = !deployed && hangar != null && hangar.CurrentMech == this;
             gameObject.SetActive(showOnPodium);
             if (showOnPodium) RestoreRestPose();
             if (bayVisualRoot != null) bayVisualRoot.gameObject.SetActive(showOnPodium);

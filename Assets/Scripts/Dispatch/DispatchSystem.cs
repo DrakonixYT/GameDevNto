@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using HangarGame.CameraControl;
 using HangarGame.Core;
@@ -9,7 +10,12 @@ namespace HangarGame.Dispatch
 {
     public class DispatchSystem : MonoBehaviour
     {
-        public static DispatchSystem Instance { get; private set; }
+        [Header("Ссылки")]
+        public GameManager game;
+        public HangarMechManager hangar;
+        public RepairWorkbench workbench;
+        public RoomCamera roomCamera;
+        public HangarAlarmLight alarmLight;
 
         [Header("Волны")]
         public float firstEnemyDelay = 9f;
@@ -34,6 +40,8 @@ namespace HangarGame.Dispatch
         public bool IsDeployMode { get; set; }
         public Vector2 BasePosition => basePos;
 
+        public event Action OnRadarChanged;
+
         private readonly Vector2 basePos = new Vector2(0f, -240f);
         private float spawnTimer;
         private int enemyCounter;
@@ -43,66 +51,73 @@ namespace HangarGame.Dispatch
 
         private void Awake()
         {
-            Instance = this;
+            game ??= GetComponent<GameManager>() ?? FindAnyObjectByType<GameManager>();
+            hangar ??= game?.hangar ?? FindAnyObjectByType<HangarMechManager>();
+            workbench ??= game?.workbench ?? FindAnyObjectByType<RepairWorkbench>();
+            roomCamera ??= game?.roomCamera ?? FindAnyObjectByType<RoomCamera>();
+            alarmLight ??= GetComponent<HangarAlarmLight>() ?? FindAnyObjectByType<HangarAlarmLight>();
+
             spawnTimer = firstEnemyDelay;
         }
 
         private void Update()
         {
-            var gm = GameManager.Instance;
-            if (gm != null && (gm.IsGameWon || gm.IsGameLost)) return;
+            if (game != null && (game.IsGameWon || game.IsGameLost)) return;
 
+            StepWaveSpawner();
+            StepEnemies();
+            StepMechs();
+        }
+
+        private void StepWaveSpawner()
+        {
             float tick = Time.deltaTime;
-            if (gm != null && gm.CurrentView == RoomView.WorkbenchFocus)
+            if (game != null && game.CurrentView == RoomView.WorkbenchFocus)
                 tick *= workbenchTimerMultiplier;
 
             spawnTimer -= tick;
-            if (spawnTimer <= 0f)
-            {
-                float paceScale = Mathf.Max(0.65f, 1f - enemyCounter * 0.035f);
-                spawnTimer = Random.Range(minSpawnInterval, maxSpawnInterval) * paceScale;
+            if (spawnTimer > 0f) return;
 
-                if (Enemies.Count < maxActiveEnemies)
-                {
-                    SpawnEnemy();
-                    if (enemyCounter >= 5 && Enemies.Count < maxActiveEnemies && Random.value < 0.30f)
-                        SpawnEnemy();
-                }
-            }
+            float paceScale = Mathf.Max(0.65f, 1f - enemyCounter * 0.035f);
+            spawnTimer = UnityEngine.Random.Range(minSpawnInterval, maxSpawnInterval) * paceScale;
 
-            UpdateEnemies();
-            UpdateMechs();
+            if (Enemies.Count >= maxActiveEnemies) return;
+            SpawnEnemy();
+
+            if (enemyCounter >= 5 && Enemies.Count < maxActiveEnemies && UnityEngine.Random.value < 0.30f)
+                SpawnEnemy();
         }
 
         public void SpawnEnemy()
         {
             enemyCounter++;
             int tier = Mathf.Min(4, (enemyCounter - 1) / 3);
-            int typeIdx = Random.Range(0, DamageTypes.Length);
+            int typeIdx = UnityEngine.Random.Range(0, DamageTypes.Length);
             DamageType atk = DamageTypes[typeIdx];
             DamageType weak = DamageTypes[(typeIdx + 1) % DamageTypes.Length];
 
             var enemy = new EnemyDot
             {
                 id = enemyCounter,
-                name = $"{EnemyNames[Random.Range(0, EnemyNames.Length)]} #{enemyCounter}",
-                position = new Vector2(Random.Range(-420f, 420f), 240f),
+                name = $"{EnemyNames[UnityEngine.Random.Range(0, EnemyNames.Length)]} #{enemyCounter}",
+                position = new Vector2(UnityEngine.Random.Range(-420f, 420f), 240f),
                 attackType = atk,
                 weakAgainst = weak,
-                hp = Random.Range(115f, 165f) + tier * 35f,
-                speed = Random.Range(12f, 19f) + tier * 1.5f,
-                attackPower = Random.Range(12f, 18f) + tier * 2.5f,
-                rewardCredits = Random.Range(85, 120) + tier * 15,
-                rewardAlloy = Random.Range(35, 55) + tier * 8
+                hp = UnityEngine.Random.Range(115f, 165f) + tier * 35f,
+                speed = UnityEngine.Random.Range(12f, 19f) + tier * 1.5f,
+                attackPower = UnityEngine.Random.Range(12f, 18f) + tier * 2.5f,
+                rewardCredits = UnityEngine.Random.Range(85, 120) + tier * 15,
+                rewardAlloy = UnityEngine.Random.Range(35, 55) + tier * 8
             };
             enemy.maxHp = enemy.hp;
 
             Enemies.Add(enemy);
-            HangarAlarmLight.Instance?.SetAlarm(true);
+            alarmLight?.SetAlarm(true);
             LastBattleLog = $"{enemy.name} на подходе (уязв.: {weak.ToRu()}).";
+            OnRadarChanged?.Invoke();
         }
 
-        private void UpdateEnemies()
+        private void StepEnemies()
         {
             for (int i = Enemies.Count - 1; i >= 0; i--)
             {
@@ -110,10 +125,11 @@ namespace HangarGame.Dispatch
                 if (enemy.hp <= 0f)
                 {
                     Enemies.RemoveAt(i);
-                    GameManager.Instance?.AddResources(enemy.rewardCredits, enemy.rewardAlloy);
+                    game?.AddResources(enemy.rewardCredits, enemy.rewardAlloy);
                     LastBattleLog = $"{enemy.name} уничтожен (+{enemy.rewardCredits} кр, +{enemy.rewardAlloy} м).";
-                    HangarAudio.Play(Sfx.Success);
-                    if (Enemies.Count == 0) HangarAlarmLight.Instance?.SetAlarm(false);
+                    game?.PlaySfx(Sfx.Success);
+                    if (Enemies.Count == 0) alarmLight?.SetAlarm(false);
+                    OnRadarChanged?.Invoke();
                     continue;
                 }
 
@@ -124,31 +140,30 @@ namespace HangarGame.Dispatch
                 if (Vector2.Distance(enemy.position, basePos) < 15f)
                 {
                     Enemies.RemoveAt(i);
-                    OnEnemyBreached(enemy);
+                    HandleBreach(enemy);
                 }
             }
         }
 
-        private void OnEnemyBreached(EnemyDot enemy)
+        private void HandleBreach(EnemyDot enemy)
         {
-            var gm = GameManager.Instance;
-            int lostC = 0, lostA = 0;
-            if (gm != null)
-                (lostC, lostA) = gm.ApplyBreachPenalty(breachCreditsPenalty, breachAlloyPenalty, breachBaseDamage);
+            var (lostC, lostA) = game != null
+                ? game.ApplyBreachPenalty(breachCreditsPenalty, breachAlloyPenalty, breachBaseDamage)
+                : (0, 0);
 
-            RoomCamera.Instance?.Shake(0.35f, 0.16f);
-            HangarAudio.Play(Sfx.Alarm);
-            float baseHp = gm != null ? gm.BaseHp : 0f;
+            roomCamera?.Shake(0.35f, 0.16f);
+            game?.PlaySfx(Sfx.Alarm);
+            float baseHp = game != null ? game.BaseHp : 0f;
             LastBattleLog = $"Прорыв {enemy.name}: база {baseHp:F0}%, -{lostC} кр, -{lostA} м";
-            if (Enemies.Count == 0) HangarAlarmLight.Instance?.SetAlarm(false);
+            if (Enemies.Count == 0) alarmLight?.SetAlarm(false);
+            OnRadarChanged?.Invoke();
         }
 
-        private void UpdateMechs()
+        private void StepMechs()
         {
-            var mgr = HangarMechManager.Instance;
-            if (mgr == null) return;
+            if (hangar == null) return;
 
-            foreach (var mech in mgr.Mechs)
+            foreach (var mech in hangar.Mechs)
             {
                 if (mech == null || !mech.isDeployed) continue;
 
@@ -161,7 +176,7 @@ namespace HangarGame.Dispatch
                     {
                         RecallMech(mech.id);
                         LastBattleLog = $"{mech.mechName}: разряд батареи, возврат.";
-                        HangarAudio.Play(Sfx.Alarm);
+                        game?.PlaySfx(Sfx.Alarm);
                     }
                 }
 
@@ -176,88 +191,94 @@ namespace HangarGame.Dispatch
 
                 if (mech.isReturning && Vector2.Distance(mech.battlefieldPos, basePos) < 15f)
                 {
-                    mech.SetDeployed(false);
+                    mech.SetDeployed(false, hangar);
                     mech.isReturning = false;
                     mech.SyncPartsFromHp(mech.GetTotalHpPercent());
-                    mgr.UpdatePodiumDisplay();
-                    HangarAudio.Play(Sfx.Bolt);
+                    hangar.UpdatePodiumDisplay();
+                    game?.PlaySfx(Sfx.Bolt);
                     LastBattleLog = $"{mech.mechName} в ангаре.";
+                    OnRadarChanged?.Invoke();
                     continue;
                 }
 
                 if (enemy != null)
-                {
-                    var right = mech.GetPartBySlot(PartSlot.RightArm);
-                    float atkMult = right?.Data != null
-                        ? (right.Data.attackType == enemy.weakAgainst ? 1.55f : 0.90f)
-                        : 1f;
+                    Engage(mech, enemy);
+            }
+        }
 
-                    var left = mech.GetPartBySlot(PartSlot.LeftArm);
-                    float defMult = (left?.Data != null && left.Data.defenseType == enemy.attackType) ? 0.60f : 1f;
+        private void Engage(MechUnit mech, EnemyDot enemy)
+        {
+            var right = mech.GetPartBySlot(PartSlot.RightArm);
+            float atkMult = right?.Data != null
+                ? (right.Data.attackType == enemy.weakAgainst ? 1.55f : 0.90f)
+                : 1f;
 
-                    enemy.hp -= mech.attackPower * atkMult * Time.deltaTime;
-                    mech.ApplyDamage(enemy.attackPower * 0.62f * defMult * Time.deltaTime);
+            var left = mech.GetPartBySlot(PartSlot.LeftArm);
+            float defMult = (left?.Data != null && left.Data.defenseType == enemy.attackType) ? 0.60f : 1f;
 
-                    if (mech.currentHp <= 6f && !mech.isReturning)
-                    {
-                        RecallMech(mech.id);
-                        LastBattleLog = $"{mech.mechName}: критический урон, отход.";
-                        HangarAudio.Play(Sfx.Alarm);
-                    }
-                }
+            enemy.hp -= mech.attackPower * atkMult * Time.deltaTime;
+            mech.ApplyDamage(enemy.attackPower * 0.62f * defMult * Time.deltaTime);
+
+            if (mech.currentHp <= 6f && !mech.isReturning)
+            {
+                RecallMech(mech.id);
+                LastBattleLog = $"{mech.mechName}: критический урон, отход.";
+                game?.PlaySfx(Sfx.Alarm);
             }
         }
 
         public bool DeployMech(int mechId, Vector2 destination)
         {
-            var mech = HangarMechManager.Instance?.GetMechById(mechId);
+            var mech = hangar?.GetMechById(mechId);
             if (mech == null || !mech.CanDeploy()) return false;
-
-            var wb = RepairWorkbench.Instance;
-            if (wb != null && wb.CurrentPart != null && mech.parts.Contains(wb.CurrentPart))
+            if (workbench != null && workbench.CurrentPart != null && mech.parts.Contains(workbench.CurrentPart))
                 return false;
 
             mech.SyncHpFromParts();
             mech.isReturning = false;
-            mech.SetDeployed(true, basePos);
+            mech.SetDeployed(true, hangar, basePos);
             mech.targetPos = destination;
             SelectedMechId = mechId;
             IsDeployMode = false;
-            HangarAudio.Play(Sfx.Deploy);
+            game?.PlaySfx(Sfx.Deploy);
             LastBattleLog = $"{mech.mechName} высажен.";
+            OnRadarChanged?.Invoke();
             return true;
         }
 
         public void RecallMech(int mechId)
         {
-            var mech = HangarMechManager.Instance?.GetMechById(mechId);
+            var mech = hangar?.GetMechById(mechId);
             if (mech == null || !mech.isDeployed || mech.isReturning) return;
 
             mech.isReturning = true;
             mech.targetPos = basePos;
-            HangarAudio.Play(Sfx.Recall);
+            game?.PlaySfx(Sfx.Recall);
             LastBattleLog = $"{mech.mechName} отходит на базу.";
+            OnRadarChanged?.Invoke();
         }
 
         public void ToggleMechShield(int mechId)
         {
-            var mech = HangarMechManager.Instance?.GetMechById(mechId);
+            var mech = hangar?.GetMechById(mechId);
             if (mech == null || !mech.isDeployed) return;
 
             mech.ToggleShield();
-            HangarAudio.Play(Sfx.Shield);
+            game?.PlaySfx(Sfx.Shield);
             LastBattleLog = mech.isShieldActive ? $"{mech.mechName}: щит включен." : $"{mech.mechName}: щит выключен.";
+            OnRadarChanged?.Invoke();
         }
 
         public void OrderMechMove(int mechId, Vector2 radarPos)
         {
-            var mech = HangarMechManager.Instance?.GetMechById(mechId);
+            var mech = hangar?.GetMechById(mechId);
             if (mech == null || !mech.isDeployed) return;
 
             mech.isReturning = false;
             mech.targetPos = radarPos;
-            HangarAudio.Play(Sfx.Click);
+            game?.PlaySfx(Sfx.Click);
             LastBattleLog = $"{mech.mechName} меняет позицию.";
+            OnRadarChanged?.Invoke();
         }
 
         public EnemyDot GetClosestEnemy(Vector2 pos, float maxRange)
@@ -274,12 +295,10 @@ namespace HangarGame.Dispatch
 
         public MechUnit GetClosestMech(Vector2 pos, float maxRange)
         {
-            var mgr = HangarMechManager.Instance;
-            if (mgr == null) return null;
-
+            if (hangar == null) return null;
             MechUnit best = null;
             float minDist = maxRange;
-            foreach (var m in mgr.Mechs)
+            foreach (var m in hangar.Mechs)
             {
                 if (m == null || !m.isDeployed) continue;
                 float d = Vector2.Distance(pos, m.battlefieldPos);
