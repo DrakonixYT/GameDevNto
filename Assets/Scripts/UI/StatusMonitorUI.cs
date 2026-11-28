@@ -1,3 +1,4 @@
+using System;
 using HangarGame.Core;
 using HangarGame.Dispatch;
 using HangarGame.Repair;
@@ -8,19 +9,24 @@ namespace HangarGame.UI
 {
     public class StatusMonitorUI : MonoBehaviour
     {
+        [Serializable]
+        public class StageRowView
+        {
+            public Image bg;
+            public Image accent;
+            public Text label;
+        }
+
         [SerializeField] private Text txtHeaderStatus;
         [SerializeField] private Text txtBaseHp;
         [SerializeField] private Image barBaseHp;
         [SerializeField] private Text txtResources;
         [SerializeField] private Text txtJaegerHeader;
-        [SerializeField] private Image[] stageRows = new Image[5];
-        [SerializeField] private Image[] stageBars = new Image[5];
-        [SerializeField] private Text[] stageTexts = new Text[5];
+        [SerializeField] private StageRowView[] stages = new StageRowView[5];
         [SerializeField] private Button btnBuildJaeger;
         [SerializeField] private Text txtBuildBtn;
 
         private float refreshTimer;
-        private bool eventsBound;
 
         public void BindFromHierarchy()
         {
@@ -40,10 +46,12 @@ namespace HangarGame.UI
             for (int i = 0; i < 5; i++)
             {
                 Transform row = bg.Find($"Stage_{i}");
-                if (row == null) continue;
-                stageRows[i] = row.GetComponent<Image>();
-                stageBars[i] = row.Find("Accent")?.GetComponent<Image>();
-                stageTexts[i] = row.Find("Txt_Stage")?.GetComponent<Text>();
+                stages[i] = row == null ? null : new StageRowView
+                {
+                    bg = row.GetComponent<Image>(),
+                    accent = row.Find("Accent")?.GetComponent<Image>(),
+                    label = row.Find("Txt_Stage")?.GetComponent<Text>()
+                };
             }
 
             btnBuildJaeger = bg.Find("Btn_BuildJaeger")?.GetComponent<Button>();
@@ -60,41 +68,25 @@ namespace HangarGame.UI
             }
         }
 
-        private void Start()
-        {
-            BindEvents();
-            Refresh();
-        }
+        private void Start() => HookEvents(true);
+        private void OnEnable() => HookEvents(true);
+        private void OnDisable() => HookEvents(false);
 
-        private void OnEnable()
+        private void HookEvents(bool subscribe)
         {
-            BindEvents();
-            Refresh();
-        }
-
-        private void OnDisable() => UnbindEvents();
-
-        private void BindEvents()
-        {
-            if (eventsBound) return;
             var gm = GameManager.Instance;
             if (gm == null) return;
-            gm.OnResourcesChanged += OnResourcesChanged;
-            gm.OnBaseHpChanged += OnBaseChanged;
-            gm.OnJaegerProgressChanged += OnJaegerChanged;
-            eventsBound = true;
-        }
 
-        private void UnbindEvents()
-        {
-            if (!eventsBound) return;
-            eventsBound = false;
-            var gm = GameManager.Instance;
-            if (gm != null)
+            gm.OnResourcesChanged -= OnResourcesChanged;
+            gm.OnBaseHpChanged -= OnBaseChanged;
+            gm.OnJaegerProgressChanged -= OnJaegerChanged;
+
+            if (subscribe)
             {
-                gm.OnResourcesChanged -= OnResourcesChanged;
-                gm.OnBaseHpChanged -= OnBaseChanged;
-                gm.OnJaegerProgressChanged -= OnJaegerChanged;
+                gm.OnResourcesChanged += OnResourcesChanged;
+                gm.OnBaseHpChanged += OnBaseChanged;
+                gm.OnJaegerProgressChanged += OnJaegerChanged;
+                Refresh();
             }
         }
 
@@ -114,7 +106,7 @@ namespace HangarGame.UI
 
         private void OnBuildClicked()
         {
-            HangarAudio.Instance?.PlayClick();
+            HangarAudio.Play(Sfx.Click);
             JaegerProject.Instance?.StartNextStage();
             Refresh();
         }
@@ -134,7 +126,7 @@ namespace HangarGame.UI
 
             if (gm != null)
             {
-                float ratio = gm.MaxBaseHp > 0f ? Mathf.Clamp01(gm.BaseHp / gm.MaxBaseHp) : 1f;
+                float ratio = gm.maxBaseHp > 0f ? Mathf.Clamp01(gm.BaseHp / gm.maxBaseHp) : 1f;
                 if (txtBaseHp != null)
                 {
                     txtBaseHp.text = $"{gm.BaseHp:F0}%";
@@ -156,21 +148,18 @@ namespace HangarGame.UI
 
             for (int i = 0; i < 5; i++)
             {
+                var row = stages[i];
+                if (row == null) continue;
+
                 bool done = i < jp.CurrentStage;
                 bool next = i == jp.CurrentStage;
-                string name = jp.GetStageName(i);
-                int cr = jp.GetStageCredits(i);
-                int al = jp.GetStageAlloy(i);
-
-                if (stageRows[i] != null)
-                    stageRows[i].color = done ? UITheme.BgCardActive : (next ? UITheme.BgHeader : UITheme.BgCard);
-                if (stageBars[i] != null)
-                    stageBars[i].color = done ? UITheme.AccentGreen : (next ? UITheme.AccentAmber : UITheme.Border);
-                if (stageTexts[i] != null)
+                if (row.bg != null) row.bg.color = done ? UITheme.BgCardActive : (next ? UITheme.BgHeader : UITheme.BgCard);
+                if (row.accent != null) row.accent.color = done ? UITheme.AccentGreen : (next ? UITheme.AccentAmber : UITheme.Border);
+                if (row.label != null)
                 {
-                    string right = done ? "ГОТОВО" : $"{cr} кр / {al} м";
-                    stageTexts[i].text = $"{i + 1}. {name}    —    {right}";
-                    stageTexts[i].color = done ? UITheme.TextMuted : (next ? UITheme.TextMain : UITheme.TextMuted);
+                    string state = done ? "ГОТОВО" : $"{jp.GetStageCredits(i)} кр / {jp.GetStageAlloy(i)} м";
+                    row.label.text = $"{i + 1}. {jp.GetStageName(i)}    —    {state}";
+                    row.label.color = (next && !done) ? UITheme.TextMain : UITheme.TextMuted;
                 }
             }
 
@@ -180,15 +169,14 @@ namespace HangarGame.UI
                 btnBuildJaeger.interactable = canBuild;
                 var img = btnBuildJaeger.GetComponent<Image>();
                 if (img != null)
-                {
-                    img.color = jp.IsComplete
-                        ? UITheme.AccentGreen
-                        : (canBuild ? UITheme.AccentTeal : UITheme.BgRecessed);
-                }
+                    img.color = jp.IsComplete ? UITheme.AccentGreen : (canBuild ? UITheme.AccentTeal : UITheme.BgRecessed);
+
                 if (txtBuildBtn != null)
                 {
                     if (jp.IsComplete)
+                    {
                         txtBuildBtn.text = "ЕГЕРЬ СОБРАН";
+                    }
                     else
                     {
                         int s = jp.CurrentStage;

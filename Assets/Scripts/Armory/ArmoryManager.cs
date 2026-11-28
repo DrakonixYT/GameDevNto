@@ -108,15 +108,15 @@ namespace HangarGame.Armory
             {
                 if (GameManager.Instance == null || !GameManager.Instance.TrySpend(def.costCredits, def.costAlloy))
                 {
-                    HangarAudio.Instance?.PlayError();
+                    HangarAudio.Play(Sfx.Error);
                     return false;
                 }
                 ownedIds.Add(weaponId);
-                HangarAudio.Instance?.PlayBuy();
+                HangarAudio.Play(Sfx.Buy);
             }
             else
             {
-                HangarAudio.Instance?.PlayEquip();
+                HangarAudio.Play(Sfx.Equip);
             }
 
             if (def.slot == ArmorySlot.LeftArm) mech.equippedLeftWeaponId = def.id;

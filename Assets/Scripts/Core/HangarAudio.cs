@@ -1,7 +1,37 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace HangarGame.Core
 {
+    public enum Sfx
+    {
+        Click,
+        Button3D,
+        Bolt,
+        Wire,
+        Plate,
+        Error,
+        Success,
+        Swap,
+        Battery,
+        Buy,
+        Equip,
+        Deploy,
+        Recall,
+        Shield,
+        Alarm,
+        JaegerStage,
+        Victory
+    }
+
+    [Serializable]
+    public struct SfxClipEntry
+    {
+        public Sfx id;
+        public AudioClip clip;
+    }
+
     public class HangarAudio : MonoBehaviour
     {
         public static HangarAudio Instance { get; private set; }
@@ -10,30 +40,12 @@ namespace HangarGame.Core
         [SerializeField] private AudioSource ambientSource;
         [SerializeField, Range(0f, 1f)] private float sfxVolume = 0.85f;
         [SerializeField, Range(0f, 1f)] private float ambientVolume = 0.35f;
-        [SerializeField] private bool useFallbackBeep = true;
+        [SerializeField] private AudioClip ambientClip;
+        [SerializeField] private List<SfxClipEntry> clips = new List<SfxClipEntry>();
 
-        [Header("Звуковые слоты")]
-        [SerializeField] private AudioClip clipUiClick;
-        [SerializeField] private AudioClip clipButton3D;
-        [SerializeField] private AudioClip clipBoltUnscrew;
-        [SerializeField] private AudioClip clipWireConnect;
-        [SerializeField] private AudioClip clipPlateInsert;
-        [SerializeField] private AudioClip clipWireError;
-        [SerializeField] private AudioClip clipRepairDone;
-        [SerializeField] private AudioClip clipMechSwap;
-        [SerializeField] private AudioClip clipBatteryCharge;
-        [SerializeField] private AudioClip clipWeaponBuy;
-        [SerializeField] private AudioClip clipWeaponEquip;
-        [SerializeField] private AudioClip clipMechDeploy;
-        [SerializeField] private AudioClip clipMechRecall;
-        [SerializeField] private AudioClip clipShieldToggle;
-        [SerializeField] private AudioClip clipAlarm;
-        [SerializeField] private AudioClip clipJaegerStage;
-        [SerializeField] private AudioClip clipVictory;
-        [SerializeField] private AudioClip clipHangarAmbient;
-
-        private AudioClip cachedBeep;
-        private AudioClip cachedAlarmBeep;
+        private readonly Dictionary<Sfx, AudioClip> clipMap = new Dictionary<Sfx, AudioClip>();
+        private AudioClip clickTone;
+        private AudioClip alertTone;
 
         private void Awake()
         {
@@ -52,43 +64,37 @@ namespace HangarGame.Core
                 ambientSource.playOnAwake = false;
             }
 
-            cachedBeep = CreateTone(620f, 0.05f, 0.25f);
-            cachedAlarmBeep = CreateTone(440f, 0.25f, 0.35f);
+            foreach (var entry in clips)
+                if (entry.clip != null) clipMap[entry.id] = entry.clip;
+
+            clickTone = CreateTone(620f, 0.05f, 0.22f);
+            alertTone = CreateTone(420f, 0.22f, 0.30f);
         }
 
         private void Start()
         {
-            if (clipHangarAmbient != null && ambientSource != null)
+            if (ambientClip != null && ambientSource != null)
             {
-                ambientSource.clip = clipHangarAmbient;
+                ambientSource.clip = ambientClip;
                 ambientSource.volume = ambientVolume;
                 ambientSource.Play();
             }
         }
 
-        public void PlayClick() => Play(clipUiClick);
-        public void PlayButton3D() => Play(clipButton3D);
-        public void PlayBolt() => Play(clipBoltUnscrew);
-        public void PlayWire() => Play(clipWireConnect);
-        public void PlayPlate() => Play(clipPlateInsert);
-        public void PlayError() => Play(clipWireError);
-        public void PlaySuccess() => Play(clipRepairDone);
-        public void PlayMechSwap() => Play(clipMechSwap);
-        public void PlayBattery() => Play(clipBatteryCharge);
-        public void PlayBuy() => Play(clipWeaponBuy);
-        public void PlayEquip() => Play(clipWeaponEquip);
-        public void PlayDeploy() => Play(clipMechDeploy);
-        public void PlayRecall() => Play(clipMechRecall);
-        public void PlayShield() => Play(clipShieldToggle);
-        public void PlayAlarm() => Play(clipAlarm, true);
-        public void PlayJaegerStage() => Play(clipJaegerStage);
-        public void PlayVictory() => Play(clipVictory);
+        public static void Play(Sfx id) => Instance?.PlayOneShot(id);
 
-        private void Play(AudioClip clip, bool isAlarm = false)
+        private void PlayOneShot(Sfx id)
         {
             if (sfxSource == null) return;
-            AudioClip target = clip != null ? clip : (useFallbackBeep ? (isAlarm ? cachedAlarmBeep : cachedBeep) : null);
-            if (target != null) sfxSource.PlayOneShot(target, sfxVolume);
+            if (clipMap.TryGetValue(id, out var custom) && custom != null)
+            {
+                sfxSource.PlayOneShot(custom, sfxVolume);
+                return;
+            }
+
+            bool isAlert = id == Sfx.Alarm || id == Sfx.Error;
+            sfxSource.pitch = isAlert ? 0.9f : UnityEngine.Random.Range(0.95f, 1.06f);
+            sfxSource.PlayOneShot(isAlert ? alertTone : clickTone, sfxVolume);
         }
 
         private static AudioClip CreateTone(float freq, float dur, float vol)
@@ -99,7 +105,7 @@ namespace HangarGame.Core
             for (int i = 0; i < count; i++)
                 data[i] = Mathf.Sin(2f * Mathf.PI * freq * (i / (float)rate)) * (1f - i / (float)count) * vol;
 
-            var clip = AudioClip.Create("SfxFallback", count, 1, rate, false);
+            var clip = AudioClip.Create("Tone", count, 1, rate, false);
             clip.SetData(data, 0);
             return clip;
         }

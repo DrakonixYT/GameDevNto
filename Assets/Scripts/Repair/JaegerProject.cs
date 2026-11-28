@@ -9,57 +9,36 @@ namespace HangarGame.Repair
     {
         public static JaegerProject Instance { get; private set; }
 
-        [Header("Этапы Егеря: Голова, Л.Рука, П.Рука, Щит, Копьё")]
-        [SerializeField] private Transform[] stageVisualParts = new Transform[5];
-        [SerializeField] private GameObject[] stageWorkbenchPrefabs = new GameObject[5];
-        [SerializeField] private GameObject platePrefab;
+        public Transform[] stageVisualParts = new Transform[5];
+        public GameObject[] stageWorkbenchPrefabs = new GameObject[5];
+        public GameObject platePrefab;
 
-        [Header("Стоимость и названия")]
-        [SerializeField] private string[] stageNames =
-        {
-            "Голова",
-            "Левая рука",
-            "Правая рука",
-            "Щит",
-            "Копьё"
-        };
-        [SerializeField] private int[] stageCredits = { 160, 210, 260, 330, 420 };
-        [SerializeField] private int[] stageAlloy = { 70, 95, 120, 150, 190 };
+        public string[] stageNames = { "Голова", "Левая рука", "Правая рука", "Щит", "Копьё" };
+        public int[] stageCredits = { 160, 210, 260, 330, 420 };
+        public int[] stageAlloy = { 70, 95, 120, 150, 190 };
 
         public int CurrentStage { get; private set; }
         public int TotalStages => 5;
         public bool IsComplete => CurrentStage >= TotalStages;
 
-        public string GetStageName(int idx) => (stageNames != null && idx >= 0 && idx < stageNames.Length) ? stageNames[idx] : $"Этап {idx + 1}";
-        public int GetStageCredits(int idx) => (stageCredits != null && idx >= 0 && idx < stageCredits.Length) ? stageCredits[idx] : 0;
-        public int GetStageAlloy(int idx) => (stageAlloy != null && idx >= 0 && idx < stageAlloy.Length) ? stageAlloy[idx] : 0;
-
-        private void Awake()
-        {
-            Instance = this;
-        }
+        private void Awake() => Instance = this;
 
         private void Start()
         {
             RefreshVisualStages();
             if (RepairWorkbench.Instance != null && platePrefab != null)
-                RepairWorkbench.Instance.SetPlatePrefab(platePrefab);
+                RepairWorkbench.Instance.platePrefab = platePrefab;
         }
 
-        public void Configure(Transform[] sceneParts, GameObject[] workbenchPrefabs, GameObject plate)
-        {
-            stageVisualParts = sceneParts;
-            stageWorkbenchPrefabs = workbenchPrefabs;
-            platePrefab = plate;
-            RefreshVisualStages();
-        }
+        public string GetStageName(int idx) => (stageNames != null && idx >= 0 && idx < stageNames.Length) ? stageNames[idx] : $"Этап {idx + 1}";
+        public int GetStageCredits(int idx) => (stageCredits != null && idx >= 0 && idx < stageCredits.Length) ? stageCredits[idx] : 0;
+        public int GetStageAlloy(int idx) => (stageAlloy != null && idx >= 0 && idx < stageAlloy.Length) ? stageAlloy[idx] : 0;
 
-        public string GetNextStageInfo()
+        public void RefreshVisualStages()
         {
-            if (IsComplete)
-                return "Егерь собран (5/5)";
-
-            return $"Егерь {CurrentStage}/{TotalStages}: {stageNames[CurrentStage]} ({stageCredits[CurrentStage]} кр / {stageAlloy[CurrentStage]} м)";
+            if (stageVisualParts == null) return;
+            for (int i = 0; i < stageVisualParts.Length; i++)
+                if (stageVisualParts[i] != null) stageVisualParts[i].gameObject.SetActive(i < CurrentStage);
         }
 
         public bool CanStartNext()
@@ -76,8 +55,8 @@ namespace HangarGame.Repair
             if (!CanStartNext()) return;
             if (!GameManager.Instance.TrySpend(stageCredits[CurrentStage], stageAlloy[CurrentStage])) return;
 
-            if (platePrefab != null)
-                RepairWorkbench.Instance?.SetPlatePrefab(platePrefab);
+            if (platePrefab != null && RepairWorkbench.Instance != null)
+                RepairWorkbench.Instance.platePrefab = platePrefab;
 
             GameObject model = CreateWorkbenchModel(CurrentStage);
             RepairWorkbench.Instance?.ReceiveJaegerModule(model, stageNames[CurrentStage], OnStageCompleted);
@@ -85,38 +64,26 @@ namespace HangarGame.Repair
 
         private void OnStageCompleted()
         {
-            int completedIndex = CurrentStage;
-            CurrentStage++;
-
-            if (stageVisualParts != null && completedIndex < stageVisualParts.Length && stageVisualParts[completedIndex] != null)
+            int doneIdx = CurrentStage++;
+            if (stageVisualParts != null && doneIdx < stageVisualParts.Length && stageVisualParts[doneIdx] != null)
             {
-                var part = stageVisualParts[completedIndex].gameObject;
-                part.SetActive(true);
-                if (Application.isPlaying) StartCoroutine(AnimateStageMount(part.transform));
+                var part = stageVisualParts[doneIdx];
+                part.gameObject.SetActive(true);
+                if (Application.isPlaying) StartCoroutine(AnimateStageMount(part));
             }
 
-            HangarAudio.Instance?.PlayJaegerStage();
+            HangarAudio.Play(Sfx.JaegerStage);
             RoomCamera.Instance?.Shake(0.32f, 0.14f);
             GameManager.Instance?.SetJaegerProgress(CurrentStage / (float)TotalStages);
 
             if (IsComplete)
             {
-                HangarAudio.Instance?.PlayVictory();
+                HangarAudio.Play(Sfx.Victory);
                 GameManager.Instance?.TriggerVictory();
             }
         }
 
-        private void RefreshVisualStages()
-        {
-            if (stageVisualParts == null) return;
-            for (int i = 0; i < stageVisualParts.Length; i++)
-            {
-                if (stageVisualParts[i] != null)
-                    stageVisualParts[i].gameObject.SetActive(i < CurrentStage);
-            }
-        }
-
-        private IEnumerator AnimateStageMount(Transform part)
+        private static IEnumerator AnimateStageMount(Transform part)
         {
             Vector3 targetScale = part.localScale;
             part.localScale = targetScale * 0.1f;
@@ -126,8 +93,7 @@ namespace HangarGame.Repair
             while (t < dur && part != null)
             {
                 t += Time.deltaTime;
-                float k = Mathf.SmoothStep(0f, 1f, t / dur);
-                part.localScale = Vector3.Lerp(targetScale * 0.1f, targetScale, k);
+                part.localScale = Vector3.Lerp(targetScale * 0.1f, targetScale, Mathf.SmoothStep(0f, 1f, t / dur));
                 yield return null;
             }
             if (part != null) part.localScale = targetScale;
@@ -135,7 +101,7 @@ namespace HangarGame.Repair
 
         private GameObject CreateWorkbenchModel(int stageIndex)
         {
-            GameObject prefab = (stageWorkbenchPrefabs != null && stageIndex < stageWorkbenchPrefabs.Length)
+            GameObject prefab = stageWorkbenchPrefabs != null && stageIndex < stageWorkbenchPrefabs.Length
                 ? stageWorkbenchPrefabs[stageIndex]
                 : null;
 

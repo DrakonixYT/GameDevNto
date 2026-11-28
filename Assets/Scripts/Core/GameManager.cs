@@ -7,15 +7,13 @@ namespace HangarGame.Core
     {
         public static GameManager Instance { get; private set; }
 
-        [Header("Стартовые ресурсы и база")]
-        [SerializeField] private int startingCredits = 220;
-        [SerializeField] private int startingAlloy = 95;
-        [SerializeField] private float maxBaseHp = 100f;
+        public int startingCredits = 220;
+        public int startingAlloy = 95;
+        public float maxBaseHp = 100f;
 
         public int Credits { get; private set; }
         public int Alloy { get; private set; }
         public float BaseHp { get; private set; }
-        public float MaxBaseHp => maxBaseHp;
         public float JaegerProgress { get; private set; }
         public RoomView CurrentView { get; private set; } = RoomView.Hangar;
         public bool IsGameWon { get; private set; }
@@ -47,15 +45,11 @@ namespace HangarGame.Core
             OnBaseHpChanged?.Invoke(BaseHp, maxBaseHp);
         }
 
-        public bool CanAfford(int credits, int alloy)
-        {
-            return Credits >= credits && Alloy >= alloy;
-        }
+        public bool CanAfford(int credits, int alloy) => Credits >= credits && Alloy >= alloy;
 
         public bool TrySpend(int credits, int alloy)
         {
             if (!CanAfford(credits, alloy)) return false;
-
             Credits -= credits;
             Alloy -= alloy;
             OnResourcesChanged?.Invoke(Credits, Alloy);
@@ -82,23 +76,26 @@ namespace HangarGame.Core
             OnJaegerProgressChanged?.Invoke(JaegerProgress);
         }
 
-        public void ApplyBreachPenalty(int creditsCost, int alloyCost, float baseDamage, out int lostCredits, out int lostAlloy)
+        public (int lostCredits, int lostAlloy) ApplyBreachPenalty(int creditsCost, int alloyCost, float baseDamage)
         {
-            lostCredits = Mathf.Min(Credits, Mathf.Max(0, creditsCost));
-            lostAlloy = Mathf.Min(Alloy, Mathf.Max(0, alloyCost));
+            int lostCredits = Mathf.Min(Credits, Mathf.Max(0, creditsCost));
+            int lostAlloy = Mathf.Min(Alloy, Mathf.Max(0, alloyCost));
             Credits -= lostCredits;
             Alloy -= lostAlloy;
             OnResourcesChanged?.Invoke(Credits, Alloy);
 
-            if (IsGameWon || IsGameLost) return;
-            BaseHp = Mathf.Max(0f, BaseHp - Mathf.Max(0f, baseDamage));
-            OnBaseHpChanged?.Invoke(BaseHp, maxBaseHp);
-
-            if (BaseHp <= 0f)
+            if (!IsGameWon && !IsGameLost)
             {
-                IsGameLost = true;
-                OnGameLost?.Invoke();
+                BaseHp = Mathf.Max(0f, BaseHp - Mathf.Max(0f, baseDamage));
+                OnBaseHpChanged?.Invoke(BaseHp, maxBaseHp);
+                if (BaseHp <= 0f)
+                {
+                    IsGameLost = true;
+                    OnGameLost?.Invoke();
+                }
             }
+
+            return (lostCredits, lostAlloy);
         }
 
         public void TriggerVictory()

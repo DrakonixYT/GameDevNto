@@ -65,12 +65,6 @@ namespace HangarGame.Mechs
             SyncHpFromParts();
         }
 
-        private void Update()
-        {
-            if (!isDeployed)
-                SyncHpFromParts();
-        }
-
         public void CaptureRestPose()
         {
             if (HasRestPose) return;

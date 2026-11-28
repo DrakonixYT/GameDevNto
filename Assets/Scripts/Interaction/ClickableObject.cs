@@ -8,7 +8,6 @@ namespace HangarGame.Interaction
     {
         public string promptText = "";
         public Action onClick;
-        public Action onHold;
         public bool disableHover;
         public bool isInteractable = true;
 
@@ -16,35 +15,22 @@ namespace HangarGame.Interaction
 
         private Renderer rend;
         private Color baseColor = Color.white;
-        private bool colorReady;
 
-        private void Awake() => InitColor();
-
-        private void InitColor()
+        private void Awake()
         {
-            if (colorReady) return;
-            rend = GetComponent<Renderer>() ?? GetComponentInChildren<Renderer>();
+            rend = GetComponentInChildren<Renderer>();
             if (rend != null) baseColor = ModelUtils.GetColor(rend);
-            colorReady = true;
-        }
-
-        public void SetBaseColor(Color c)
-        {
-            InitColor();
-            baseColor = c;
-            if (Application.isPlaying) ModelUtils.SetColor(rend, c);
         }
 
         public bool CanInteract() => isInteractable && gameObject.activeInHierarchy;
         public string GetPrompt() => promptText;
         public void OnInteract() => onClick?.Invoke();
-        public void OnInteractHold() => onHold?.Invoke();
+        public void OnInteractHold() { }
 
         public void OnHover(bool isHovered)
         {
-            if (disableHover) return;
-            InitColor();
-            if (Application.isPlaying) ModelUtils.SetColor(rend, isHovered ? hoverColor : baseColor);
+            if (disableHover || rend == null || !Application.isPlaying) return;
+            ModelUtils.SetColor(rend, isHovered ? hoverColor : baseColor);
         }
     }
 }

@@ -40,7 +40,7 @@ namespace HangarGame.Core
                 redAlarmLight.intensity = active ? minIntensity : 0f;
 
             if (active)
-                HangarAudio.Instance?.PlayAlarm();
+                HangarAudio.Play(Sfx.Alarm);
         }
     }
 }

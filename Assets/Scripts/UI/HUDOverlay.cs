@@ -60,86 +60,54 @@ namespace HangarGame.UI
             btnRestart = vicT != null ? vicT.Find("Btn_Restart")?.GetComponent<Button>() : null;
         }
 
-        private bool eventsBound;
-
         private void Awake()
         {
             Instance = this;
             if (txtResources == null) BindFromHierarchy();
 
-            WireButton(btnTurnLeft, () => RoomCamera.Instance?.TurnLeft());
-            WireButton(btnTurnRight, () => RoomCamera.Instance?.TurnRight());
-            WireButton(btnPrevMech, () =>
-            {
-                HangarAudio.Instance?.PlayClick();
-                HangarMechManager.Instance?.PrevMech();
-            });
-            WireButton(btnNextMech, () =>
-            {
-                HangarAudio.Instance?.PlayClick();
-                HangarMechManager.Instance?.NextMech();
-            });
-            WireButton(btnRechargeBattery, () =>
-            {
-                HangarMechManager.Instance?.RechargeCurrentMech();
-                UpdateMechInfo();
-            });
-            WireButton(btnRestart, () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex));
+            if (btnTurnLeft != null) { btnTurnLeft.onClick.RemoveAllListeners(); btnTurnLeft.onClick.AddListener(() => RoomCamera.Instance?.TurnLeft()); }
+            if (btnTurnRight != null) { btnTurnRight.onClick.RemoveAllListeners(); btnTurnRight.onClick.AddListener(() => RoomCamera.Instance?.TurnRight()); }
+            if (btnPrevMech != null) { btnPrevMech.onClick.RemoveAllListeners(); btnPrevMech.onClick.AddListener(() => { HangarAudio.Play(Sfx.Click); HangarMechManager.Instance?.PrevMech(); }); }
+            if (btnNextMech != null) { btnNextMech.onClick.RemoveAllListeners(); btnNextMech.onClick.AddListener(() => { HangarAudio.Play(Sfx.Click); HangarMechManager.Instance?.NextMech(); }); }
+            if (btnRechargeBattery != null) { btnRechargeBattery.onClick.RemoveAllListeners(); btnRechargeBattery.onClick.AddListener(() => { HangarMechManager.Instance?.RechargeCurrentMech(); UpdateMechInfo(); }); }
+            if (btnRestart != null) { btnRestart.onClick.RemoveAllListeners(); btnRestart.onClick.AddListener(() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex)); }
         }
 
-        private void Start()
-        {
-            BindEvents();
-            RefreshAll();
-        }
+        private void Start() => HookEvents(true);
+        private void OnEnable() => HookEvents(true);
+        private void OnDisable() => HookEvents(false);
 
-        private static void WireButton(Button btn, UnityEngine.Events.UnityAction action)
+        private void HookEvents(bool subscribe)
         {
-            if (btn == null) return;
-            btn.onClick.RemoveAllListeners();
-            btn.onClick.AddListener(action);
-        }
-
-        private void OnEnable()
-        {
-            BindEvents();
-            RefreshAll();
-        }
-
-        private void OnDisable() => UnbindEvents();
-
-        private void BindEvents()
-        {
-            if (eventsBound) return;
-            var gm = GameManager.Instance;
-            if (gm == null) return;
-            gm.OnResourcesChanged += HandleResourcesChanged;
-            gm.OnBaseHpChanged += HandleBaseHpChanged;
-            gm.OnViewChanged += HandleViewChanged;
-            gm.OnJaegerProgressChanged += HandleJaegerChanged;
-            gm.OnGameWon += ShowVictory;
-            gm.OnGameLost += ShowDefeat;
-            if (HangarMechManager.Instance != null)
-                HangarMechManager.Instance.OnMechSwitched += HandleMechSwitched;
-            eventsBound = true;
-        }
-
-        private void UnbindEvents()
-        {
-            if (!eventsBound) return;
-            eventsBound = false;
             var gm = GameManager.Instance;
             if (gm != null)
             {
-                gm.OnResourcesChanged -= HandleResourcesChanged;
-                gm.OnBaseHpChanged -= HandleBaseHpChanged;
+                gm.OnResourcesChanged -= OnResourcesChanged;
+                gm.OnBaseHpChanged -= OnBaseHpChanged;
+                gm.OnJaegerProgressChanged -= OnJaegerChanged;
                 gm.OnViewChanged -= HandleViewChanged;
-                gm.OnJaegerProgressChanged -= HandleJaegerChanged;
                 gm.OnGameWon -= ShowVictory;
                 gm.OnGameLost -= ShowDefeat;
+
+                if (subscribe)
+                {
+                    gm.OnResourcesChanged += OnResourcesChanged;
+                    gm.OnBaseHpChanged += OnBaseHpChanged;
+                    gm.OnJaegerProgressChanged += OnJaegerChanged;
+                    gm.OnViewChanged += HandleViewChanged;
+                    gm.OnGameWon += ShowVictory;
+                    gm.OnGameLost += ShowDefeat;
+                }
             }
-            if (HangarMechManager.Instance != null)
-                HangarMechManager.Instance.OnMechSwitched -= HandleMechSwitched;
+
+            var mgr = HangarMechManager.Instance;
+            if (mgr != null)
+            {
+                mgr.OnMechSwitched -= HandleMechSwitched;
+                if (subscribe) mgr.OnMechSwitched += HandleMechSwitched;
+            }
+
+            if (subscribe) RefreshAll();
         }
 
         private void Update()
@@ -147,10 +115,8 @@ namespace HangarGame.UI
             var gm = GameManager.Instance;
             if (gm != null && gm.CurrentView == RoomView.Hangar)
             {
-                if (GameInput.KeyDown(KeyCode.A) || GameInput.KeyDown(KeyCode.LeftArrow))
-                    HangarMechManager.Instance?.PrevMech();
-                if (GameInput.KeyDown(KeyCode.D) || GameInput.KeyDown(KeyCode.RightArrow))
-                    HangarMechManager.Instance?.NextMech();
+                if (GameInput.PrevMech) HangarMechManager.Instance?.PrevMech();
+                if (GameInput.NextMech) HangarMechManager.Instance?.NextMech();
             }
 
             if (gm != null && gm.CurrentView == RoomView.WorkbenchFocus && RepairWorkbench.Instance != null)
@@ -190,24 +156,25 @@ namespace HangarGame.UI
             var gm = GameManager.Instance;
             if (gm != null)
             {
-                UpdateTopBar(gm.Credits, gm.Alloy, gm.BaseHp);
+                RefreshTopBar();
                 HandleViewChanged(gm.CurrentView);
             }
             UpdateMechInfo();
             SetPrompt("");
         }
 
-        private void HandleResourcesChanged(int c, int a) => UpdateTopBar(c, a, GameManager.Instance != null ? GameManager.Instance.BaseHp : 100f);
-        private void HandleBaseHpChanged(float hp, float max) => UpdateTopBar(GameManager.Instance != null ? GameManager.Instance.Credits : 0, GameManager.Instance != null ? GameManager.Instance.Alloy : 0, hp);
-        private void HandleJaegerChanged(float p) => UpdateTopBar(GameManager.Instance != null ? GameManager.Instance.Credits : 0, GameManager.Instance != null ? GameManager.Instance.Alloy : 0, GameManager.Instance != null ? GameManager.Instance.BaseHp : 100f);
+        private void OnResourcesChanged(int c, int a) => RefreshTopBar();
+        private void OnBaseHpChanged(float hp, float max) => RefreshTopBar();
+        private void OnJaegerChanged(float p) => RefreshTopBar();
         private void HandleMechSwitched(int idx) => UpdateMechInfo();
 
-        private void UpdateTopBar(int credits, int alloy, float baseHp)
+        private void RefreshTopBar()
         {
-            if (txtResources == null) return;
+            var gm = GameManager.Instance;
+            if (txtResources == null || gm == null) return;
             var jp = JaegerProject.Instance;
             string jStr = jp != null ? $"{jp.CurrentStage}/{jp.TotalStages}" : "0/5";
-            txtResources.text = $"Кредиты: {credits}   |   Сплав: {alloy}   |   База: {baseHp:F0}%   |   Егерь: {jStr}";
+            txtResources.text = $"Кредиты: {gm.Credits}   |   Сплав: {gm.Alloy}   |   База: {gm.BaseHp:F0}%   |   Егерь: {jStr}";
         }
 
         private void HandleViewChanged(RoomView view)
@@ -222,8 +189,8 @@ namespace HangarGame.UI
             if (showNav)
             {
                 string label = view == RoomView.Hangar ? "Пульт" : "Ангар";
-                var lTxt = btnTurnLeft != null ? btnTurnLeft.GetComponentInChildren<Text>() : null;
-                var rTxt = btnTurnRight != null ? btnTurnRight.GetComponentInChildren<Text>() : null;
+                var lTxt = btnTurnLeft?.GetComponentInChildren<Text>();
+                var rTxt = btnTurnRight?.GetComponentInChildren<Text>();
                 if (lTxt != null) lTxt.text = $"◄ {label} (Q)";
                 if (rTxt != null) rTxt.text = $"{label} (E) ►";
             }
@@ -236,7 +203,7 @@ namespace HangarGame.UI
         private void UpdateMechInfo()
         {
             var mgr = HangarMechManager.Instance;
-            if (mgr == null || mgr.CurrentMech == null || txtCurrentMech == null) return;
+            if (mgr?.CurrentMech == null || txtCurrentMech == null) return;
 
             var m = mgr.CurrentMech;
             if (m.isDeployed)

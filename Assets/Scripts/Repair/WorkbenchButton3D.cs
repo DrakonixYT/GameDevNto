@@ -17,14 +17,12 @@ namespace HangarGame.Repair
 
     public class WorkbenchButton3D : MonoBehaviour, IInteractable
     {
-        [SerializeField] private WorkbenchButtonAction action;
-        [SerializeField] private string label = "";
-        [SerializeField] private string prompt = "";
-        [SerializeField] private Color idleColor = new Color(0.16f, 0.25f, 0.36f);
-        [SerializeField] private Color hoverColor = new Color(0.32f, 0.72f, 0.88f);
-        [SerializeField] private Color readyColor = new Color(0.20f, 0.58f, 0.36f);
-        [SerializeField] private float continuousSpeed = 95f;
-        [SerializeField] private float stepAngle = 22f;
+        public WorkbenchButtonAction action;
+        public string label = "";
+        public string prompt = "";
+        public Color idleColor = new Color(0.16f, 0.25f, 0.36f);
+        public Color hoverColor = new Color(0.32f, 0.72f, 0.88f);
+        public Color readyColor = new Color(0.20f, 0.58f, 0.36f);
 
         private Renderer capRenderer;
         private Vector3 restLocalPos;
@@ -52,7 +50,7 @@ namespace HangarGame.Repair
             RefreshColor();
         }
 
-        public void Setup(WorkbenchButtonAction btnAction, string btnLabel, string btnPrompt, Color baseColor)
+        public void Init(WorkbenchButtonAction btnAction, string btnLabel, string btnPrompt, Color baseColor)
         {
             action = btnAction;
             label = btnLabel;
@@ -63,7 +61,6 @@ namespace HangarGame.Repair
 
             var tm = GetComponentInChildren<TextMesh>();
             if (tm != null) tm.text = btnLabel;
-
             RefreshColor();
         }
 
@@ -80,10 +77,7 @@ namespace HangarGame.Repair
             ModelUtils.SetColor(capRenderer, target);
         }
 
-        public bool CanInteract()
-        {
-            return gameObject.activeInHierarchy && RepairWorkbench.Instance != null && RepairWorkbench.Instance.HasItem;
-        }
+        public bool CanInteract() => gameObject.activeInHierarchy && RepairWorkbench.Instance != null && RepairWorkbench.Instance.HasItem;
 
         public string GetPrompt()
         {
@@ -102,19 +96,20 @@ namespace HangarGame.Repair
         {
             if (!CanInteract()) return;
             pressTimer = 0.1f;
-            HangarAudio.Instance?.PlayButton3D();
+            HangarAudio.Play(Sfx.Button3D);
 
             var wb = RepairWorkbench.Instance;
+            const float step = 22f;
             switch (action)
             {
-                case WorkbenchButtonAction.RotateYawLeft: wb.RotateYaw(-stepAngle); break;
-                case WorkbenchButtonAction.RotateYawRight: wb.RotateYaw(stepAngle); break;
-                case WorkbenchButtonAction.RotatePitchUp: wb.RotatePitch(-stepAngle * 0.7f); break;
-                case WorkbenchButtonAction.RotatePitchDown: wb.RotatePitch(stepAngle * 0.7f); break;
+                case WorkbenchButtonAction.RotateYawLeft: wb.Rotate(-step, 0f); break;
+                case WorkbenchButtonAction.RotateYawRight: wb.Rotate(step, 0f); break;
+                case WorkbenchButtonAction.RotatePitchUp: wb.Rotate(0f, -step * 0.7f); break;
+                case WorkbenchButtonAction.RotatePitchDown: wb.Rotate(0f, step * 0.7f); break;
                 case WorkbenchButtonAction.ResetRotation: wb.ResetRotation(); break;
                 case WorkbenchButtonAction.FinishWork:
                     if (wb.IsWorkComplete) wb.FinishWork();
-                    else HangarAudio.Instance?.PlayError();
+                    else HangarAudio.Play(Sfx.Error);
                     break;
                 case WorkbenchButtonAction.CancelWork: wb.CancelWork(); break;
             }
@@ -124,14 +119,14 @@ namespace HangarGame.Repair
         {
             if (!CanInteract()) return;
             var wb = RepairWorkbench.Instance;
-            float delta = continuousSpeed * Time.deltaTime;
+            float delta = 95f * Time.deltaTime;
 
             switch (action)
             {
-                case WorkbenchButtonAction.RotateYawLeft: pressTimer = 0.05f; wb.RotateYaw(-delta); break;
-                case WorkbenchButtonAction.RotateYawRight: pressTimer = 0.05f; wb.RotateYaw(delta); break;
-                case WorkbenchButtonAction.RotatePitchUp: pressTimer = 0.05f; wb.RotatePitch(-delta * 0.75f); break;
-                case WorkbenchButtonAction.RotatePitchDown: pressTimer = 0.05f; wb.RotatePitch(delta * 0.75f); break;
+                case WorkbenchButtonAction.RotateYawLeft: pressTimer = 0.05f; wb.Rotate(-delta, 0f); break;
+                case WorkbenchButtonAction.RotateYawRight: pressTimer = 0.05f; wb.Rotate(delta, 0f); break;
+                case WorkbenchButtonAction.RotatePitchUp: pressTimer = 0.05f; wb.Rotate(0f, -delta * 0.75f); break;
+                case WorkbenchButtonAction.RotatePitchDown: pressTimer = 0.05f; wb.Rotate(0f, delta * 0.75f); break;
             }
         }
     }

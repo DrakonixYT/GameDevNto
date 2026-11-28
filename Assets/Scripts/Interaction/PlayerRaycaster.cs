@@ -28,20 +28,19 @@ namespace HangarGame.Interaction
 
         private void Update()
         {
-            if (cam == null) return;
             var gm = GameManager.Instance;
-            if (gm != null && (gm.IsGameWon || gm.IsGameLost))
+            if (cam == null || (gm != null && (gm.IsGameWon || gm.IsGameLost)))
             {
                 ClearHover();
                 pressed = null;
                 return;
             }
 
-            Vector2 mousePos = GameInput.MousePosition;
-            if (IsPointerOverUI(mousePos))
+            Vector2 mousePos = GameInput.PointerPos;
+            if (IsPointerOverHUD(mousePos))
             {
                 ClearHover();
-                if (!GameInput.MouseLeftHeld) pressed = null;
+                if (!GameInput.LeftHeld) pressed = null;
                 return;
             }
 
@@ -55,16 +54,16 @@ namespace HangarGame.Interaction
 
             CurrentPrompt = hovered != null ? hovered.GetPrompt() : "";
 
-            if (GameInput.MouseLeftDown && hovered != null)
+            if (GameInput.LeftDown && hovered != null)
             {
                 pressed = hovered;
                 hovered.OnInteract();
             }
-            else if (GameInput.MouseLeftHeld && pressed != null && pressed == hovered && pressed.CanInteract())
+            else if (GameInput.LeftHeld && pressed != null && pressed == hovered && pressed.CanInteract())
             {
                 pressed.OnInteractHold();
             }
-            else if (!GameInput.MouseLeftHeld)
+            else if (!GameInput.LeftHeld)
             {
                 pressed = null;
             }
@@ -72,33 +71,33 @@ namespace HangarGame.Interaction
 
         private IInteractable FindTarget(Ray ray)
         {
-            var hit = PickFirst(Physics.RaycastAll(ray, maxRayDistance));
-            return hit ?? PickFirst(Physics.SphereCastAll(ray, sphereCastRadius, maxRayDistance));
+            return PickFirst(Physics.RaycastAll(ray, maxRayDistance))
+                ?? PickFirst(Physics.SphereCastAll(ray, sphereCastRadius, maxRayDistance));
         }
 
-        private IInteractable PickFirst(RaycastHit[] hits)
+        private static IInteractable PickFirst(RaycastHit[] hits)
         {
             if (hits == null || hits.Length == 0) return null;
             Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
-            for (int i = 0; i < hits.Length; i++)
+            foreach (var hit in hits)
             {
-                var target = hits[i].collider.GetComponentInParent<IInteractable>();
+                var target = hit.collider.GetComponentInParent<IInteractable>();
                 if (target != null && target.CanInteract()) return target;
             }
             return null;
         }
 
-        private bool IsPointerOverUI(Vector2 mousePos)
+        private bool IsPointerOverHUD(Vector2 mousePos)
         {
             if (EventSystem.current == null) return false;
             var ped = new PointerEventData(EventSystem.current) { position = mousePos };
             uiResults.Clear();
             EventSystem.current.RaycastAll(ped, uiResults);
 
-            for (int i = 0; i < uiResults.Count; i++)
+            foreach (var res in uiResults)
             {
-                var go = uiResults[i].gameObject;
+                var go = res.gameObject;
                 if (go.GetComponentInParent<Selectable>() != null) return true;
                 var canvas = go.GetComponentInParent<Canvas>();
                 var graphic = go.GetComponent<Graphic>();
@@ -110,11 +109,8 @@ namespace HangarGame.Interaction
 
         private void ClearHover()
         {
-            if (hovered != null)
-            {
-                hovered.OnHover(false);
-                hovered = null;
-            }
+            hovered?.OnHover(false);
+            hovered = null;
             CurrentPrompt = "";
         }
     }

@@ -10,18 +10,18 @@ namespace HangarGame.CameraControl
     {
         public static RoomCamera Instance { get; private set; }
 
-        [Header("Позиции")]
-        [SerializeField] private Vector3 hangarPos = new Vector3(-14.94f, 1.53f, -0.02f);
-        [SerializeField] private Vector3 dispatchPos = new Vector3(-14.89f, 1.38f, 1.02f);
-        [SerializeField] private float hangarYaw = 180f;
-        [SerializeField] private float dispatchYaw;
+        [Header("Точки комнат")]
+        public Vector3 hangarPos = new Vector3(-14.94f, 1.53f, -0.02f);
+        public Vector3 dispatchPos = new Vector3(-14.89f, 1.38f, 1.02f);
+        public float hangarYaw = 180f;
+        public float dispatchYaw;
 
         [Header("Верстак и пульт")]
-        [SerializeField] private Vector3 wbCameraOffset = new Vector3(0f, 1.62f, -1.26f);
-        [SerializeField] private float wbCameraPitch = 25f;
-        [SerializeField] private float dispatchDistance = 1.32f;
-        [SerializeField] private Vector3 armoryFocusPos = new Vector3(-14.38f, 1.47f, 1.72f);
-        [SerializeField] private float armoryFocusYaw = 30f;
+        public Vector3 wbCameraOffset = new Vector3(0f, 1.54f, -1.24f);
+        public float wbCameraPitch = 22f;
+        public float dispatchDistance = 1.32f;
+        public Vector3 armoryFocusPos = new Vector3(-14.38f, 1.47f, 1.72f);
+        public float armoryFocusYaw = 30f;
 
         public bool IsArmoryFocused { get; private set; }
 
@@ -36,65 +36,17 @@ namespace HangarGame.CameraControl
             Instance = this;
             var camData = GetComponent<UniversalAdditionalCameraData>();
             if (camData != null) camData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
-            foreach (var v in Object.FindObjectsByType<Volume>(FindObjectsInactive.Include))
+
+            if (Application.isPlaying)
             {
-                if (Application.isPlaying && v.profile != null && v.profile.TryGet<ChromaticAberration>(out var ca))
-                    ca.active = false;
+                foreach (var v in FindObjectsByType<Volume>(FindObjectsInactive.Include))
+                    if (v.profile != null && v.profile.TryGet<ChromaticAberration>(out var ca))
+                        ca.active = false;
             }
-        }
-
-        public void ConfigureAnchor(Vector3 hPos, Vector3 dPos, float hYaw, float dYaw)
-        {
-            hangarPos = hPos;
-            dispatchPos = dPos;
-            hangarYaw = hYaw;
-            dispatchYaw = dYaw;
-            targetYaw = hYaw;
-            currentYaw = hYaw;
-            transform.position = hPos;
-            transform.rotation = Quaternion.Euler(0f, hYaw, 0f);
-        }
-
-        public void ConfigureWorkbenchCamera(Vector3 offset, float pitch)
-        {
-            wbCameraOffset = offset;
-            wbCameraPitch = pitch;
-        }
-
-        public void ConfigureDispatchMonitorCamera(float overviewDist, Vector3 armoryPos, float armoryYaw)
-        {
-            dispatchDistance = overviewDist;
-            armoryFocusPos = armoryPos;
-            armoryFocusYaw = armoryYaw;
         }
 
         private void Start()
         {
-            var hf = GameObject.Find("HANGARFULL");
-            if (hf != null)
-            {
-                var c85 = hf.transform.Find("Cube.085");
-                var c104 = hf.transform.Find("Cube.104");
-                if (c85 != null && c104 != null)
-                {
-                    Vector3 mid = Vector3.Lerp(c85.position, c104.position, 0.45f) + Vector3.up * 0.75f;
-                    hangarPos = mid;
-                    hangarYaw = Quaternion.LookRotation(c85.position - mid).eulerAngles.y;
-
-                    var tCanvas = GameObject.Find("Terminal_Canvas");
-                    Vector3 sPoint = tCanvas != null ? tCanvas.transform.position : c104.position + Vector3.up * 0.34f;
-                    dispatchPos = new Vector3(sPoint.x, sPoint.y, sPoint.z - dispatchDistance);
-                    dispatchYaw = 0f;
-
-                    var armoryCanvas = GameObject.Find("Armory_Canvas");
-                    if (armoryCanvas != null)
-                    {
-                        armoryFocusPos = armoryCanvas.transform.position - armoryCanvas.transform.forward * 0.58f;
-                        armoryFocusYaw = armoryCanvas.transform.eulerAngles.y;
-                    }
-                }
-            }
-
             targetYaw = currentYaw = hangarYaw;
             transform.position = hangarPos;
             transform.rotation = Quaternion.Euler(0f, hangarYaw, 0f);
@@ -123,7 +75,7 @@ namespace HangarGame.CameraControl
             if (GameManager.Instance == null || GameManager.Instance.CurrentView != RoomView.DispatchConsole) return;
             IsArmoryFocused = !IsArmoryFocused;
             targetYaw += Mathf.DeltaAngle(targetYaw, IsArmoryFocused ? armoryFocusYaw : dispatchYaw);
-            HangarAudio.Instance?.PlayClick();
+            HangarAudio.Play(Sfx.Click);
         }
 
         private void Update()
@@ -133,19 +85,18 @@ namespace HangarGame.CameraControl
 
             if (view != RoomView.WorkbenchFocus && (gm == null || (!gm.IsGameWon && !gm.IsGameLost)))
             {
-                if (view == RoomView.DispatchConsole && (GameInput.KeyDown(KeyCode.Tab) || GameInput.KeyDown(KeyCode.I)))
-                    ToggleArmoryFocus();
-                if (GameInput.KeyDown(KeyCode.Q)) TurnLeft();
-                if (GameInput.KeyDown(KeyCode.E)) TurnRight();
+                if (view == RoomView.DispatchConsole && GameInput.FocusArmory) ToggleArmoryFocus();
+                if (GameInput.TurnLeft) TurnLeft();
+                if (GameInput.TurnRight) TurnRight();
             }
             else if (view == RoomView.WorkbenchFocus)
             {
-                float scroll = GameInput.ScrollY;
+                float scroll = GameInput.Scroll;
                 if (Mathf.Abs(scroll) > 0.01f)
                     wbZoom = Mathf.Clamp(wbZoom - Mathf.Sign(scroll) * 0.14f, -0.35f, 0.55f);
             }
 
-            Vector2 m = GameInput.MousePosition;
+            Vector2 m = GameInput.PointerPos;
             float nx = Mathf.Clamp(m.x / Mathf.Max(1, Screen.width) * 2f - 1f, -1f, 1f);
             float ny = Mathf.Clamp(m.y / Mathf.Max(1, Screen.height) * 2f - 1f, -1f, 1f);
 

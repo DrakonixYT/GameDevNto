@@ -11,21 +11,18 @@ namespace HangarGame.Mechs
         public static HangarMechManager Instance { get; private set; }
 
         public List<MechUnit> Mechs = new List<MechUnit>();
+        public List<Transform> bayMechs = new List<Transform>();
+        public Animator podiumAnimator;
 
-        [Header("Анимация смены больших мехов в ангаре")]
-        [SerializeField] private List<Transform> bayMechs = new List<Transform>();
-        [SerializeField] private Animator podiumAnimator;
-        [SerializeField] private float exitDuration = 1.0f;
-        [SerializeField] private float enterDuration = 1.0f;
-        [SerializeField] private float verticalLiftOffset = 0.9f;
-        [SerializeField] private float bayVerticalLiftOffset = 9.5f;
-
-        [Header("Начальное состояние")]
-        [SerializeField] private bool startFirstMechDamaged = true;
-        [SerializeField, Range(0.3f, 1f)] private float firstMechStartHpRatio = 0.58f;
+        public float exitDuration = 1.0f;
+        public float enterDuration = 1.0f;
+        public float verticalLiftOffset = 0.9f;
+        public float bayVerticalLiftOffset = 9.5f;
+        public bool startFirstMechDamaged = true;
+        [Range(0.3f, 1f)] public float firstMechStartHpRatio = 0.58f;
 
         public int CurrentIndex { get; private set; }
-        public MechUnit CurrentMech => (Mechs.Count > 0 && CurrentIndex >= 0 && CurrentIndex < Mechs.Count) ? Mechs[CurrentIndex] : null;
+        public MechUnit CurrentMech => (CurrentIndex >= 0 && CurrentIndex < Mechs.Count) ? Mechs[CurrentIndex] : null;
         public bool IsAnimatingSwap { get; private set; }
 
         public event Action<int> OnMechSwitched;
@@ -42,12 +39,9 @@ namespace HangarGame.Mechs
 
         private void CaptureBayPoses()
         {
-            if (bayMechs == null) return;
             foreach (var b in bayMechs)
-            {
                 if (b != null && !bayRestPoses.ContainsKey(b))
                     bayRestPoses[b] = (b.localPosition, b.localRotation, b.localScale);
-            }
         }
 
         private void RestoreBayPose(Transform b)
@@ -62,21 +56,16 @@ namespace HangarGame.Mechs
 
         private bool HasBayMechs()
         {
-            if (bayMechs == null || bayMechs.Count == 0) return false;
-            for (int i = 0; i < bayMechs.Count; i++)
-                if (bayMechs[i] != null) return true;
+            foreach (var b in bayMechs)
+                if (b != null) return true;
             return false;
         }
 
         private void Awake()
         {
             Instance = this;
-
             if (Mechs.Count == 0)
-            {
-                var found = GetComponentsInChildren<MechUnit>(true);
-                Mechs.AddRange(found);
-            }
+                Mechs.AddRange(GetComponentsInChildren<MechUnit>(true));
 
             foreach (var m in Mechs)
             {
@@ -96,64 +85,61 @@ namespace HangarGame.Mechs
                 Mechs[0].SyncPartsFromHp(firstMechStartHpRatio);
                 Mechs[0].currentEnergy = 75f;
             }
-            if (Mechs.Count > 1 && Mechs[1] != null)
-                Mechs[1].currentEnergy = 85f;
-            if (Mechs.Count > 2 && Mechs[2] != null)
-                Mechs[2].currentEnergy = 55f;
+            if (Mechs.Count > 1 && Mechs[1] != null) Mechs[1].currentEnergy = 85f;
+            if (Mechs.Count > 2 && Mechs[2] != null) Mechs[2].currentEnergy = 55f;
         }
 
         public void NextMech()
         {
-            if (Mechs.Count <= 1) return;
-            SwitchTo((CurrentIndex + 1) % Mechs.Count, 1);
+            if (Mechs.Count > 1) SwitchTo((CurrentIndex + 1) % Mechs.Count);
         }
 
         public void PrevMech()
         {
-            if (Mechs.Count <= 1) return;
-            SwitchTo((CurrentIndex - 1 + Mechs.Count) % Mechs.Count, -1);
+            if (Mechs.Count > 1) SwitchTo((CurrentIndex - 1 + Mechs.Count) % Mechs.Count);
         }
 
         public void SelectMech(int idx)
         {
-            if (idx < 0 || idx >= Mechs.Count || idx == CurrentIndex) return;
-            SwitchTo(idx, idx > CurrentIndex ? 1 : -1);
+            if (idx >= 0 && idx < Mechs.Count && idx != CurrentIndex)
+                SwitchTo(idx);
         }
 
-        private void SwitchTo(int targetIdx, int direction)
+        private void SwitchTo(int targetIdx)
         {
             int prevIdx = CurrentIndex;
             MechUnit prevMech = CurrentMech;
             CurrentIndex = targetIdx;
             MechUnit nextMech = CurrentMech;
 
-            HangarAudio.Instance?.PlayMechSwap();
+            HangarAudio.Play(Sfx.Swap);
             if (podiumAnimator != null) podiumAnimator.SetTrigger("Swap");
 
-            if (Application.isPlaying && gameObject.activeInHierarchy)
+            if (!Application.isPlaying || !gameObject.activeInHierarchy)
             {
-                if (swapCoroutine != null)
-                {
-                    StopCoroutine(swapCoroutine);
-                    SnapAllToRest();
-                }
+                UpdatePodiumDisplay();
+                OnMechSwitched?.Invoke(CurrentIndex);
+                return;
+            }
 
-                if (HasBayMechs())
-                {
-                    UpdateForegroundHoloDisplay();
-                    Transform prevBay = (prevIdx >= 0 && prevIdx < bayMechs.Count) ? bayMechs[prevIdx] : null;
-                    Transform nextBay = (targetIdx >= 0 && targetIdx < bayMechs.Count) ? bayMechs[targetIdx] : null;
-                    bool showNextBay = nextMech != null && !nextMech.isDeployed;
-                    swapCoroutine = StartCoroutine(AnimateBaySwapRoutine(prevBay, showNextBay ? nextBay : null, direction));
-                }
-                else
-                {
-                    swapCoroutine = StartCoroutine(AnimateSwapRoutine(prevMech, nextMech, direction));
-                }
+            if (swapCoroutine != null)
+            {
+                StopCoroutine(swapCoroutine);
+                IsAnimatingSwap = false;
+                UpdatePodiumDisplay();
+            }
+
+            if (HasBayMechs())
+            {
+                UpdateForegroundHoloDisplay();
+                Transform prevBay = prevIdx >= 0 && prevIdx < bayMechs.Count ? bayMechs[prevIdx] : null;
+                Transform nextBay = targetIdx >= 0 && targetIdx < bayMechs.Count ? bayMechs[targetIdx] : null;
+                bool showNextBay = nextMech != null && !nextMech.isDeployed;
+                swapCoroutine = StartCoroutine(SwapElevatorRoutine(prevBay, showNextBay ? nextBay : null));
             }
             else
             {
-                UpdatePodiumDisplay();
+                swapCoroutine = StartCoroutine(SwapHoloRoutine(prevMech, nextMech));
             }
 
             OnMechSwitched?.Invoke(CurrentIndex);
@@ -164,19 +150,13 @@ namespace HangarGame.Mechs
             for (int i = 0; i < Mechs.Count; i++)
             {
                 if (Mechs[i] == null) continue;
-                bool show = (i == CurrentIndex) && !Mechs[i].isDeployed;
+                bool show = i == CurrentIndex && !Mechs[i].isDeployed;
                 Mechs[i].gameObject.SetActive(show);
                 if (show) Mechs[i].RestoreRestPose();
             }
         }
 
-        private void SnapAllToRest()
-        {
-            IsAnimatingSwap = false;
-            UpdatePodiumDisplay();
-        }
-
-        private IEnumerator AnimateBaySwapRoutine(Transform outgoing, Transform incoming, int dir)
+        private IEnumerator SwapElevatorRoutine(Transform outgoing, Transform incoming)
         {
             IsAnimatingSwap = true;
 
@@ -185,50 +165,25 @@ namespace HangarGame.Mechs
                 if (!bayRestPoses.ContainsKey(outgoing))
                     bayRestPoses[outgoing] = (outgoing.localPosition, outgoing.localRotation, outgoing.localScale);
                 var basePose = bayRestPoses[outgoing];
-
-                Vector3 outPos = basePose.pos - Vector3.up * bayVerticalLiftOffset;
-                float durOut = Mathf.Max(0.05f, exitDuration);
-                float t = 0f;
-                while (t < durOut)
-                {
-                    t += Time.deltaTime;
-                    float k = Mathf.Clamp01(t / durOut);
-                    outgoing.localPosition = Vector3.Lerp(basePose.pos, outPos, k);
-                    yield return null;
-                }
-
+                yield return SlideVertical(outgoing, basePose.pos, basePose.pos - Vector3.up * bayVerticalLiftOffset, exitDuration);
                 RestoreBayPose(outgoing);
                 outgoing.gameObject.SetActive(false);
             }
 
-            for (int i = 0; i < bayMechs.Count; i++)
-            {
-                if (bayMechs[i] != null && bayMechs[i] != incoming)
-                    bayMechs[i].gameObject.SetActive(false);
-            }
+            foreach (var b in bayMechs)
+                if (b != null && b != incoming) b.gameObject.SetActive(false);
 
             if (incoming != null)
             {
                 if (!bayRestPoses.ContainsKey(incoming))
                     bayRestPoses[incoming] = (incoming.localPosition, incoming.localRotation, incoming.localScale);
                 var basePose = bayRestPoses[incoming];
-
                 Vector3 startPos = basePose.pos - Vector3.up * bayVerticalLiftOffset;
                 incoming.localPosition = startPos;
                 incoming.localRotation = basePose.rot;
                 incoming.localScale = basePose.scl;
                 incoming.gameObject.SetActive(true);
-
-                float durIn = Mathf.Max(0.05f, enterDuration);
-                float t = 0f;
-                while (t < durIn)
-                {
-                    t += Time.deltaTime;
-                    float k = Mathf.Clamp01(t / durIn);
-                    incoming.localPosition = Vector3.Lerp(startPos, basePose.pos, k);
-                    yield return null;
-                }
-
+                yield return SlideVertical(incoming, startPos, basePose.pos, enterDuration);
                 RestoreBayPose(incoming);
             }
 
@@ -236,62 +191,47 @@ namespace HangarGame.Mechs
             swapCoroutine = null;
         }
 
-        private IEnumerator AnimateSwapRoutine(MechUnit outgoing, MechUnit incoming, int dir)
+        private IEnumerator SwapHoloRoutine(MechUnit outgoing, MechUnit incoming)
         {
             IsAnimatingSwap = true;
 
             if (outgoing != null && outgoing != incoming && outgoing.gameObject.activeSelf)
             {
                 outgoing.CaptureRestPose();
-                Vector3 basePos = outgoing.RestLocalPos;
-                Vector3 outPos = basePos - Vector3.up * verticalLiftOffset;
-
-                float durOut = Mathf.Max(0.05f, exitDuration);
-                float t = 0f;
-                while (t < durOut)
-                {
-                    t += Time.deltaTime;
-                    float k = Mathf.Clamp01(t / durOut);
-                    outgoing.transform.localPosition = Vector3.Lerp(basePos, outPos, k);
-                    yield return null;
-                }
-
+                yield return SlideVertical(outgoing.transform, outgoing.RestLocalPos, outgoing.RestLocalPos - Vector3.up * verticalLiftOffset, exitDuration);
                 outgoing.RestoreRestPose();
                 outgoing.gameObject.SetActive(false);
             }
 
-            for (int i = 0; i < Mechs.Count; i++)
-            {
-                if (Mechs[i] != null && Mechs[i] != incoming)
-                    Mechs[i].gameObject.SetActive(false);
-            }
+            foreach (var m in Mechs)
+                if (m != null && m != incoming) m.gameObject.SetActive(false);
 
             if (incoming != null && !incoming.isDeployed)
             {
                 incoming.CaptureRestPose();
-                Vector3 basePos = incoming.RestLocalPos;
-                Vector3 startPos = basePos - Vector3.up * verticalLiftOffset;
-
+                Vector3 startPos = incoming.RestLocalPos - Vector3.up * verticalLiftOffset;
                 incoming.transform.localPosition = startPos;
                 incoming.transform.localRotation = incoming.RestLocalRot;
                 incoming.transform.localScale = incoming.RestLocalScale;
                 incoming.gameObject.SetActive(true);
-
-                float durIn = Mathf.Max(0.05f, enterDuration);
-                float t = 0f;
-                while (t < durIn)
-                {
-                    t += Time.deltaTime;
-                    float k = Mathf.Clamp01(t / durIn);
-                    incoming.transform.localPosition = Vector3.Lerp(startPos, basePos, k);
-                    yield return null;
-                }
-
+                yield return SlideVertical(incoming.transform, startPos, incoming.RestLocalPos, enterDuration);
                 incoming.RestoreRestPose();
             }
 
             IsAnimatingSwap = false;
             swapCoroutine = null;
+        }
+
+        private static IEnumerator SlideVertical(Transform target, Vector3 from, Vector3 to, float duration)
+        {
+            float dur = Mathf.Max(0.05f, duration);
+            float t = 0f;
+            while (t < dur && target != null)
+            {
+                t += Time.deltaTime;
+                target.localPosition = Vector3.Lerp(from, to, Mathf.Clamp01(t / dur));
+                yield return null;
+            }
         }
 
         public void RechargeCurrentMech()
@@ -306,7 +246,7 @@ namespace HangarGame.Mechs
             for (int i = 0; i < bayMechs.Count; i++)
             {
                 if (bayMechs[i] == null) continue;
-                bool showBay = (i == CurrentIndex) && (i < Mechs.Count && Mechs[i] != null && !Mechs[i].isDeployed);
+                bool showBay = i == CurrentIndex && i < Mechs.Count && Mechs[i] != null && !Mechs[i].isDeployed;
                 bayMechs[i].gameObject.SetActive(showBay);
                 if (showBay) RestoreBayPose(bayMechs[i]);
             }

@@ -17,8 +17,7 @@ namespace HangarGame.Prototype
     {
         public void BuildCompleteHangarPrototype()
         {
-            Transform c85 = null;
-            Transform c104 = null;
+            Transform c85 = null, c104 = null;
             GameObject hf = GameObject.Find("HANGARFULL");
             if (hf == null)
             {
@@ -54,10 +53,10 @@ namespace HangarGame.Prototype
             CreateWorkbench(wbPos);
             CreateJaegerStage(wbPos + new Vector3(0f, 0f, 1.6f), managers.jaeger);
 
-            GameObject consoleGrp = new GameObject("--- 07_DISPATCH_CONSOLE ---");
+            var consoleGrp = new GameObject("--- 07_DISPATCH_CONSOLE ---");
             BuildDispatchMonitors(consoleGrp.transform, c104, screenCenter, cam);
 
-            GameObject hudGrp = new GameObject("--- 08_MINIMAL_HUD ---");
+            var hudGrp = new GameObject("--- 08_MINIMAL_HUD ---");
             BuildHUD(hudGrp.transform);
         }
 
@@ -88,17 +87,22 @@ namespace HangarGame.Prototype
             cam.farClipPlane = 200f;
 
             ModelUtils.GetOrAdd<AudioListener>(camObj);
-            ModelUtils.GetOrAdd<RoomCamera>(camObj).ConfigureAnchor(camPos, dispatchPos, hYaw, dYaw);
+            var rCam = ModelUtils.GetOrAdd<RoomCamera>(camObj);
+            rCam.hangarPos = camPos;
+            rCam.dispatchPos = dispatchPos;
+            rCam.hangarYaw = hYaw;
+            rCam.dispatchYaw = dYaw;
+
             ModelUtils.GetOrAdd<PlayerRaycaster>(camObj);
             return cam;
         }
 
         private (JaegerProject jaeger, HangarAlarmLight alarmLight) CreateCoreManagers()
         {
-            GameObject grp = new GameObject("--- 01_MANAGERS ---");
+            var grp = new GameObject("--- 01_MANAGERS ---");
             if (FindAnyObjectByType<EventSystem>() == null)
             {
-                GameObject es = new GameObject("EventSystem");
+                var es = new GameObject("EventSystem");
                 es.transform.SetParent(grp.transform, false);
                 es.AddComponent<EventSystem>();
                 GameInput.AddUIInputModule(es);
@@ -119,7 +123,7 @@ namespace HangarGame.Prototype
 
         private void CreateLighting(Vector3 podiumPos, Vector3 screenCenter, HangarAlarmLight alarmLight)
         {
-            GameObject grp = new GameObject("--- 02_LIGHTING_AND_VFX ---");
+            var grp = new GameObject("--- 02_LIGHTING_AND_VFX ---");
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.24f, 0.28f, 0.35f);
 
@@ -168,8 +172,7 @@ namespace HangarGame.Prototype
             if (hf == null)
             {
                 GameObject fullPrefab = LoadPrefab("Assets/Prefabs/Base/HANGARFULL.prefab");
-                if (fullPrefab != null)
-                    Instantiate(fullPrefab, grp.transform).name = "HANGARFULL";
+                if (fullPrefab != null) Instantiate(fullPrefab, grp.transform).name = "HANGARFULL";
             }
         }
 
@@ -228,8 +231,7 @@ namespace HangarGame.Prototype
             foreach (var col in obj.GetComponentsInChildren<Collider>(true))
                 ModelUtils.DestroySafe(col);
 
-            Material mat = LoadMaterial(matPath);
-            ModelUtils.ApplyPrimaryMaterial(obj, mat);
+            ModelUtils.ApplyPrimaryMaterial(obj, LoadMaterial(matPath));
             SnapFeetToPodium(obj, bayPos);
             return obj.transform;
         }
@@ -363,8 +365,7 @@ namespace HangarGame.Prototype
             for (int i = 0; i < root.childCount; i++)
             {
                 var ch = root.GetChild(i);
-                if (ch.GetComponent<MechPart>() == null)
-                    AddLocalMeshColliders(ch, true);
+                if (ch.GetComponent<MechPart>() == null) AddLocalMeshColliders(ch, true);
             }
         }
 
@@ -375,7 +376,8 @@ namespace HangarGame.Prototype
             grp.transform.rotation = Quaternion.Euler(0f, 270f, 0f);
 
             GameObject egerPrefab = LoadPrefab("Assets/Prefabs/Eger/Eger.prefab");
-            Transform[] sceneParts = new Transform[5];
+            if (jaeger == null) return;
+
             if (egerPrefab != null)
             {
                 GameObject egerObj = Instantiate(egerPrefab, grp.transform);
@@ -383,14 +385,17 @@ namespace HangarGame.Prototype
                 egerObj.transform.localPosition = Vector3.zero;
                 egerObj.transform.localRotation = Quaternion.identity;
 
-                sceneParts[0] = egerObj.transform.Find("EgerHead");
-                sceneParts[1] = egerObj.transform.Find("EgerLeftArm");
-                sceneParts[2] = egerObj.transform.Find("EgerRightArm");
-                sceneParts[3] = egerObj.transform.Find("EgerShield");
-                sceneParts[4] = egerObj.transform.Find("EgerSpear");
+                jaeger.stageVisualParts = new[]
+                {
+                    egerObj.transform.Find("EgerHead"),
+                    egerObj.transform.Find("EgerLeftArm"),
+                    egerObj.transform.Find("EgerRightArm"),
+                    egerObj.transform.Find("EgerShield"),
+                    egerObj.transform.Find("EgerSpear")
+                };
             }
 
-            GameObject[] stagePrefabs =
+            jaeger.stageWorkbenchPrefabs = new[]
             {
                 LoadPrefab("Assets/Prefabs/Eger/EgerHead.fbx"),
                 LoadPrefab("Assets/Prefabs/Eger/EgerLeftArm.fbx"),
@@ -398,7 +403,8 @@ namespace HangarGame.Prototype
                 LoadPrefab("Assets/Prefabs/Eger/EgerShield.fbx"),
                 LoadPrefab("Assets/Prefabs/Eger/EgerSpear.fbx")
             };
-            jaeger?.Configure(sceneParts, stagePrefabs, LoadPrefab("Assets/Prefabs/Eger/Plate.fbx"));
+            jaeger.platePrefab = LoadPrefab("Assets/Prefabs/Eger/Plate.fbx");
+            jaeger.RefreshVisualStages();
         }
 
         private void CreateWorkbench(Vector3 wbPos)
@@ -408,7 +414,7 @@ namespace HangarGame.Prototype
             grp.transform.rotation = Quaternion.Euler(0f, 270f, 0f);
 
             var wb = grp.AddComponent<RepairWorkbench>();
-            wb.SetPlatePrefab(LoadPrefab("Assets/Prefabs/Eger/Plate.fbx"));
+            wb.platePrefab = LoadPrefab("Assets/Prefabs/Eger/Plate.fbx");
 
             CreatePrimitive(grp.transform, PrimitiveType.Cube, "Tabletop", new Vector3(0f, 0.75f, 0f), new Vector3(2.4f, 0.12f, 1.1f), new Color(0.22f, 0.24f, 0.27f), true);
             CreatePrimitive(grp.transform, PrimitiveType.Cube, "Vice", new Vector3(-0.95f, 0.88f, 0f), new Vector3(0.25f, 0.2f, 0.3f), new Color(0.65f, 0.22f, 0.22f), true);
@@ -447,7 +453,7 @@ namespace HangarGame.Prototype
         private static void AddBtn3D(Transform panel, float localX, WorkbenchButtonAction action, string text, string prompt, Color color, float width)
         {
             GameObject btn = CreatePrimitive(panel, PrimitiveType.Cube, $"Btn3D_{action}", new Vector3(localX, 0.025f, 0f), new Vector3(width, 0.032f, 0.11f), color, true);
-            btn.AddComponent<WorkbenchButton3D>().Setup(action, text, prompt, color);
+            btn.AddComponent<WorkbenchButton3D>().Init(action, text, prompt, color);
 
             var lblObj = new GameObject("Label");
             lblObj.transform.SetParent(btn.transform, false);
@@ -478,12 +484,8 @@ namespace HangarGame.Prototype
             Font hiFont = UIBuilder.GetFont(28);
 
             BuildTerminalMonitor(consoleGroup, new Vector3(cb.center.x, cb.center.y, cb.min.z - 0.014f), termScale, cam, baseFont);
-
-            Vector3 leftPivot = new Vector3(cb.min.x, cb.center.y, cb.center.z);
-            BuildStatusMonitor(consoleGroup, leftPivot, cam, hiFont);
-
-            Vector3 rightPivot = new Vector3(cb.max.x, cb.center.y, cb.center.z);
-            BuildArmoryMonitor(consoleGroup, rightPivot, cam, hiFont);
+            BuildStatusMonitor(consoleGroup, new Vector3(cb.min.x, cb.center.y, cb.center.z), cam, hiFont);
+            BuildArmoryMonitor(consoleGroup, new Vector3(cb.max.x, cb.center.y, cb.center.z), cam, hiFont);
         }
 
         private static Canvas CreateWorldCanvas(Transform parent, string name, Vector3 pos, Quaternion rot, float scale, Vector2 size, UnityEngine.Camera cam, int order)
@@ -522,10 +524,10 @@ namespace HangarGame.Prototype
             GameObject radar = UIBuilder.Panel(bg.transform, "Radar_Screen", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 44f), new Vector2(1140f, 420f), UITheme.BgRecessed, UITheme.Border);
             radar.AddComponent<RadarClickHandler>();
 
-            float[] vx = { -360f, -180f, 0f, 180f, 360f };
-            foreach (float x in vx) UIBuilder.AddLine(radar.transform, new Vector2(x, 0f), new Vector2(1.5f, 412f), UITheme.RadarGrid);
-            float[] hy = { -110f, 0f, 110f };
-            foreach (float y in hy) UIBuilder.AddLine(radar.transform, new Vector2(0f, y), new Vector2(1132f, 1.5f), UITheme.RadarGrid);
+            foreach (float x in new[] { -360f, -180f, 0f, 180f, 360f })
+                UIBuilder.AddLine(radar.transform, new Vector2(x, 0f), new Vector2(1.5f, 412f), UITheme.RadarGrid);
+            foreach (float y in new[] { -110f, 0f, 110f })
+                UIBuilder.AddLine(radar.transform, new Vector2(0f, y), new Vector2(1132f, 1.5f), UITheme.RadarGrid);
 
             UIBuilder.AddLine(radar.transform, new Vector2(0f, -178f), new Vector2(1120f, 2f), new Color(UITheme.AccentTeal.r, UITheme.AccentTeal.g, UITheme.AccentTeal.b, 0.75f));
 
@@ -541,19 +543,16 @@ namespace HangarGame.Prototype
             {
                 GameObject slot = UIBuilder.Panel(bg.transform, $"SlotRoot_{i}", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(xOff[i], 96f), new Vector2(368f, 112f), UITheme.BgCard, UITheme.Border);
                 UIBuilder.Button(slot.transform, $"Btn_MechSlot_{i}", $"Мех {i + 1}", new Vector2(0.5f, 1f), new Vector2(0f, -20f), new Vector2(354f, 32f), UITheme.BgHeader, UITheme.Border, 15, font);
-
                 UIBuilder.BarFill(slot.transform, "Bar_Hp", new Vector2(0.5f, 0.5f), new Vector2(-88f, 4f), new Vector2(168f, 10f), UITheme.BgRecessed, UITheme.AccentGreen);
                 UIBuilder.BarFill(slot.transform, "Bar_En", new Vector2(0.5f, 0.5f), new Vector2(88f, 4f), new Vector2(168f, 10f), UITheme.BgRecessed, UITheme.AccentTeal);
                 UIBuilder.Label(slot.transform, "Txt_Stats", "ХП 100%     ЭН 100%", new Vector2(0.5f, 0.5f), new Vector2(0f, -14f), new Vector2(350f, 20f), 13, UITheme.TextMuted, font);
-
                 UIBuilder.Button(slot.transform, $"Btn_Shield_{i}", "Щит", new Vector2(0f, 0f), new Vector2(92f, 18f), new Vector2(166f, 26f), UITheme.AccentTeal, UITheme.Border, 14, font);
                 UIBuilder.Button(slot.transform, $"Btn_Recall_{i}", "На базу", new Vector2(1f, 0f), new Vector2(-92f, 18f), new Vector2(166f, 26f), UITheme.AccentRed, UITheme.Border, 14, font);
             }
 
             UIBuilder.Label(bg.transform, "Txt_BattleLog", "Радар чист.", new Vector2(0.5f, 0f), new Vector2(0f, 20f), new Vector2(1140f, 26f), 15, UITheme.TextMuted, font);
 
-            var ui = ModelUtils.GetOrAdd<TerminalUI>(c.gameObject);
-            ui.BindFromHierarchy();
+            ModelUtils.GetOrAdd<TerminalUI>(c.gameObject).BindFromHierarchy();
         }
 
         private static void BuildStatusMonitor(Transform parent, Vector3 leftPivot, UnityEngine.Camera cam, Font hiFont)
@@ -586,8 +585,7 @@ namespace HangarGame.Prototype
 
             UIBuilder.Button(bg.transform, "Btn_BuildJaeger", "СОБРАТЬ МОДУЛЬ", new Vector2(0.5f, 0f), new Vector2(0f, 68f), new Vector2(660f, 84f), UITheme.AccentTeal, UITheme.Border, 25, hiFont);
 
-            var ui = ModelUtils.GetOrAdd<StatusMonitorUI>(c.gameObject);
-            ui.BindFromHierarchy();
+            ModelUtils.GetOrAdd<StatusMonitorUI>(c.gameObject).BindFromHierarchy();
         }
 
         public static ArmoryUI BuildArmoryMonitor(Transform consoleGroup, Vector3 rightPivot, UnityEngine.Camera cam, Font hiFont)

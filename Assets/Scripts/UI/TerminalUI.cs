@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using HangarGame.Core;
 using HangarGame.Dispatch;
@@ -10,6 +11,19 @@ namespace HangarGame.UI
 {
     public class TerminalUI : MonoBehaviour
     {
+        [Serializable]
+        public class MechSlotView
+        {
+            public Button mainBtn;
+            public Button shieldBtn;
+            public Button recallBtn;
+            public Image mainBg;
+            public Image hpFill;
+            public Image energyFill;
+            public Text title;
+            public Text stats;
+        }
+
         [SerializeField] private Text txtRadarTitle;
         [SerializeField] private Text txtBattleLog;
         [SerializeField] private Text txtJaegerInfo;
@@ -17,15 +31,7 @@ namespace HangarGame.UI
         [SerializeField] private RectTransform radarArea;
         [SerializeField] private RadarClickHandler radarClick;
         [SerializeField] private Transform markerContainer;
-
-        [SerializeField] private Button[] btnMechSlots = new Button[3];
-        [SerializeField] private Button[] btnShieldSlots = new Button[3];
-        [SerializeField] private Button[] btnRecallSlots = new Button[3];
-        [SerializeField] private Text[] txtMechSlots = new Text[3];
-        [SerializeField] private Image[] imgMechSlots = new Image[3];
-        [SerializeField] private Image[] barMechHp = new Image[3];
-        [SerializeField] private Image[] barMechEnergy = new Image[3];
-        [SerializeField] private Text[] txtMechBars = new Text[3];
+        [SerializeField] private MechSlotView[] slots = new MechSlotView[3];
 
         private struct MarkerView
         {
@@ -59,16 +65,20 @@ namespace HangarGame.UI
             for (int i = 0; i < 3; i++)
             {
                 Transform slot = bg.Find($"SlotRoot_{i}");
-                if (slot == null) continue;
+                if (slot == null) { slots[i] = null; continue; }
+
                 Transform main = slot.Find($"Btn_MechSlot_{i}");
-                btnMechSlots[i] = main != null ? main.GetComponent<Button>() : null;
-                imgMechSlots[i] = main != null ? main.GetComponent<Image>() : null;
-                txtMechSlots[i] = main != null ? main.GetComponentInChildren<Text>() : null;
-                barMechHp[i] = slot.Find("Bar_Hp/Fill")?.GetComponent<Image>();
-                barMechEnergy[i] = slot.Find("Bar_En/Fill")?.GetComponent<Image>();
-                txtMechBars[i] = slot.Find("Txt_Stats")?.GetComponent<Text>();
-                btnShieldSlots[i] = slot.Find($"Btn_Shield_{i}")?.GetComponent<Button>();
-                btnRecallSlots[i] = slot.Find($"Btn_Recall_{i}")?.GetComponent<Button>();
+                slots[i] = new MechSlotView
+                {
+                    mainBtn = main?.GetComponent<Button>(),
+                    mainBg = main?.GetComponent<Image>(),
+                    title = main?.GetComponentInChildren<Text>(),
+                    hpFill = slot.Find("Bar_Hp/Fill")?.GetComponent<Image>(),
+                    energyFill = slot.Find("Bar_En/Fill")?.GetComponent<Image>(),
+                    stats = slot.Find("Txt_Stats")?.GetComponent<Text>(),
+                    shieldBtn = slot.Find($"Btn_Shield_{i}")?.GetComponent<Button>(),
+                    recallBtn = slot.Find($"Btn_Recall_{i}")?.GetComponent<Button>()
+                };
             }
         }
 
@@ -82,29 +92,32 @@ namespace HangarGame.UI
                 btnScanThreat.onClick.RemoveAllListeners();
                 btnScanThreat.onClick.AddListener(() =>
                 {
-                    HangarAudio.Instance?.PlayClick();
+                    HangarAudio.Play(Sfx.Click);
                     DispatchSystem.Instance?.SpawnEnemy();
                     Refresh();
                 });
             }
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < slots.Length; i++)
             {
+                var s = slots[i];
+                if (s == null) continue;
                 int idx = i;
-                if (btnMechSlots[idx] != null)
+
+                if (s.mainBtn != null)
                 {
-                    btnMechSlots[idx].onClick.RemoveAllListeners();
-                    btnMechSlots[idx].onClick.AddListener(() => OnSlotClicked(idx));
+                    s.mainBtn.onClick.RemoveAllListeners();
+                    s.mainBtn.onClick.AddListener(() => OnSlotClicked(idx));
                 }
-                if (btnShieldSlots[idx] != null)
+                if (s.shieldBtn != null)
                 {
-                    btnShieldSlots[idx].onClick.RemoveAllListeners();
-                    btnShieldSlots[idx].onClick.AddListener(() => OnShieldClicked(idx));
+                    s.shieldBtn.onClick.RemoveAllListeners();
+                    s.shieldBtn.onClick.AddListener(() => OnShieldClicked(idx));
                 }
-                if (btnRecallSlots[idx] != null)
+                if (s.recallBtn != null)
                 {
-                    btnRecallSlots[idx].onClick.RemoveAllListeners();
-                    btnRecallSlots[idx].onClick.AddListener(() => OnRecallClicked(idx));
+                    s.recallBtn.onClick.RemoveAllListeners();
+                    s.recallBtn.onClick.AddListener(() => OnRecallClicked(idx));
                 }
             }
         }
@@ -129,53 +142,27 @@ namespace HangarGame.UI
             if (mgr == null || ds == null || slotIdx >= mgr.Mechs.Count) return;
 
             var mech = mgr.Mechs[slotIdx];
-            HangarAudio.Instance?.PlayClick();
+            HangarAudio.Play(Sfx.Click);
 
-            if (!mech.CanDeploy())
-            {
-                if (!mech.isDeployed)
-                {
-                    ds.SelectedMechId = mech.id;
-                    ds.IsDeployMode = false;
-                }
-                else
-                {
-                    ds.SelectedMechId = mech.id;
-                    ds.IsDeployMode = false;
-                }
-                Refresh();
-                return;
-            }
-
-            if (ds.SelectedMechId == mech.id && ds.IsDeployMode)
-            {
-                ds.IsDeployMode = false;
-            }
-            else
-            {
-                ds.SelectedMechId = mech.id;
-                ds.IsDeployMode = true;
-            }
+            bool toggleOff = !mech.CanDeploy() || (ds.SelectedMechId == mech.id && ds.IsDeployMode);
+            ds.SelectedMechId = mech.id;
+            ds.IsDeployMode = !toggleOff;
             Refresh();
         }
 
         private void OnShieldClicked(int slotIdx)
         {
             var mgr = HangarMechManager.Instance;
-            var ds = DispatchSystem.Instance;
-            if (mgr == null || ds == null || slotIdx >= mgr.Mechs.Count) return;
-
-            ds.ToggleMechShield(mgr.Mechs[slotIdx].id);
+            if (mgr == null || DispatchSystem.Instance == null || slotIdx >= mgr.Mechs.Count) return;
+            DispatchSystem.Instance.ToggleMechShield(mgr.Mechs[slotIdx].id);
             Refresh();
         }
 
         private void OnRecallClicked(int slotIdx)
         {
             var mgr = HangarMechManager.Instance;
-            var ds = DispatchSystem.Instance;
-            if (mgr == null || ds == null || slotIdx >= mgr.Mechs.Count) return;
-
-            ds.RecallMech(mgr.Mechs[slotIdx].id);
+            if (mgr == null || DispatchSystem.Instance == null || slotIdx >= mgr.Mechs.Count) return;
+            DispatchSystem.Instance.RecallMech(mgr.Mechs[slotIdx].id);
             Refresh();
         }
 
@@ -202,7 +189,6 @@ namespace HangarGame.UI
             if (ds == null || mgr == null) return;
 
             Vector2 mapPos = UIToRadar(pos);
-
             if (ds.SelectedMechId >= 0)
             {
                 var mech = mgr.GetMechById(ds.SelectedMechId);
@@ -225,7 +211,7 @@ namespace HangarGame.UI
             {
                 ds.SelectedMechId = nearby.id;
                 ds.IsDeployMode = false;
-                HangarAudio.Instance?.PlayClick();
+                HangarAudio.Play(Sfx.Click);
                 Refresh();
             }
         }
@@ -233,11 +219,11 @@ namespace HangarGame.UI
         public void Refresh()
         {
             var ds = DispatchSystem.Instance;
+            if (ds == null) return;
+
             var mgr = HangarMechManager.Instance;
             var jp = JaegerProject.Instance;
             var gm = GameManager.Instance;
-
-            if (ds == null) return;
 
             if (txtRadarTitle != null)
             {
@@ -263,63 +249,65 @@ namespace HangarGame.UI
         {
             if (mgr == null) return;
 
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < slots.Length; i++)
             {
+                var slot = slots[i];
+                if (slot == null) continue;
                 if (i >= mgr.Mechs.Count)
                 {
-                    if (btnMechSlots[i] != null) btnMechSlots[i].gameObject.SetActive(false);
+                    if (slot.mainBtn != null) slot.mainBtn.gameObject.SetActive(false);
                     continue;
                 }
 
                 var m = mgr.Mechs[i];
                 bool selected = ds.SelectedMechId == m.id;
-                bool missingParts = m.HasMissingOrDetachedParts();
+                bool damagedParts = m.HasMissingOrDetachedParts();
 
-                if (imgMechSlots[i] != null)
+                if (slot.mainBg != null)
                 {
-                    if (selected && ds.IsDeployMode) imgMechSlots[i].color = UITheme.AccentAmber;
-                    else if (selected) imgMechSlots[i].color = UITheme.AccentTeal;
-                    else if (m.isDeployed) imgMechSlots[i].color = UITheme.AccentGreen;
-                    else if (missingParts) imgMechSlots[i].color = UITheme.AccentRed;
-                    else imgMechSlots[i].color = UITheme.BgHeader;
+                    if (selected && ds.IsDeployMode) slot.mainBg.color = UITheme.AccentAmber;
+                    else if (selected) slot.mainBg.color = UITheme.AccentTeal;
+                    else if (m.isDeployed) slot.mainBg.color = UITheme.AccentGreen;
+                    else if (damagedParts) slot.mainBg.color = UITheme.AccentRed;
+                    else slot.mainBg.color = UITheme.BgHeader;
                 }
 
-                if (txtMechSlots[i] != null)
+                if (slot.title != null)
                 {
                     string status = m.isReturning ? "Отходит"
                         : (m.isDeployed ? "В бою"
                         : (selected && ds.IsDeployMode ? "Укажите точку"
-                        : (missingParts ? "Нужен ремонт"
+                        : (damagedParts ? "Нужен ремонт"
                         : (m.CanDeploy() ? "Готов" : "Разряд / крит."))));
-                    txtMechSlots[i].text = $"{m.mechName}  •  {status}";
+                    slot.title.text = $"{m.mechName}  •  {status}";
                 }
 
-                if (barMechHp[i] != null)
+                if (slot.hpFill != null)
                 {
                     float hpR = m.GetTotalHpPercent();
-                    barMechHp[i].color = hpR > 0.5f ? UITheme.AccentGreen : (hpR > 0.25f ? UITheme.AccentAmber : UITheme.AccentRed);
-                    UIBuilder.SetBar(barMechHp[i], hpR);
+                    slot.hpFill.color = hpR > 0.5f ? UITheme.AccentGreen : (hpR > 0.25f ? UITheme.AccentAmber : UITheme.AccentRed);
+                    UIBuilder.SetBar(slot.hpFill, hpR);
                 }
 
-                if (barMechEnergy[i] != null)
-                    UIBuilder.SetBar(barMechEnergy[i], m.maxEnergy > 0f ? m.currentEnergy / m.maxEnergy : 0f);
+                if (slot.energyFill != null)
+                    UIBuilder.SetBar(slot.energyFill, m.maxEnergy > 0f ? m.currentEnergy / m.maxEnergy : 0f);
 
-                if (txtMechBars[i] != null)
-                    txtMechBars[i].text = $"ХП {m.HpPercent:F0}%     ЭН {m.currentEnergy:F0}%";
+                if (slot.stats != null)
+                    slot.stats.text = $"ХП {m.HpPercent:F0}%     ЭН {m.currentEnergy:F0}%";
 
-                if (btnShieldSlots[i] != null)
+                if (slot.shieldBtn != null)
                 {
-                    btnShieldSlots[i].interactable = m.isDeployed;
-                    var img = btnShieldSlots[i].GetComponent<Image>();
+                    slot.shieldBtn.interactable = m.isDeployed;
+                    var img = slot.shieldBtn.GetComponent<Image>();
                     if (img != null) img.color = m.isShieldActive ? UITheme.AccentAmber : (m.isDeployed ? UITheme.AccentTeal : UITheme.BgRecessed);
-                    var st = btnShieldSlots[i].GetComponentInChildren<Text>();
+                    var st = slot.shieldBtn.GetComponentInChildren<Text>();
                     if (st != null) st.text = m.isShieldActive ? "Щит: ВКЛ" : "Щит";
                 }
 
-                if (btnRecallSlots[i] != null)
+                if (slot.recallBtn != null)
                 {
-                    btnRecallSlots[i].interactable = m.isDeployed && !m.isReturning;
-                    var img = btnRecallSlots[i].GetComponent<Image>();
+                    slot.recallBtn.interactable = m.isDeployed && !m.isReturning;
+                    var img = slot.recallBtn.GetComponent<Image>();
                     if (img != null) img.color = (m.isDeployed && !m.isReturning) ? UITheme.AccentRed : UITheme.BgRecessed;
                 }
             }
@@ -329,77 +317,60 @@ namespace HangarGame.UI
         {
             if (markerContainer == null) return;
 
-            EnsureBaseMarker();
+            if (baseMarker.root == null)
+            {
+                GameObject go = UIBuilder.Panel(markerContainer, "BaseMarker", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(110f, 22f), UITheme.BgHeader, UITheme.AccentTeal);
+                go.GetComponent<Image>().raycastTarget = false;
+                Text lbl = UIBuilder.Label(go.transform, "Txt", "БАЗА", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(104f, 18f), 11, UITheme.AccentTeal, null, FontStyle.Bold);
+                baseMarker = new MarkerView { root = go, rt = go.GetComponent<RectTransform>(), label = lbl };
+            }
             baseMarker.rt.anchoredPosition = RadarToUI(ds.BasePosition);
 
             int mechIdx = 0;
             if (mgr != null)
             {
-                for (int i = 0; i < mgr.Mechs.Count; i++)
+                foreach (var m in mgr.Mechs)
                 {
-                    var m = mgr.Mechs[i];
                     if (m == null || !m.isDeployed) continue;
-
-                    var view = GetOrCreateMechMarker(mechIdx++);
+                    var view = GetOrCreateMarker(mechPool, mechIdx++, true);
                     view.root.SetActive(true);
                     view.rt.anchoredPosition = RadarToUI(m.battlefieldPos);
-                    bool sel = ds.SelectedMechId == m.id;
-                    view.bg.color = m.isShieldActive ? UITheme.AccentAmber : (sel ? UITheme.AccentTeal : UITheme.AccentGreen);
+                    view.bg.color = m.isShieldActive ? UITheme.AccentAmber : (ds.SelectedMechId == m.id ? UITheme.AccentTeal : UITheme.AccentGreen);
                     view.label.text = m.mechName.Split(' ')[0];
                     UIBuilder.SetBar(view.fill, m.GetTotalHpPercent());
                 }
             }
-            for (int i = mechIdx; i < mechPool.Count; i++)
-                mechPool[i].root.SetActive(false);
+            for (int i = mechIdx; i < mechPool.Count; i++) mechPool[i].root.SetActive(false);
 
             int enemyCount = ds.Enemies.Count;
             for (int i = 0; i < enemyCount; i++)
             {
                 var e = ds.Enemies[i];
-                var view = GetOrCreateEnemyMarker(i);
+                var view = GetOrCreateMarker(enemyPool, i, false);
                 view.root.SetActive(true);
                 view.rt.anchoredPosition = RadarToUI(e.position);
                 view.label.text = $"{e.name}\n{e.hp:F0}  •  {e.weakAgainst.ToRu()}";
                 UIBuilder.SetBar(view.fill, e.maxHp > 0f ? e.hp / e.maxHp : 1f);
             }
-            for (int i = enemyCount; i < enemyPool.Count; i++)
-                enemyPool[i].root.SetActive(false);
+            for (int i = enemyCount; i < enemyPool.Count; i++) enemyPool[i].root.SetActive(false);
         }
 
-        private void EnsureBaseMarker()
+        private MarkerView GetOrCreateMarker(List<MarkerView> pool, int idx, bool isMech)
         {
-            if (baseMarker.root != null) return;
-            GameObject go = UIBuilder.Panel(markerContainer, "BaseMarker", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(110f, 22f), UITheme.BgHeader, UITheme.AccentTeal);
-            go.GetComponent<Image>().raycastTarget = false;
-            Text lbl = UIBuilder.Label(go.transform, "Txt", "БАЗА", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(104f, 18f), 11, UITheme.AccentTeal, null, FontStyle.Bold);
-            baseMarker = new MarkerView { root = go, rt = go.GetComponent<RectTransform>(), label = lbl };
-        }
+            if (idx < pool.Count) return pool[idx];
 
-        private MarkerView GetOrCreateMechMarker(int idx)
-        {
-            if (idx < mechPool.Count) return mechPool[idx];
+            Vector2 size = isMech ? new Vector2(74f, 28f) : new Vector2(124f, 34f);
+            Color bgCol = isMech ? UITheme.AccentTeal : new Color(0.28f, 0.08f, 0.09f, 0.96f);
+            Color border = isMech ? UITheme.TextMain : UITheme.AccentRed;
 
-            GameObject go = UIBuilder.Panel(markerContainer, $"MechMarker_{idx}", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(74f, 28f), UITheme.AccentTeal, UITheme.TextMain);
+            GameObject go = UIBuilder.Panel(markerContainer, isMech ? $"MechMarker_{idx}" : $"EnemyMarker_{idx}", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, size, bgCol, border);
             go.GetComponent<Image>().raycastTarget = false;
-            Text lbl = UIBuilder.Label(go.transform, "Txt", "", new Vector2(0.5f, 0.5f), new Vector2(0f, 4f), new Vector2(70f, 16f), 11, UITheme.TextMain, null, FontStyle.Bold);
-            Image fill = UIBuilder.BarFill(go.transform, "Hp", new Vector2(0.5f, 0f), new Vector2(0f, 4f), new Vector2(64f, 4f), UITheme.BgRecessed, UITheme.AccentGreen);
+
+            Text lbl = UIBuilder.Label(go.transform, "Txt", "", new Vector2(0.5f, 0.5f), new Vector2(0f, 4f), new Vector2(size.x - 6f, isMech ? 16f : 24f), isMech ? 11 : 10, UITheme.TextMain, null, isMech ? FontStyle.Bold : FontStyle.Normal);
+            Image fill = UIBuilder.BarFill(go.transform, "Hp", new Vector2(0.5f, 0f), new Vector2(0f, 3f), new Vector2(size.x - 10f, isMech ? 4f : 3f), UITheme.BgRecessed, isMech ? UITheme.AccentGreen : UITheme.AccentRed);
 
             var mv = new MarkerView { root = go, rt = go.GetComponent<RectTransform>(), bg = go.GetComponent<Image>(), fill = fill, label = lbl };
-            mechPool.Add(mv);
-            return mv;
-        }
-
-        private MarkerView GetOrCreateEnemyMarker(int idx)
-        {
-            if (idx < enemyPool.Count) return enemyPool[idx];
-
-            GameObject go = UIBuilder.Panel(markerContainer, $"EnemyMarker_{idx}", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(124f, 34f), new Color(0.28f, 0.08f, 0.09f, 0.96f), UITheme.AccentRed);
-            go.GetComponent<Image>().raycastTarget = false;
-            Text lbl = UIBuilder.Label(go.transform, "Txt", "", new Vector2(0.5f, 0.5f), new Vector2(0f, 4f), new Vector2(118f, 24f), 10, UITheme.TextMain);
-            Image fill = UIBuilder.BarFill(go.transform, "Hp", new Vector2(0.5f, 0f), new Vector2(0f, 3f), new Vector2(114f, 3f), UITheme.BgRecessed, UITheme.AccentRed);
-
-            var mv = new MarkerView { root = go, rt = go.GetComponent<RectTransform>(), bg = go.GetComponent<Image>(), fill = fill, label = lbl };
-            enemyPool.Add(mv);
+            pool.Add(mv);
             return mv;
         }
     }

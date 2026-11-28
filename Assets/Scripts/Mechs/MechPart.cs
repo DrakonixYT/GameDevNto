@@ -155,7 +155,11 @@ namespace HangarGame.Mechs
             if (data == null || (data.slot != PartSlot.LeftArm && data.slot != PartSlot.RightArm)) return;
             InitColors();
 
-            ClearEquippedWeaponOn(transform, ref equippedWeaponVisual);
+            if (equippedWeaponVisual != null)
+            {
+                ModelUtils.DestroySafe(equippedWeaponVisual);
+                equippedWeaponVisual = null;
+            }
             if (weapon == null || !weapon.hasCustomVisual) return;
 
             Transform parentMount = weaponMountPoint != null ? weaponMountPoint : transform;
@@ -181,12 +185,6 @@ namespace HangarGame.Mechs
                 armBounds = new Bounds(armRoot.position, Vector3.one * 0.3f);
 
             CreateWeaponVisualInstance(armRoot, armBounds, weapon, modelPrefab, null);
-        }
-
-        private static void ClearEquippedWeaponOn(Transform root, ref GameObject cached)
-        {
-            ModelUtils.DestroySafe(cached);
-            cached = null;
         }
 
         private static GameObject CreateWeaponVisualInstance(Transform parentMount, Bounds armBounds, WeaponDefinition weapon, GameObject modelPrefab, Material holoMat)
@@ -407,7 +405,7 @@ namespace HangarGame.Mechs
             int hpPct = Mathf.RoundToInt(DurabilityPercent * 100f);
 
             if (!IsDamaged) return $"{title} — {hpPct}%";
-            if (data != null && data.repairCredits > 0) return $"{title} ({hpPct}%) — Чинить: {data.repairCredits}¢, {data.repairAlloy}т";
+            if (data != null && data.repairCredits > 0) return $"{title} ({hpPct}%) — Чинить: {data.repairCredits} кр, {data.repairAlloy} м";
             return $"{title} ({hpPct}%) — Чинить";
         }
 
@@ -426,7 +424,7 @@ namespace HangarGame.Mechs
             if (!CanInteract()) return;
             if (!IsDamaged)
             {
-                HangarAudio.Instance?.PlayClick();
+                HangarAudio.Play(Sfx.Click);
                 return;
             }
             RepairWorkbench.Instance?.ReceivePart(this);
